@@ -10,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -18,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { MultiSelect } from "@/components/ui/multi-select"
 
 const CLASSES = ["48K05", "48K14.1", "48K14.2", "48K21.1", "48K21.2"]
 
@@ -82,15 +82,6 @@ export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUs
         [field]: value
       }))
     }
-  }
-
-  const handleClassToggle = (classValue: string) => {
-    setFormData(prev => ({
-      ...prev,
-      assignClasses: prev.assignClasses.includes(classValue)
-        ? prev.assignClasses.filter(c => c !== classValue)
-        : [...prev.assignClasses, classValue]
-    }))
   }
 
   const handleUpdate = () => {
@@ -178,33 +169,14 @@ export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUs
             <Label className="text-sm font-medium text-gray-800">
               Gán lớp<span className="text-red-500">*</span>
             </Label>
-            <div className={`border border-gray-300 rounded-lg p-3 space-y-2 bg-white ${
-              formData.role !== "Giáo viên chủ nhiệm" ? "opacity-50 cursor-not-allowed" : ""
-            }`}>
-              {CLASSES.map((classItem) => (
-                <div key={classItem} className="flex items-center gap-2">
-                  <Checkbox
-                    id={classItem}
-                    checked={formData.assignClasses.includes(classItem)}
-                    onCheckedChange={() => handleClassToggle(classItem)}
-                    disabled={formData.role !== "Giáo viên chủ nhiệm"}
-                  />
-                  <Label 
-                    htmlFor={classItem} 
-                    className={`text-sm font-normal cursor-pointer ${
-                      formData.role !== "Giáo viên chủ nhiệm" 
-                        ? "text-gray-400" 
-                        : "text-gray-700"
-                    }`}
-                  >
-                    {classItem}
-                  </Label>
-                </div>
-              ))}
-            </div>
-            {formData.role !== "Giáo viên chủ nhiệm" && (
-              <p className="text-xs text-gray-500">Chỉ có thể gán lớp cho Giáo viên chủ nhiệm</p>
-            )}
+            <MultiSelect
+              options={CLASSES}
+              value={formData.assignClasses}
+              onChange={(classes) => setFormData(prev => ({ ...prev, assignClasses: classes }))}
+              disabled={formData.role !== "Giáo viên chủ nhiệm"}
+              placeholder="Chọn lớp"
+            />
+            {errors.assignClasses && <p className="text-xs text-red-500">{errors.assignClasses}</p>}
           </div>
 
           {/* Email */}
@@ -248,12 +220,12 @@ export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUs
           {/* Password */}
           <div className="space-y-2">
             <Label htmlFor="password" className="text-sm font-medium text-gray-800">
-              Mật khẩu mới (để trống nếu không đổi)
+              Mật khẩu<span className="text-red-500">*</span>
             </Label>
             <Input
               id="password"
               type="password"
-              placeholder="Nhập mật khẩu mới"
+              placeholder="Nhập mật khẩu"
               value={formData.password}
               onChange={(e) => {
                 handleInputChange("password", e.target.value)
