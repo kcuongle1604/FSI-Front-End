@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Student } from "../types"
+import { deleteStudent } from "../student.api"
 
 interface DeleteDialogProps {
   open: boolean
@@ -22,7 +23,17 @@ export default function DeleteDialog({ open, onOpenChange, student }: DeleteDial
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Hủy</Button>
-          <Button className="bg-[#167FFC] hover:bg-[#1470E3]" onClick={() => onOpenChange(false)}>Có</Button>
+          <Button
+            className="bg-[#167FFC] hover:bg-[#1470E3]"
+            onClick={async () => {
+              if (!student) return
+              await deleteStudent(student.id)
+              onOpenChange(false)
+              window.location.reload()
+            }}
+          >
+            Có
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

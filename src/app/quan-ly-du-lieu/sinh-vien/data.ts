@@ -1,5 +1,5 @@
 // Chứa dữ liệu mẫu (sampleStudents, importHistory)
-import { Student, FileImport } from "./types"
+import { Student, ImportHistory } from "./types"
 
 export const sampleStudents: Student[] = [
   { id: 1, mssv: "221121521206", hoTen: "Nguyễn Văn A", lop: "48K05", ngaySinh: "16/04/2004", ghiChu: "" },
@@ -24,7 +24,7 @@ export const sampleStudents: Student[] = [
   { id: 20, mssv: "221121521225", hoTen: "Phan Thị T", lop: "48K21.2", ngaySinh: "11/11/2004", ghiChu: "" },
 ]
 
-export const importHistory: FileImport[] = [
+export const importHistory: ImportHistory[] = [
   { id: 1, fileName: "Danh sách sinh viên lớp 48K21.2.xlsx", status: "Hoàn thành", success: 131, failed: 3, total: 134, createdAt: "11/02/2025 14:32:18", createdBy: "Giáo vụ khoa" },
   { id: 2, fileName: "Danh sách sinh viên lớp 48K21.2.xlsx", status: "Hoàn thành", success: 134, failed: 0, total: 134, createdAt: "11/02/2025 14:32:18", createdBy: "Giáo vụ khoa" },
   { id: 3, fileName: "Danh sách sinh viên lớp 48K21.2.xlsx", status: "Hoàn thành", success: 134, failed: 0, total: 134, createdAt: "11/02/2025 14:32:18", createdBy: "Giáo vụ khoa" },
