@@ -87,8 +87,8 @@ export function MultiSelect({
       </button>
 
       {open && !disabled && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
-          <div className="p-2 space-y-1 max-h-48 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-56 overflow-y-auto">
+          <div className="p-2 space-y-1">
             {options.map((option) => (
               <button
                 key={option}

@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
+import { MultiSelect } from "@/components/ui/multi-select"
 
 const BATCHES = ["48K", "49K", "50K", "51K", "52K"]
 
@@ -127,19 +127,14 @@ export function AddSpecializationDialog({ open, onOpenChange, onAdd }: AddSpecia
             <Label className="text-sm font-medium text-gray-800">
               Khóa áp dụng<span className="text-red-500">*</span>
             </Label>
-            <div className={`border border-gray-300 rounded-lg p-3 space-y-2 bg-white`}>
-              {BATCHES.map((batch) => (
-                <div key={batch} className="flex items-center gap-2">
-                  <Checkbox
-                    id={batch}
-                    checked={formData.batches.includes(batch)}
-                    onCheckedChange={() => handleBatchToggle(batch)}
-                  />
-                  <Label htmlFor={batch} className="text-sm font-normal text-gray-700 cursor-pointer">
-                    {batch}
-                  </Label>
-                </div>
-              ))}
+            <div style={{ zIndex: 30 }}>
+              <MultiSelect
+                options={BATCHES}
+                value={formData.batches}
+                onChange={batches => setFormData(prev => ({ ...prev, batches }))}
+                placeholder="Chọn khóa áp dụng"
+                /* Giới hạn chiều cao dropdown, thêm scroll */
+              />
             </div>
             {errors.batches && <p className="text-xs text-red-500">{errors.batches}</p>}
           </div>

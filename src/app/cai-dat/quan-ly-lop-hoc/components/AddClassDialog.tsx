@@ -135,7 +135,7 @@ export function AddClassDialog({ open, onOpenChange, onAdd }: AddClassDialogProp
               placeholder="Tên lớp"
               value={formData.name}
               onChange={handleInputChange}
-              className="h-9"
+              className="h-9 w-full"
             />
             {errors.name && (
               <p className="text-sm text-red-500">{errors.name}</p>
@@ -147,7 +147,7 @@ export function AddClassDialog({ open, onOpenChange, onAdd }: AddClassDialogProp
               Chuyên ngành <span className="text-red-500">*</span>
             </Label>
             <Select value={formData.specialization} onValueChange={(value) => handleSelectChange("specialization", value)}>
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-9 w-full">
                 <SelectValue placeholder="Chuyên ngành" />
               </SelectTrigger>
               <SelectContent>
@@ -166,7 +166,7 @@ export function AddClassDialog({ open, onOpenChange, onAdd }: AddClassDialogProp
               Giáo viên phụ trách <span className="text-red-500">*</span>
             </Label>
             <Select value={formData.advisor} onValueChange={(value) => handleSelectChange("advisor", value)}>
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-9 w-full">
                 <SelectValue placeholder="Giáo viên phụ trách" />
               </SelectTrigger>
               <SelectContent>
