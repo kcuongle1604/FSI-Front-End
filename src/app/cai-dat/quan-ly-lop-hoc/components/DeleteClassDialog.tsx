@@ -42,7 +42,7 @@ export function DeleteClassDialog({
         </DialogHeader>
         
         <div className="text-sm text-gray-600">
-          Bạn có chắc chắn muốn <span className="font-semibold">Xóa lớp học</span> này khỏi hệ thống không?
+          Bạn có chắc chắn muốn <span className="font-semibold">xóa lớp học {schoolClass?.name}</span> khỏi hệ thống không?
         </div>
 
         <div className="flex justify-end gap-3 mt-6">

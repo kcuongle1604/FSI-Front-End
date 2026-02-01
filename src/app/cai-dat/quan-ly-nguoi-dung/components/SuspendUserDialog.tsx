@@ -54,7 +54,7 @@ export function SuspendUserDialog({ open, onOpenChange, account, onConfirm, curr
         </DialogHeader>
         <div className="space-y-6">
           <p className="text-sm text-gray-700">
-            Bạn có chắc chắn muốn <span className="font-semibold">{action}</span> người dùng <span className="font-semibold">{account.name}</span> này không?
+            Bạn có chắc chắn muốn <span className="font-semibold">{action} người dùng {account.name}</span> không?
           </p>
           <div className="flex gap-3 justify-end">
             <Button

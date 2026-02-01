@@ -25,7 +25,7 @@ const StatusChangeDialog: FC<StatusChangeDialogProps> = ({ open, onClose, onConf
         </DialogHeader>
         <div className="space-y-6">
           <p className="text-sm text-gray-700">
-            Bạn có chắc chắn muốn <span className="font-semibold">{action}</span> chứng chỉ <span className="font-semibold">{certificate.name}</span> này không?
+            Bạn có chắc chắn muốn <span className="font-semibold">{action} chứng chỉ {certificate.name}</span> không?
           </p>
           <div className="flex gap-3 justify-end">
             <Button

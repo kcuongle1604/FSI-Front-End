@@ -43,7 +43,7 @@ export function DeleteSpecializationDialog({ open, onOpenChange, specialization,
 
         <div className="space-y-6">
           <p className="text-sm text-gray-700">
-            Bạn có chắc chắn muốn <span className="font-semibold">Xóa</span> chuyên ngành <span className="font-semibold">{specialization?.name}</span> này khỏi hệ thống không?
+            Bạn có chắc chắn muốn <span className="font-semibold">xóa chuyên ngành {specialization?.name}</span> khỏi hệ thống không?
           </p>
 
           {/* Action Buttons */}

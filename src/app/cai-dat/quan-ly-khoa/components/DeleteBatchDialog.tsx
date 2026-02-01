@@ -39,7 +39,7 @@ export function DeleteBatchDialog({
         </DialogHeader>
         
         <div className="text-sm text-gray-600">
-          Bạn có chắc chắn muốn <span className="font-semibold">Xóa khoá</span> này khỏi hệ thống không?
+          Bạn có chắc chắn muốn <span className="font-semibold">xóa khoá {batch?.code}</span> khỏi hệ thống không?
         </div>
 
         <div className="flex justify-end gap-3 mt-6">

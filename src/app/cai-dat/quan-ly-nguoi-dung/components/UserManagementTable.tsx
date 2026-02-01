@@ -55,7 +55,7 @@ export default function UserManagementTable({
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">HỌ TÊN</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">EMAIL</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">VAI TRÒ</TableHead>
-                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">TRẠNG THÁI</TableHead>
+                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 w-[160px] whitespace-nowrap">TRẠNG THÁI</TableHead>
                 <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-12">
                   <span className="sr-only">Actions</span>
                 </TableHead>
@@ -79,7 +79,7 @@ export default function UserManagementTable({
                   </TableCell>
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{account.email}</TableCell>
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{account.role}</TableCell>
-                  <TableCell className="h-12 px-4">
+                  <TableCell className="h-12 px-4 w-[160px] whitespace-nowrap">
                     <div 
                       className="flex items-center gap-2 cursor-pointer hover:text-[#167FFC] transition-colors w-fit"
                       onClick={() => onStatusClick(account)}

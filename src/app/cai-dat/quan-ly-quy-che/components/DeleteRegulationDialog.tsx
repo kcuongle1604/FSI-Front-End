@@ -27,7 +27,7 @@ export default function DeleteRegulationDialog({ open, onOpenChange, regulation,
         </DialogHeader>
         <div className="space-y-6">
           <p className="text-sm text-gray-700">
-            Bạn có chắc chắn muốn <span className="font-semibold">Xoá</span> quy chế <span className="font-semibold">{regulation?.name}</span> này khỏi hệ thống không?
+            Bạn có chắc chắn muốn <span className="font-semibold">xóa quy chế {regulation?.name}</span> khỏi hệ thống không?
           </p>
           <div className="flex gap-3 justify-end">
             <Button

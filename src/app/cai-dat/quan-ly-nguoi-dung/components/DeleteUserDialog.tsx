@@ -45,7 +45,7 @@ export function DeleteUserDialog({ open, onOpenChange, account, onConfirm }: Del
 
         <div className="space-y-6">
           <p className="text-sm text-gray-700">
-            Bạn có chắc chắn muốn <span className="font-semibold">Xóa</span> người dùng <span className="font-semibold">{account?.name}</span> này khỏi hệ thống không?
+            Bạn có chắc chắn muốn <span className="font-semibold">xóa người dùng {account?.name}</span> khỏi hệ thống không?
           </p>
 
           {/* Action Buttons */}

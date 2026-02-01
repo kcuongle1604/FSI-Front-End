@@ -26,7 +26,7 @@ export default function DeleteCertificateDialog({ open, onOpenChange, certificat
         </DialogHeader>
         <div className="space-y-6">
           <p className="text-sm text-gray-700">
-            Bạn có chắc chắn muốn <span className="font-semibold">Xoá</span> chứng chỉ <span className="font-semibold">{certificate?.name}</span> này khỏi hệ thống không?
+            Bạn có chắc chắn muốn <span className="font-semibold">xóa chứng chỉ {certificate?.name}</span> khỏi hệ thống không?
           </p>
           <div className="flex gap-3 justify-end">
             <Button
