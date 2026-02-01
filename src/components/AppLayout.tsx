@@ -15,7 +15,9 @@ import {
   ChevronRight as ChevronRightIcon,
   LogOut,
   Search,
-  Plus
+  Plus,
+  Layers,
+  Calendar
 } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -53,9 +55,11 @@ const menuStructure = [
     icon: Settings,
     children: [
       { id: 'user-management', label: 'Quản lý người dùng', icon: Users, path: '/cai-dat/quan-ly-nguoi-dung' },
-      { id: 'class-management', label: 'Lớp học', icon: BookOpen, path: '/cai-dat/quan-ly-lop-hoc' },
-      { id: 'specialization-management', label: 'Chuyên ngành', icon: BookOpen, path: '/cai-dat/quan-ly-chuyen-nganh' },
-      { id: 'batch-management', label: 'Khoá', icon: BookOpen, path: '/cai-dat/quan-ly-khoa' },
+      { id: 'class-management', label: 'Quản lý lớp học', icon: GraduationCap, path: '/cai-dat/quan-ly-lop-hoc' },
+      { id: 'specialization-management', label: 'Quản lý chuyên ngành', icon: Layers, path: '/cai-dat/quan-ly-chuyen-nganh' },
+      { id: 'batch-management', label: 'Quản lý khoá', icon: Calendar, path: '/cai-dat/quan-ly-khoa' },
+      { id: 'certificate-management', label: 'Quản lý chứng chỉ', icon: Award, path: '/cai-dat/quan-ly-chung-chi' },
+      { id: 'regulation-management', label: 'Quản lý quy chế', icon: FileText, path: '/cai-dat/quan-ly-quy-che' },
     ]
   }
 ]
@@ -170,14 +174,14 @@ export default function AppLayout({ children, title, actions, showSearch = false
                         <button
                           key={item.id}
                           onClick={() => handleNavigation(item.path, section.id)}
-                          className={`clickable-element w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-all duration-200 ${
+                          className={`clickable-element w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-all duration-200 whitespace-nowrap ${
                             isActive
                               ? 'bg-[#E8F2FF] text-[#167FFC] font-medium border-l-2 border-[#167FFC] -ml-3.5 pl-3.5'
                               : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                           }`}
                         >
                           <ItemIcon size={18} className={isActive ? 'text-[#167FFC]' : 'text-gray-400'} />
-                          <span>{item.label}</span>
+                          <span className="whitespace-nowrap">{item.label}</span>
                         </button>
                       )
                     })}

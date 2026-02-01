@@ -43,7 +43,7 @@ export default function CaiDatNguoiDungPage() {
         {/* Header */}
         <div className="shrink-0 px-4 py-2 bg-gray-50">
           <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold text-gray-900">Cài đặt tài khoản</h1>
+            <h1 className="text-lg font-semibold text-gray-900">Quản lý tài khoản</h1>
           </div>
         </div>
 

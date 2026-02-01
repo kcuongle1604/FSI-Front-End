@@ -47,6 +47,19 @@ export default function StudentFormDialog({ open, onOpenChange, student }: Stude
     }
   }, [student, open])
 
+  const handleNgaySinhChange = (raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, 8)
+    let formatted = ""
+    if (digits.length <= 2) {
+      formatted = digits
+    } else if (digits.length <= 4) {
+      formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`
+    } else {
+      formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+    }
+    setFormData({ ...formData, ngaySinh: formatted })
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[400px]">
@@ -87,7 +100,13 @@ export default function StudentFormDialog({ open, onOpenChange, student }: Stude
           </div>
           <div className="grid gap-2">
             <Label htmlFor="ngaySinh">Ngày sinh<span className="text-red-500">*</span></Label>
-            <Input id="ngaySinh" value={formData.ngaySinh} onChange={(e) => setFormData({ ...formData, ngaySinh: e.target.value })} placeholder="dd/mm/yyyy" />
+            <Input
+              id="ngaySinh"
+              value={formData.ngaySinh}
+              onChange={(e) => handleNgaySinhChange(e.target.value)}
+              placeholder="dd/mm/yyyy"
+              inputMode="numeric"
+            />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="ghiChu">Ghi chú</Label>

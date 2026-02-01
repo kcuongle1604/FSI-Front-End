@@ -57,7 +57,7 @@ export function DeleteClassDialog({
           <Button
             type="button"
             onClick={handleConfirm}
-            className="bg-blue-600 hover:bg-blue-700 text-white h-9"
+            className="px-6 bg-red-600 hover:bg-red-700 text-white h-9"
           >
             Có
           </Button>

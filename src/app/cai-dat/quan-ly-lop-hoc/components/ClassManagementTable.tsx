@@ -50,7 +50,7 @@ export default function ClassManagementTable({
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">CHUYÊN NGÀNH</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">GIÁO VIÊN PHỤ TRÁCH</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">SỐ LƯỢNG</TableHead>
-                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-12">
                   <span className="sr-only">Actions</span>
                 </TableHead>
               </TableRow>
@@ -65,7 +65,7 @@ export default function ClassManagementTable({
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{schoolClass.specialization}</TableCell>
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{schoolClass.advisor}</TableCell>
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{schoolClass.studentCount}</TableCell>
-                  <TableCell className="h-12 px-4">
+                  <TableCell className="h-12 px-4 text-right w-12">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -76,24 +76,16 @@ export default function ClassManagementTable({
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-40" side="bottom" sideOffset={8}>
-                        <DropdownMenuItem
-                          className="cursor-pointer text-sm"
-                        onClick={() => onEditClick(schoolClass)}
-                      >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Sửa
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="cursor-pointer text-sm text-red-600"
-                        onClick={() => onDeleteClick(schoolClass)}
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Xóa
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+                      <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => onEditClick(schoolClass)}>
+                          <Edit className="w-4 h-4 mr-2" />Sửa
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="cursor-pointer text-sm text-red-600" onClick={() => onDeleteClick(schoolClass)}>
+                          <Trash2 className="w-4 h-4 mr-2" />Xóa
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
               </TableRow>
             ))}
           </TableBody>

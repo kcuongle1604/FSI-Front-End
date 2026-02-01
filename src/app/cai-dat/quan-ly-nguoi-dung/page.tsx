@@ -141,7 +141,7 @@ export default function QuanLyNguoiDungPage() {
               className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm"
             >
               <Plus className="h-4 w-4" />
-              Thêm mới
+              Thêm
             </Button>
           </div>
         </div>
@@ -185,6 +185,7 @@ export default function QuanLyNguoiDungPage() {
         onOpenChange={setOpenSuspendDialog}
         account={selectedAccount}
         onConfirm={handleConfirmSuspend}
+        currentStatus={selectedAccount ? userStatuses[selectedAccount.id] : undefined}
       />
     </AppLayout>
   )

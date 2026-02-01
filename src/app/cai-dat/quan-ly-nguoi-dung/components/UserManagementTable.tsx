@@ -56,7 +56,7 @@ export default function UserManagementTable({
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">EMAIL</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">VAI TRÒ</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">TRẠNG THÁI</TableHead>
-                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-12">
                   <span className="sr-only">Actions</span>
                 </TableHead>
               </TableRow>
@@ -67,7 +67,7 @@ export default function UserManagementTable({
                   <TableCell className="h-12 px-4 text-sm text-gray-600">
                     {String(index + 1).padStart(2, '0')}
                   </TableCell>
-                  <TableCell className="h-12 px-4">
+                  <TableCell className="h-12 px-4 text-right pr-8">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-600">{account.name}</span>
                       {account.isBan && (
@@ -90,7 +90,7 @@ export default function UserManagementTable({
                       <span className="text-sm text-gray-900">{userStatuses[account.id]}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="h-12 px-4">
+                  <TableCell className="h-12 px-4 text-right w-12">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -101,20 +101,12 @@ export default function UserManagementTable({
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-40" side="bottom" sideOffset={8}>
-                        <DropdownMenuItem
-                          className="cursor-pointer text-sm"
-                          onClick={() => onEditClick(account)}
-                        >
-                          <Edit className="w-4 h-4 mr-2" />
-                          Sửa
+                      <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => onEditClick(account)}>
+                          <Edit className="w-4 h-4 mr-2" />Sửa
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="cursor-pointer text-sm text-red-600"
-                          onClick={() => onDeleteClick(account)}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Xóa
+                        <DropdownMenuItem className="cursor-pointer text-sm text-red-600" onClick={() => onDeleteClick(account)}>
+                          <Trash2 className="w-4 h-4 mr-2" />Xóa
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

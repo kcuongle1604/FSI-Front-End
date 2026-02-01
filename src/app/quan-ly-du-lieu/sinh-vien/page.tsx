@@ -33,6 +33,13 @@ import {
   ChevronRight,
   ChevronsRight
 } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 // Components
 import StudentFormDialog from "./components/StudentFormDialog"
@@ -43,12 +50,16 @@ import ImportHistoryTab from "./components/ImportHistoryTab"
 // API & Types
 import { getStudents } from "./student.api"
 import type { Student, ImportHistory } from "./types"
+import { sampleStudents, classesByCourse } from "./data"
 
 export default function SinhVienPage() {
   const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien")
   const [searchQuery, setSearchQuery] = useState("")
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(false)
+
+  const [selectedKhoa, setSelectedKhoa] = useState<string | undefined>()
+  const [selectedLop, setSelectedLop] = useState<string | undefined>()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
@@ -65,19 +76,28 @@ export default function SinhVienPage() {
         setLoading(true)
         const res = await getStudents()
 
-        // map đúng structure FE
-        const mapped: Student[] = res.data.students.map((s: any) => ({
-          id: s.student_id,
-          mssv: s.mssv,
-          hoTen: s.ho_ten,
-          lop: s.lop,
-          ngaySinh: s.ngay_sinh,
-          ghiChu: s.ghi_chu ?? "",
-        }))
+        const apiStudents = Array.isArray(res?.data?.students) ? res.data.students : []
 
-        setStudents(mapped)
+        if (apiStudents.length > 0) {
+          // map đúng structure FE
+          const mapped: Student[] = apiStudents.map((s: any) => ({
+            id: s.student_id,
+            mssv: s.mssv,
+            hoTen: s.ho_ten,
+            lop: s.lop,
+            ngaySinh: s.ngay_sinh,
+            ghiChu: s.ghi_chu ?? "",
+          }))
+
+          setStudents(mapped)
+        } else {
+          // fallback: hiển thị 5 bản ghi mẫu
+          setStudents(sampleStudents.slice(0, 5))
+        }
       } catch (err) {
         console.error("Load sinh viên thất bại", err)
+        // fallback khi API lỗi: hiển thị 5 bản ghi mẫu
+        setStudents(sampleStudents.slice(0, 5))
       } finally {
         setLoading(false)
       }
@@ -86,11 +106,43 @@ export default function SinhVienPage() {
     fetchStudents()
   }, [])
 
-  // ===== FIX: MSSV là number =====
-  const filteredStudents = students.filter(student =>
-    student.hoTen.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    String(student.mssv).includes(searchQuery)
-  )
+  // ===== Lọc theo Khóa, Lớp và tìm kiếm =====
+  const allClasses = Object.values(classesByCourse).flat()
+
+  const availableClasses = !selectedKhoa || selectedKhoa === "all"
+    ? allClasses
+    : (classesByCourse[selectedKhoa] || [])
+
+  const filteredStudents = students.filter((student) => {
+    // Chưa chọn lớp => không hiển thị dữ liệu
+    if (!selectedLop || selectedLop === "all") {
+      return false
+    }
+
+    // Lọc theo Khóa nếu được chọn
+    if (selectedKhoa && selectedKhoa !== "all" && !String(student.lop).startsWith(selectedKhoa)) {
+      return false
+    }
+
+    // Lọc theo Lớp cụ thể
+    if (selectedLop && selectedLop !== "all" && student.lop !== selectedLop) {
+      return false
+    }
+
+    // Lọc theo text tìm kiếm (MSSV hoặc Họ tên)
+    const query = searchQuery.toLowerCase()
+    if (!query) return true
+
+    return (
+      student.hoTen.toLowerCase().includes(query) ||
+      String(student.mssv).includes(searchQuery)
+    )
+  })
+
+  const PAGE_SIZE = 30
+  const totalRecords = filteredStudents.length
+  const displayCount = Math.min(PAGE_SIZE, totalRecords)
+  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
 
   const handleEdit = (student: Student) => {
     setSelectedStudent(student)
@@ -114,7 +166,7 @@ export default function SinhVienPage() {
         {/* Header */}
         <div className="mb-4">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Quản lý sinh viên
+            Sinh viên
           </h1>
         </div>
 
@@ -150,14 +202,58 @@ export default function SinhVienPage() {
               
               {/* Search & Actions */}
               <div className="flex items-center gap-3 p-6 pb-4">
-                <div className="relative flex-1 max-w-md">
+                <div className="relative w-[250px]">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Nhập MSSV hoặc tên..."
+                    placeholder="Nhập MSSV..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-9 h-9 bg-white"
                   />
+                </div>
+
+                {/* Filters */}
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={selectedKhoa}
+                    onValueChange={(value) => {
+                      setSelectedKhoa(value)
+                      // Reset lớp khi đổi khóa để bắt buộc chọn lại
+                      setSelectedLop(undefined)
+                    }}
+                  >
+                    <SelectTrigger className="h-9 w-[120px] bg-white">
+                      <SelectValue placeholder="Khóa" />
+                    </SelectTrigger>
+                    <SelectContent
+                      position="popper"
+                      side="bottom"
+                      align="center"
+                      className="w-[var(--radix-select-trigger-width)]"
+                    >
+                      <SelectItem value="all">Tất cả</SelectItem>
+                      <SelectItem value="48K">48K</SelectItem>
+                      <SelectItem value="49K">49K</SelectItem>
+                      <SelectItem value="50K">50K</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedLop} onValueChange={setSelectedLop}>
+                    <SelectTrigger className="h-9 w-[140px] bg-white">
+                      <SelectValue placeholder="Lớp" />
+                    </SelectTrigger>
+                    <SelectContent
+                      position="popper"
+                      side="bottom"
+                      align="center"
+                      className="w-[var(--radix-select-trigger-width)]"
+                    >
+                      {availableClasses.map((lop) => (
+                        <SelectItem key={lop} value={lop}>
+                          {lop}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="flex items-center gap-2 ml-auto">
@@ -172,49 +268,64 @@ export default function SinhVienPage() {
                     variant="outline"
                     size="sm"
                     className="h-9 gap-2 text-sm"
-                    onClick={() => setIsImportOpen(true)}
                   >
-                    <Upload className="h-4 w-4" />
-                    Import
+                    <Download className="h-4 w-4" />
+                    Mẫu
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     className="h-9 gap-2 text-sm"
+                    onClick={() => setIsImportOpen(true)}
                   >
-                    <Download className="h-4 w-4" />
-                    Tải
+                    <Upload className="h-4 w-4" />
+                    Import
                   </Button>
                 </div>
               </div>
 
               {/* Table */}
               <div className="flex-1 overflow-auto px-6 pb-6">
-                <Table className="min-w-max">
+                <Table className="w-full" style={{ borderCollapse: 'collapse' }}>
                   <TableHeader>
-                    <TableRow className="border-b border-gray-200">
-                      <TableHead className="h-10 px-0 text-sm font-medium text-gray-700">STT</TableHead>
-                      <TableHead className="h-10 px-4 text-sm font-medium text-gray-700">MSSV</TableHead>
-                      <TableHead className="h-10 px-4 text-sm font-medium text-gray-700">HỌ VÀ TÊN</TableHead>
-                      <TableHead className="h-10 px-4 text-sm font-medium text-gray-700">LỚP</TableHead>
-                      <TableHead className="h-10 px-4 text-sm font-medium text-gray-700">NGÀY SINH</TableHead>
-                      <TableHead className="h-10 px-4 text-sm font-medium text-gray-700">GHI CHÚ</TableHead>
-                      <TableHead className="h-10 px-4 text-right" />
+                    <TableRow
+                      className="border-b border-gray-200 bg-blue-50"
+                      style={{ position: "sticky", top: 0, zIndex: 10 }}
+                    >
+                      <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                        STT
+                      </TableHead>
+                      <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                        MSSV
+                      </TableHead>
+                      <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                        HỌ VÀ TÊN
+                      </TableHead>
+                      <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                        LỚP
+                      </TableHead>
+                      <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                        NGÀY SINH
+                      </TableHead>
+                      <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                        GHI CHÚ
+                      </TableHead>
+                      <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-12" />
                     </TableRow>
                   </TableHeader>
 
                   <TableBody>
                     {filteredStudents.slice(0, 30).map((student, index) => (
                       <TableRow key={student.id} className="border-b border-gray-200 hover:bg-gray-50">
-                        <TableCell className="px-0">
+                        <TableCell className="h-12 px-4 text-sm text-gray-600">
                           {String(index + 1).padStart(2, "0")}
                         </TableCell>
-                        <TableCell className="px-4">{student.mssv}</TableCell>
-                        <TableCell className="px-4">{student.hoTen}</TableCell>
-                        <TableCell className="px-4">{student.lop}</TableCell>
-                        <TableCell className="px-4">{student.ngaySinh}</TableCell>
-                        <TableCell className="px-4">{student.ghiChu || "-"}</TableCell>
-                        <TableCell className="px-4 text-right">
+                        <TableCell className="h-12 px-4 text-sm text-gray-600">{student.mssv}</TableCell>
+                        <TableCell className="h-12 px-4 text-sm text-gray-600">{student.hoTen}</TableCell>
+                        <TableCell className="h-12 px-4 text-sm text-gray-600">{student.lop}</TableCell>
+                        <TableCell className="h-12 px-4 text-sm text-gray-600">{student.ngaySinh}</TableCell>
+                        <TableCell className="h-12 px-4 text-sm text-gray-600">{student.ghiChu || "-"}</TableCell>
+                        <TableCell className="h-12 px-4 text-right w-12">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -240,23 +351,47 @@ export default function SinhVienPage() {
                 </Table>
               </div>
 
-              {/* Pagination – GIỮ NGUYÊN */}
+              {/* Pagination – giống màn quản lý người dùng */}
               <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50">
                 <div className="text-sm text-gray-600">
-                  Hiển thị {Math.min(30, filteredStudents.length)}/{filteredStudents.length} bản ghi
+                  Hiển thị {displayCount}/{totalRecords} dòng
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="outline" size="icon" className="h-8 w-8" disabled>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-gray-300"
+                    disabled
+                  >
                     <ChevronsLeft className="h-4 w-4" />
                   </Button>
-                  <Button variant="outline" size="icon" className="h-8 w-8" disabled>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-gray-300"
+                    disabled
+                  >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <div className="px-3 text-sm">1 / 1</div>
-                  <Button variant="outline" size="icon" className="h-8 w-8" disabled>
+                  <div className="flex items-center gap-1 px-3 text-sm">
+                    <span className="font-medium text-gray-700">1</span>
+                    <span className="text-gray-400">/</span>
+                    <span className="text-gray-600">{totalPages}</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-gray-300"
+                    disabled={totalRecords <= PAGE_SIZE}
+                  >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
-                  <Button variant="outline" size="icon" className="h-8 w-8" disabled>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-gray-300"
+                    disabled={totalRecords <= PAGE_SIZE}
+                  >
                     <ChevronsRight className="h-4 w-4" />
                   </Button>
                 </div>

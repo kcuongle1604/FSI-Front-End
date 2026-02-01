@@ -68,7 +68,7 @@ export default function QuanLyKhoaPage() {
         {/* Header */}
         <div className="mb-4">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Quản lý khóa
+            Quản lý khoá
           </h1>
         </div>
 
