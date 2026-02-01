@@ -13,19 +13,21 @@ import { DeleteBatchDialog } from "./components/DeleteBatchDialog"
 type Batch = {
   id: number
   code: string
+  startYear: string
+  endYear: string
 }
 
 const batches = [
-  { id: 1, code: "48K" },
-  { id: 2, code: "48K" },
-  { id: 3, code: "48K" },
-  { id: 4, code: "48K" },
-  { id: 5, code: "48K" },
-  { id: 6, code: "48K" },
-  { id: 7, code: "48K" },
-  { id: 8, code: "48K" },
-  { id: 9, code: "48K" },
-  { id: 10, code: "48K" },
+  { id: 1, code: "46K", startYear: "2020", endYear: "2024" },
+  { id: 2, code: "47K", startYear: "2021", endYear: "2025" },
+  { id: 3, code: "48K", startYear: "2022", endYear: "2026" },
+  { id: 4, code: "49K", startYear: "2023", endYear: "2027" },
+  { id: 5, code: "50K", startYear: "2024", endYear: "2028" },
+  { id: 6, code: "51K", startYear: "2025", endYear: "2029" },
+  { id: 7, code: "52K", startYear: "2026", endYear: "2030" },
+  { id: 8, code: "53K", startYear: "2027", endYear: "2031" },
+  { id: 9, code: "54K", startYear: "2028", endYear: "2032" },
+  { id: 10, code: "55K", startYear: "2029", endYear: "2033" },
 ]
 
 export default function QuanLyKhoaPage() {
@@ -49,11 +51,11 @@ export default function QuanLyKhoaPage() {
     setOpenDeleteDialog(true)
   }
 
-  const handleAddBatch = (data: { code: string }) => {
+  const handleAddBatch = (data: { code: string; startYear: string; endYear: string }) => {
     console.log("Add batch:", data)
   }
 
-  const handleUpdateBatch = (data: { code: string }) => {
+  const handleUpdateBatch = (data: { code: string; startYear: string; endYear: string }) => {
     console.log("Update batch:", data)
   }
 

@@ -18,6 +18,8 @@ import {
 type Batch = {
   id: number
   code: string
+  startYear: string
+  endYear: string
 }
 
 interface BatchManagementTableProps {
@@ -44,6 +46,8 @@ export default function BatchManagementTable({
               <TableRow className="border-b border-gray-200 bg-blue-50">
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">STT</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">MÃ KHÓA</TableHead>
+                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">NĂM BẮT ĐẦU</TableHead>
+                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">NĂM KẾT THÚC</TableHead>
                 <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-12">
                   <span className="sr-only">Actions</span>
                 </TableHead>
@@ -56,6 +60,8 @@ export default function BatchManagementTable({
                     {String(index + 1).padStart(2, '0')}
                   </TableCell>
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{batch.code}</TableCell>
+                  <TableCell className="h-12 px-4 text-sm text-gray-600">{batch.startYear}</TableCell>
+                  <TableCell className="h-12 px-4 text-sm text-gray-600">{batch.endYear}</TableCell>
                   <TableCell className="h-12 px-4 text-right w-12">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
