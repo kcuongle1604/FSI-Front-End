@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
-import { Award, History } from "lucide-react"
+import { Users, History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -21,15 +21,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { 
-  Edit, 
-  Trash2, 
+  Edit,
+  Trash2,
   Plus,
   MoreVertical,
   Search,
@@ -38,85 +31,155 @@ import {
   ChevronsLeft,
   ChevronLeft,
   ChevronRight,
-  ChevronsRight
+  ChevronsRight,
 } from "lucide-react"
-import ImportDialog from "./components/ImportDialog"
-import CertificateFormDialog from "./components/CertificateFormDialog"
-import DeleteCertificateDialog from "./components/DeleteCertificateDialog"
-import { sampleCertificates, certificateImportHistory, batchesAndClasses } from "./data"
-import { Certificate, CertificateFormData } from "./types"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+// Dùng lại toàn bộ component & dữ liệu của Sinh viên
+import StudentFormDialog from "../sinh-vien/components/StudentFormDialog"
+import DeleteDialog from "../sinh-vien/components/DeleteDialog"
+import ImportDialog from "../sinh-vien/components/ImportDialog"
+import ImportHistoryTab from "../sinh-vien/components/ImportHistoryTab"
+import { getStudents } from "../sinh-vien/student.api"
+import type { Student, ImportHistory } from "../sinh-vien/types"
+import { sampleStudents, classesByCourse } from "../sinh-vien/data"
 
 export default function ChungChiPage() {
-  const [activeTab, setActiveTab] = useState("thong-tin-chung-chi")
+  const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien")
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedBatch, setSelectedBatch] = useState("")
-  const [selectedClass, setSelectedClass] = useState("")
-  const [isImportOpen, setIsImportOpen] = useState(false)
+  const [students, setStudents] = useState<Student[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const [selectedKhoa, setSelectedKhoa] = useState<string | undefined>()
+  const [selectedLop, setSelectedLop] = useState<string | undefined>()
+
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [editingCertificate, setEditingCertificate] = useState<Certificate | null>(null)
-  const [deletingCertificate, setDeleteCertificate] = useState<Certificate | null>(null)
+  const [isImportOpen, setIsImportOpen] = useState(false)
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
 
-  const filteredCertificates = sampleCertificates.filter(cert => {
-    const matchesSearch = searchQuery === "" || 
-      (cert.hoLot + " " + cert.ten).toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesBatch = selectedBatch === "" || cert.lop.startsWith(selectedBatch)
-    const matchesClass = selectedClass === "" || cert.lop === selectedClass
-    return matchesSearch && matchesBatch && matchesClass
+  const [importHistory] = useState<ImportHistory[]>([])
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        setLoading(true)
+        const res = await getStudents()
+        const apiStudents = Array.isArray(res?.data?.students) ? res.data.students : []
+
+        if (apiStudents.length > 0) {
+          const mapped: Student[] = apiStudents.map((s: any) => ({
+            id: s.student_id,
+            mssv: s.mssv,
+            hoTen: s.ho_ten,
+            lop: s.lop,
+            ngaySinh: s.ngay_sinh,
+            ghiChu: s.ghi_chu ?? "",
+          }))
+          setStudents(mapped)
+        } else {
+          setStudents(sampleStudents.slice(0, 5))
+        }
+      } catch (err) {
+        console.error("Load sinh viên thất bại", err)
+        setStudents(sampleStudents.slice(0, 5))
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchStudents()
+  }, [])
+
+  const allClasses = Object.values(classesByCourse).flat()
+
+  const availableClasses =
+    !selectedKhoa || selectedKhoa === "all"
+      ? allClasses
+      : classesByCourse[selectedKhoa] || []
+
+  const filteredStudents = students.filter((student) => {
+    if (!selectedLop || selectedLop === "all") {
+      return false
+    }
+
+    if (
+      selectedKhoa &&
+      selectedKhoa !== "all" &&
+      !String(student.lop).startsWith(selectedKhoa)
+    ) {
+      return false
+    }
+
+    if (selectedLop && selectedLop !== "all" && student.lop !== selectedLop) {
+      return false
+    }
+
+    const query = searchQuery.toLowerCase()
+    if (!query) return true
+
+    return (
+      student.hoTen.toLowerCase().includes(query) ||
+      String(student.mssv).includes(searchQuery)
+    )
   })
 
-  const handleAddCertificate = () => {
-    setEditingCertificate(null)
+  const PAGE_SIZE = 30
+  const totalRecords = filteredStudents.length
+  const displayCount = Math.min(PAGE_SIZE, totalRecords)
+  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+
+  const handleEdit = (student: Student) => {
+    setSelectedStudent(student)
     setIsFormOpen(true)
   }
 
-  const handleEditCertificate = (cert: Certificate) => {
-    setEditingCertificate(cert)
-    setIsFormOpen(true)
-  }
-
-  const handleDeleteCertificate = (cert: Certificate) => {
-    setDeleteCertificate(cert)
+  const handleDelete = (student: Student) => {
+    setSelectedStudent(student)
     setIsDeleteOpen(true)
   }
 
-  const handleFormSubmit = (data: CertificateFormData) => {
-    console.log("Submitting certificate:", data)
-    setIsFormOpen(false)
-  }
-
-  const handleDeleteConfirm = () => {
-    if (deletingCertificate) {
-      console.log("Deleting certificate:", deletingCertificate.id)
-      setDeleteCertificate(null)
-    }
+  const handleAdd = () => {
+    setSelectedStudent(null)
+    setIsFormOpen(true)
   }
 
   return (
     <AppLayout showSearch={false}>
       <div className="h-full flex flex-col px-8 py-5 bg-slate-50/50">
-        
-        {/* Header */}
         <div className="mb-4">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Quản lý chứng chỉ
+            Quản lý dữ liệu
+            <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">
+              &gt; Chứng chỉ
+            </span>
           </h1>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          {/* TabsList */}
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="flex-1 flex flex-col min-h-0"
+        >
           <div className="border-b border-slate-200">
             <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start">
-              <TabsTrigger 
-                value="thong-tin-chung-chi" 
+              <TabsTrigger
+                value="thong-tin-sinh-vien"
                 className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
               >
                 <div className="flex items-center gap-2">
-                  <Award className="w-4 h-4" />
-                  Thông tin chứng chỉ
+                  <Users className="w-4 h-4" />
+                  Thông tin sinh viên
                 </div>
               </TabsTrigger>
-              <TabsTrigger 
+
+              <TabsTrigger
                 value="lich-su-import"
                 className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
               >
@@ -128,328 +191,241 @@ export default function ChungChiPage() {
             </TabsList>
           </div>
 
-          {/* Table Container */}
-          <div className="flex-1 min-h-0 bg-white rounded-lg border border-slate-200 overflow-hidden mt-5">
-            <TabsContent value="thong-tin-chung-chi" className="m-0 h-full outline-none flex flex-col">
-              {/* Search and Actions Bar */}
-              <div className="flex flex-col gap-3 p-6 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      type="text"
-                      placeholder="Nhập MSSV hoặc tên..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9 h-9 bg-white"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Select value={selectedBatch || "all"} onValueChange={(v) => setSelectedBatch(v === "all" ? "" : v)}>
-                      <SelectTrigger className="w-32 h-9">
-                        <SelectValue placeholder="Khoá" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Tất cả khoá</SelectItem>
-                        {Object.keys(batchesAndClasses).map((batch) => (
-                          <SelectItem key={batch} value={batch}>
-                            {batch}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={selectedClass || "all"} onValueChange={(v) => setSelectedClass(v === "all" ? "" : v)}>
-                      <SelectTrigger className="w-32 h-9">
-                        <SelectValue placeholder="Lớp" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Tất cả lớp</SelectItem>
-                        {selectedBatch ? (
-                          batchesAndClasses[selectedBatch]?.map((cls) => (
-                            <SelectItem key={cls} value={cls}>
-                              {cls}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          Object.values(batchesAndClasses).flat().map((cls) => (
-                            <SelectItem key={cls} value={cls}>
-                              {cls}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-center gap-2 ml-auto">
-                    <Button 
-                      className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm"
-                      onClick={handleAddCertificate}
-                    >
-                      <Plus className="h-4 w-4" />
-                      Thêm
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 gap-2 text-sm"
-                    >
-                      <Download className="h-4 w-4" />
-                      Tải
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 gap-2 text-sm"
-                      onClick={() => setIsImportOpen(true)}
-                    >
-                      <Upload className="h-4 w-4" />
-                      Import
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Table */}
-              <div className="flex-1 overflow-auto px-6 pb-6">
-                <Table className="min-w-max">
-                  <TableHeader>
-                    <TableRow className="border-b border-gray-200">
-                      <TableHead className="h-10 px-0 text-left text-sm font-medium text-gray-700">STT</TableHead>
-                      <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700">LỚP</TableHead>
-                      <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700">HỌ LÓT</TableHead>
-                      <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700">TÊN</TableHead>
-                      <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700">NGÀY SINH</TableHead>
-                      <TableHead className="h-10 px-4 text-center text-sm font-medium text-gray-700">ĐƠN TN</TableHead>
-                      <TableHead className="h-10 px-4 text-center text-sm font-medium text-gray-700">KIỂM ĐIỂM</TableHead>
-                      <TableHead className="h-10 px-4 text-center text-sm font-medium text-gray-700">QUÂN SỰ</TableHead>
-                      <TableHead className="h-10 px-4 text-center text-sm font-medium text-gray-700">THỂ DỤC</TableHead>
-                      <TableHead className="h-10 px-4 text-center text-sm font-medium text-gray-700">NGOẠI NGỮ</TableHead>
-                      <TableHead className="h-10 px-4 text-center text-sm font-medium text-gray-700">TIN HỌC</TableHead>
-                      <TableHead className="h-10 px-4 text-right text-sm font-medium text-gray-700">
-                        <span className="sr-only">Actions</span>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredCertificates.slice(0, 30).map((cert, index) => (
-                      <TableRow key={cert.id} className="border-b border-gray-200 hover:bg-gray-50">
-                        <TableCell className="h-12 px-0 text-sm text-gray-600">
-                          {String(index + 1).padStart(2, '0')}
-                        </TableCell>
-                        <TableCell className="h-12 px-4 text-sm text-gray-600">{cert.lop}</TableCell>
-                        <TableCell className="h-12 px-4 text-sm text-gray-600">{cert.hoLot}</TableCell>
-                        <TableCell className="h-12 px-4 text-sm text-gray-600">{cert.ten}</TableCell>
-                        <TableCell className="h-12 px-4 text-sm text-gray-600">{cert.ngaySinh}</TableCell>
-                        <TableCell className="h-12 px-4 text-center text-sm">
-                          {cert.donTN ? <span className="text-green-600">✓</span> : <span className="text-gray-300">-</span>}
-                        </TableCell>
-                        <TableCell className="h-12 px-4 text-center text-sm">
-                          {cert.kiemDiem ? <span className="text-green-600">✓</span> : <span className="text-gray-300">-</span>}
-                        </TableCell>
-                        <TableCell className="h-12 px-4 text-center text-sm">
-                          {cert.quanSu ? <span className="text-green-600">✓</span> : <span className="text-gray-300">-</span>}
-                        </TableCell>
-                        <TableCell className="h-12 px-4 text-center text-sm">
-                          {cert.theDuc ? <span className="text-green-600">✓</span> : <span className="text-gray-300">-</span>}
-                        </TableCell>
-                        <TableCell className="h-12 px-4 text-center text-sm">
-                          {cert.ngoaiNgu ? <span className="text-green-600">✓</span> : <span className="text-gray-300">-</span>}
-                        </TableCell>
-                        <TableCell className="h-12 px-4 text-center text-sm">
-                          {cert.tinhHoc ? <span className="text-green-600">✓</span> : <span className="text-gray-300">-</span>}
-                        </TableCell>
-                        <TableCell className="h-12 px-4 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 hover:bg-gray-100"
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="w-40" side="bottom" sideOffset={8}>
-                              <DropdownMenuItem 
-                                className="cursor-pointer text-sm"
-                                onClick={() => handleEditCertificate(cert)}
-                              >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Sửa
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="cursor-pointer text-sm text-red-600"
-                                onClick={() => handleDeleteCertificate(cert)}
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Xóa
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Pagination */}
-              <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50">
-                <div className="text-sm text-gray-600">
-                  Hiển thị {Math.min(30, filteredCertificates.length)}/{filteredCertificates.length} bản ghi
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 border-gray-300"
-                    disabled={true}
-                  >
-                    <ChevronsLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 border-gray-300"
-                    disabled={true}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <div className="flex items-center gap-1 px-3">
-                    <span className="text-sm font-medium text-gray-700">1</span>
-                    <span className="text-sm text-gray-400">/</span>
-                    <span className="text-sm text-gray-600">2</span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 border-gray-300"
-                    disabled={filteredCertificates.length <= 30}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 border-gray-300"
-                    disabled={filteredCertificates.length <= 30}
-                  >
-                    <ChevronsRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="lich-su-import" className="m-0 h-full outline-none flex flex-col">
-              {/* Search Bar */}
-              <div className="flex items-center gap-3 p-6 pb-4">
-                <div className="relative flex-1 max-w-md">
+          <div className="flex-1 min-h-0 mt-5 flex flex-col">
+            <TabsContent
+              value="thong-tin-sinh-vien"
+              className="m-0 h-full outline-none flex flex-col"
+            >
+              {/* Search & Actions – giống Quản lý người dùng */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="relative w-[250px]">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    type="text"
-                    placeholder="Nhập tên file..."
+                    placeholder="Nhập MSSV..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-9 h-9 bg-white"
                   />
                 </div>
-              </div>
 
-              {/* Table */}
-              <div className="flex-1 overflow-auto px-6 pb-6">
-                <Table className="min-w-max">
-                  <TableHeader>
-                    <TableRow className="border-b border-gray-200">
-                      <TableHead className="h-10 px-0 text-left text-sm font-medium text-gray-700">STT</TableHead>
-                      <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700">TÊN FILE</TableHead>
-                      <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700">TRẠNG THÁI</TableHead>
-                      <TableHead className="h-10 px-4 text-center text-sm font-medium text-gray-700">THÀNH CÔNG</TableHead>
-                      <TableHead className="h-10 px-4 text-center text-sm font-medium text-gray-700">THẤT BẠI</TableHead>
-                      <TableHead className="h-10 px-4 text-center text-sm font-medium text-gray-700">TỔNG</TableHead>
-                      <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700">NGÀY TẠO</TableHead>
-                      <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700">NGƯỜI TẠO</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {certificateImportHistory.map((doc, index) => (
-                      <TableRow key={doc.id} className="border-b border-gray-200 hover:bg-gray-50">
-                        <TableCell className="h-12 px-0 text-sm text-gray-600">
-                          {String(index + 1).padStart(2, '0')}
-                        </TableCell>
-                        <TableCell className="h-12 px-4 text-sm font-medium text-gray-900">{doc.fileName}</TableCell>
-                        <TableCell className="h-12 px-4 text-sm text-gray-600">{doc.status}</TableCell>
-                        <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{doc.success}</TableCell>
-                        <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{doc.failed}</TableCell>
-                        <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{doc.total}</TableCell>
-                        <TableCell className="h-12 px-4 text-sm text-gray-600">{doc.createdAt}</TableCell>
-                        <TableCell className="h-12 px-4 text-sm text-gray-600">{doc.createdBy}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Pagination */}
-              <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50">
-                <div className="text-sm text-gray-600">
-                  Hiển thị {Math.min(30, certificateImportHistory.length)}/{certificateImportHistory.length} bản ghi
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={selectedKhoa}
+                    onValueChange={(value) => {
+                      setSelectedKhoa(value)
+                      setSelectedLop(undefined)
+                    }}
+                  >
+                    <SelectTrigger className="h-9 w-[120px] bg-white">
+                      <SelectValue placeholder="Khóa" />
+                    </SelectTrigger>
+                    <SelectContent
+                      position="popper"
+                      side="bottom"
+                      align="center"
+                      className="w-[var(--radix-select-trigger-width)]"
+                    >
+                      <SelectItem value="all">Tất cả</SelectItem>
+                      <SelectItem value="48K">48K</SelectItem>
+                      <SelectItem value="49K">49K</SelectItem>
+                      <SelectItem value="50K">50K</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedLop} onValueChange={setSelectedLop}>
+                    <SelectTrigger className="h-9 w-[140px] bg-white">
+                      <SelectValue placeholder="Lớp" />
+                    </SelectTrigger>
+                    <SelectContent
+                      position="popper"
+                      side="bottom"
+                      align="center"
+                      className="w-[var(--radix-select-trigger-width)]"
+                    >
+                      {availableClasses.map((lop) => (
+                        <SelectItem key={lop} value={lop}>
+                          {lop}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="flex items-center gap-1">
+
+                <div className="flex items-center gap-2 ml-auto">
                   <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 border-gray-300"
-                    disabled={true}
+                    onClick={handleAdd}
+                    className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm"
                   >
-                    <ChevronsLeft className="h-4 w-4" />
+                    <Plus className="h-4 w-4" />
+                    Thêm
                   </Button>
                   <Button
                     variant="outline"
-                    size="icon"
-                    className="h-8 w-8 border-gray-300"
-                    disabled={true}
+                    size="sm"
+                    className="h-9 gap-2 text-sm"
                   >
-                    <ChevronLeft className="h-4 w-4" />
+                    <Download className="h-4 w-4" />
+                    Mẫu
                   </Button>
-                  <div className="flex items-center gap-1 px-3">
-                    <span className="text-sm font-medium text-gray-700">1</span>
-                    <span className="text-sm text-gray-400">/</span>
-                    <span className="text-sm text-gray-600">2</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-2 text-sm"
+                    onClick={() => setIsImportOpen(true)}
+                  >
+                    <Upload className="h-4 w-4" />
+                    Import
+                  </Button>
+                </div>
+              </div>
+
+              {/* Card bảng – giống UserManagementTable & Sinh viên */}
+              <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
+                <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+                  <div className="overflow-auto">
+                    <Table className="w-full min-w-[900px]">
+                      <TableHeader>
+                        <TableRow className="border-b border-gray-200 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                            STT
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                            MSSV
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                            HỌ VÀ TÊN
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                            LỚP
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                            NGÀY SINH
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                            GHI CHÚ
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 w-12" />
+                        </TableRow>
+                      </TableHeader>
+
+                      <TableBody>
+                        {filteredStudents.map((student, index) => (
+                          <TableRow
+                            key={student.id}
+                            className="border-b border-gray-200 hover:bg-gray-50"
+                          >
+                            <TableCell className="h-12 px-4 text-sm text-gray-600">
+                              {String(index + 1).padStart(2, "0")}
+                            </TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600">
+                              {student.mssv}
+                            </TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600">
+                              {student.hoTen}
+                            </TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600">
+                              {student.lop}
+                            </TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600">
+                              {student.ngaySinh}
+                            </TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600">
+                              {student.ghiChu}
+                            </TableCell>
+                            <TableCell className="h-12 px-4 text-right w-12">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start" sideOffset={8}>
+                                  <DropdownMenuItem onClick={() => handleEdit(student)}>
+                                    <Edit className="h-4 w-4 mr-2" /> Sửa
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="text-red-600"
+                                    onClick={() => handleDelete(student)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" /> Xóa
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 border-gray-300"
-                    disabled={certificateImportHistory.length <= 30}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 border-gray-300"
-                    disabled={certificateImportHistory.length <= 30}
-                  >
-                    <ChevronsRight className="h-4 w-4" />
-                  </Button>
+                </div>
+
+                <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50 sticky bottom-0 z-10">
+                  <div className="text-sm text-gray-600">
+                    Hiển thị {displayCount}/{totalRecords} dòng
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 border-gray-300"
+                      disabled
+                    >
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 border-gray-300"
+                      disabled
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="flex items-center gap-1 px-3 text-sm">
+                      <span className="font-medium text-gray-700">1</span>
+                      <span className="text-gray-400">/</span>
+                      <span className="text-gray-600">{totalPages}</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 border-gray-300"
+                      disabled={totalRecords <= PAGE_SIZE}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 border-gray-300"
+                      disabled={totalRecords <= PAGE_SIZE}
+                    >
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </TabsContent>
+
+            <TabsContent
+              value="lich-su-import"
+              className="m-0 h-full outline-none flex flex-col min-h-0"
+            >
+              <ImportHistoryTab history={importHistory} />
+            </TabsContent>
           </div>
         </Tabs>
-
-        <ImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
-        <CertificateFormDialog 
-          open={isFormOpen} 
-          onOpenChange={setIsFormOpen}
-          certificate={editingCertificate}
-          onSubmit={handleFormSubmit}
-        />
-        <DeleteCertificateDialog
-          open={isDeleteOpen}
-          onOpenChange={setIsDeleteOpen}
-          certificateName={deletingCertificate ? `${deletingCertificate.hoLot} ${deletingCertificate.ten} - ${deletingCertificate.lop}` : ""}
-          onConfirm={handleDeleteConfirm}
-        />
       </div>
+
+      <StudentFormDialog
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        student={selectedStudent}
+      />
+      <DeleteDialog
+        open={isDeleteOpen}
+        onOpenChange={setIsDeleteOpen}
+        student={selectedStudent}
+      />
+      <ImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
     </AppLayout>
   )
 }

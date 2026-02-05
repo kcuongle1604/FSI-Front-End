@@ -20,9 +20,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { 
-  Edit, 
-  Trash2, 
+import {
+  Edit,
+  Trash2,
   Plus,
   MoreVertical,
   Search,
@@ -31,7 +31,7 @@ import {
   ChevronsLeft,
   ChevronLeft,
   ChevronRight,
-  ChevronsRight
+  ChevronsRight,
 } from "lucide-react"
 import {
   Select,
@@ -41,18 +41,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-// Components
-import StudentFormDialog from "./components/StudentFormDialog"
-import DeleteDialog from "./components/DeleteDialog"
-import ImportDialog from "./components/ImportDialog"
-import ImportHistoryTab from "./components/ImportHistoryTab"
+// Dùng lại toàn bộ component & dữ liệu của Sinh viên
+import StudentFormDialog from "../sinh-vien/components/StudentFormDialog"
+import DeleteDialog from "../sinh-vien/components/DeleteDialog"
+import ImportDialog from "../sinh-vien/components/ImportDialog"
+import ImportHistoryTab from "../sinh-vien/components/ImportHistoryTab"
+import { getStudents } from "../sinh-vien/student.api"
+import type { Student, ImportHistory } from "../sinh-vien/types"
+import { sampleStudents, classesByCourse } from "../sinh-vien/data"
 
-// API & Types
-import { getStudents } from "./student.api"
-import type { Student, ImportHistory } from "./types"
-import { sampleStudents, classesByCourse } from "./data"
-
-export default function SinhVienPage() {
+export default function ChuongTrinhDaoTaoPage() {
   const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien")
   const [searchQuery, setSearchQuery] = useState("")
   const [students, setStudents] = useState<Student[]>([])
@@ -66,20 +64,16 @@ export default function SinhVienPage() {
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
 
-  // giữ nguyên để dùng cho tab lịch sử import
   const [importHistory] = useState<ImportHistory[]>([])
 
-  // ===== FIX: LOAD DATA TỪ API =====
   useEffect(() => {
     const fetchStudents = async () => {
       try {
         setLoading(true)
         const res = await getStudents()
-
         const apiStudents = Array.isArray(res?.data?.students) ? res.data.students : []
 
         if (apiStudents.length > 0) {
-          // map đúng structure FE
           const mapped: Student[] = apiStudents.map((s: any) => ({
             id: s.student_id,
             mssv: s.mssv,
@@ -88,15 +82,12 @@ export default function SinhVienPage() {
             ngaySinh: s.ngay_sinh,
             ghiChu: s.ghi_chu ?? "",
           }))
-
           setStudents(mapped)
         } else {
-          // fallback: hiển thị 5 bản ghi mẫu
           setStudents(sampleStudents.slice(0, 5))
         }
       } catch (err) {
         console.error("Load sinh viên thất bại", err)
-        // fallback khi API lỗi: hiển thị 5 bản ghi mẫu
         setStudents(sampleStudents.slice(0, 5))
       } finally {
         setLoading(false)
@@ -106,30 +97,30 @@ export default function SinhVienPage() {
     fetchStudents()
   }, [])
 
-  // ===== Lọc theo Khóa, Lớp và tìm kiếm =====
   const allClasses = Object.values(classesByCourse).flat()
 
-  const availableClasses = !selectedKhoa || selectedKhoa === "all"
-    ? allClasses
-    : (classesByCourse[selectedKhoa] || [])
+  const availableClasses =
+    !selectedKhoa || selectedKhoa === "all"
+      ? allClasses
+      : classesByCourse[selectedKhoa] || []
 
   const filteredStudents = students.filter((student) => {
-    // Chưa chọn lớp => không hiển thị dữ liệu
     if (!selectedLop || selectedLop === "all") {
       return false
     }
 
-    // Lọc theo Khóa nếu được chọn
-    if (selectedKhoa && selectedKhoa !== "all" && !String(student.lop).startsWith(selectedKhoa)) {
+    if (
+      selectedKhoa &&
+      selectedKhoa !== "all" &&
+      !String(student.lop).startsWith(selectedKhoa)
+    ) {
       return false
     }
 
-    // Lọc theo Lớp cụ thể
     if (selectedLop && selectedLop !== "all" && student.lop !== selectedLop) {
       return false
     }
 
-    // Lọc theo text tìm kiếm (MSSV hoặc Họ tên)
     const query = searchQuery.toLowerCase()
     if (!query) return true
 
@@ -162,27 +153,24 @@ export default function SinhVienPage() {
   return (
     <AppLayout showSearch={false}>
       <div className="h-full flex flex-col px-8 py-5 bg-slate-50/50">
-        
-        {/* Header */}
-              <div className="mb-4">
-                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                  Quản lý dữ liệu
-                  <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">
-                    &gt; Sinh viên
-                  </span>
-                </h1>
-              </div>
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Quản lý dữ liệu
+            <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">
+              &gt; Chương trình đào tạo
+            </span>
+          </h1>
+        </div>
 
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
           className="flex-1 flex flex-col min-h-0"
         >
-          {/* TabsList – GIỮ NGUYÊN */}
           <div className="border-b border-slate-200">
             <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start">
-              <TabsTrigger 
-                value="thong-tin-sinh-vien" 
+              <TabsTrigger
+                value="thong-tin-sinh-vien"
                 className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
               >
                 <div className="flex items-center gap-2">
@@ -191,7 +179,7 @@ export default function SinhVienPage() {
                 </div>
               </TabsTrigger>
 
-              <TabsTrigger 
+              <TabsTrigger
                 value="lich-su-import"
                 className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
               >
@@ -203,9 +191,11 @@ export default function SinhVienPage() {
             </TabsList>
           </div>
 
-          {/* Content */}
           <div className="flex-1 min-h-0 mt-5 flex flex-col">
-            <TabsContent value="thong-tin-sinh-vien" className="m-0 h-full outline-none flex flex-col">
+            <TabsContent
+              value="thong-tin-sinh-vien"
+              className="m-0 h-full outline-none flex flex-col"
+            >
               {/* Search & Actions – giống Quản lý người dùng */}
               <div className="flex items-center gap-3 mb-4">
                 <div className="relative w-[250px]">
@@ -218,13 +208,11 @@ export default function SinhVienPage() {
                   />
                 </div>
 
-                {/* Filters */}
                 <div className="flex items-center gap-2">
                   <Select
                     value={selectedKhoa}
                     onValueChange={(value) => {
                       setSelectedKhoa(value)
-                      // Reset lớp khi đổi khóa để bắt buộc chọn lại
                       setSelectedLop(undefined)
                     }}
                   >
@@ -263,7 +251,7 @@ export default function SinhVienPage() {
                 </div>
 
                 <div className="flex items-center gap-2 ml-auto">
-                  <Button 
+                  <Button
                     onClick={handleAdd}
                     className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm"
                   >
@@ -290,40 +278,37 @@ export default function SinhVienPage() {
                 </div>
               </div>
 
-              {/* Card bảng – giống UserManagementTable */}
+              {/* Card bảng – giống UserManagementTable & Sinh viên */}
               <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
                 <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                   <div className="overflow-auto">
-                    <Table className="w-full" style={{ borderCollapse: "collapse" }}>
+                    <Table className="w-full min-w-[900px]">
                       <TableHeader>
-                        <TableRow
-                          className="border-b border-gray-200 bg-blue-50"
-                          style={{ position: "sticky", top: 0, zIndex: 10 }}
-                        >
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                        <TableRow className="border-b border-gray-200 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
                             STT
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
                             MSSV
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
                             HỌ VÀ TÊN
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
                             LỚP
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
                             NGÀY SINH
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
                             GHI CHÚ
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-12" />
+                          <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 w-12" />
                         </TableRow>
                       </TableHeader>
 
                       <TableBody>
-                        {filteredStudents.slice(0, 30).map((student, index) => (
+                        {filteredStudents.map((student, index) => (
                           <TableRow
                             key={student.id}
                             className="border-b border-gray-200 hover:bg-gray-50"
@@ -344,7 +329,7 @@ export default function SinhVienPage() {
                               {student.ngaySinh}
                             </TableCell>
                             <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.ghiChu || "-"}
+                              {student.ghiChu}
                             </TableCell>
                             <TableCell className="h-12 px-4 text-right w-12">
                               <DropdownMenu>
@@ -373,7 +358,6 @@ export default function SinhVienPage() {
                   </div>
                 </div>
 
-                {/* Pagination – giống UserManagementTable */}
                 <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50 sticky bottom-0 z-10">
                   <div className="text-sm text-gray-600">
                     Hiển thị {displayCount}/{totalRecords} dòng
@@ -431,9 +415,16 @@ export default function SinhVienPage() {
         </Tabs>
       </div>
 
-      {/* Dialogs */}
-      <StudentFormDialog open={isFormOpen} onOpenChange={setIsFormOpen} student={selectedStudent} />
-      <DeleteDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen} student={selectedStudent} />
+      <StudentFormDialog
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        student={selectedStudent}
+      />
+      <DeleteDialog
+        open={isDeleteOpen}
+        onOpenChange={setIsDeleteOpen}
+        student={selectedStudent}
+      />
       <ImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
     </AppLayout>
   )

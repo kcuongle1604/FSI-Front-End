@@ -76,7 +76,12 @@ export default function QuanLyChuyenNganhPage() {
         
         {/* Header */}
         <div className="mb-4">
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Quản lý chuyên ngành</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Cài đặt
+            <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">
+              &gt; Quản lý chuyên ngành
+            </span>
+          </h1>
         </div>
 
         {/* Search and Filters Bar */}

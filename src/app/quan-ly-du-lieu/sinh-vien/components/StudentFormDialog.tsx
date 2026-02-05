@@ -4,8 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Student } from "../types"
+import { classesByCourse } from "../data"
+import { Search, X } from "lucide-react"
 
 interface StudentFormDialogProps {
   open: boolean
@@ -20,9 +21,18 @@ export default function StudentFormDialog({ open, onOpenChange, student }: Stude
     hoTen: "",
     lop: "",
     ngaySinh: "",
-    ghiChu: "",
-    chuyenNganh: ""
+    ghiChu: ""
   })
+
+  // Trạng thái hiển thị dropdown lookup cho trường Lớp
+  const [showClassLookup, setShowClassLookup] = useState(false)
+  // Chuỗi người dùng đang nhập để tìm lớp (khác với lớp đã chọn)
+  const [lopSearch, setLopSearch] = useState("")
+
+  const classOptions = Object.values(classesByCourse).flat()
+  const filteredClassOptions = classOptions.filter((lopOption) =>
+    lopOption.toLowerCase().includes(lopSearch.toLowerCase())
+  )
 
   // Reset/Fill form khi props student thay đổi hoặc mở dialog
   useEffect(() => {
@@ -32,8 +42,7 @@ export default function StudentFormDialog({ open, onOpenChange, student }: Stude
         hoTen: student.hoTen,
         lop: student.lop,
         ngaySinh: student.ngaySinh,
-        ghiChu: student.ghiChu,
-        chuyenNganh: student.chuyenNganh || "qthttt"
+        ghiChu: student.ghiChu
       })
     } else {
       setFormData({
@@ -41,10 +50,12 @@ export default function StudentFormDialog({ open, onOpenChange, student }: Stude
         hoTen: "",
         lop: "",
         ngaySinh: "",
-        ghiChu: "",
-        chuyenNganh: ""
+        ghiChu: ""
       })
     }
+    // Luôn ẩn dropdown lookup Lớp khi mở/đóng dialog
+    setShowClassLookup(false)
+    setLopSearch("")
   }, [student, open])
 
   const handleNgaySinhChange = (raw: string) => {
@@ -75,28 +86,85 @@ export default function StudentFormDialog({ open, onOpenChange, student }: Stude
             <Label htmlFor="hoTen">Họ và tên<span className="text-red-500">*</span></Label>
             <Input id="hoTen" value={formData.hoTen} onChange={(e) => setFormData({ ...formData, hoTen: e.target.value })} placeholder="Nhập họ và tên" />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="chuyenNganh">Chuyên ngành</Label>
-            <Select value={formData.chuyenNganh || undefined} onValueChange={(val) => setFormData({...formData, chuyenNganh: val})}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Chọn chuyên ngành" /></SelectTrigger>
-              <SelectContent className="w-[--radix-select-trigger-width] min-w-[200px]">
-                <SelectItem value="qthttt">Quản trị hệ thống thông tin</SelectItem>
-                <SelectItem value="cnpm">Công nghệ phần mềm</SelectItem>
-                <SelectItem value="httt">Hệ thống thông tin</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
+          <div className="grid gap-2 relative">
             <Label htmlFor="lop">Lớp<span className="text-red-500">*</span></Label>
-            <Select value={formData.lop || undefined} onValueChange={(val) => setFormData({...formData, lop: val})}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Chọn lớp" /></SelectTrigger>
-              <SelectContent className="w-[--radix-select-trigger-width] min-w-[200px]">
-                <SelectItem value="48K05">48K05</SelectItem>
-                <SelectItem value="48K14.1">48K14.1</SelectItem>
-                <SelectItem value="48K14.2">48K14.2</SelectItem>
-                <SelectItem value="48K21.2">48K21.2</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="relative">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              {!formData.lop && (
+                <Input
+                  id="lop"
+                  value={lopSearch}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    // Chỉ cập nhật chuỗi tìm kiếm, KHÔNG đổi lớp đã chọn
+                    setLopSearch(value)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      const value = (e.currentTarget.value || "").trim()
+                      if (value.length > 0) {
+                        setShowClassLookup(true)
+                      }
+                    }
+                  }}
+                  onFocus={() => {
+                    // Click vào ô là mở danh sách tất cả lớp ngay
+                    setShowClassLookup(true)
+                  }}
+                  onBlur={() =>
+                    setTimeout(() => {
+                      // Nếu chưa chọn lớp nào, blur ra ngoài thì reset lại ô
+                      if (!formData.lop) {
+                        setLopSearch("")
+                      }
+                      setShowClassLookup(false)
+                    }, 120)
+                  }
+                  placeholder="Nhập tên lớp"
+                  autoComplete="off"
+                  className="pr-9"
+                />
+              )}
+              {formData.lop && (
+                <div className="w-full pr-9 px-3 py-2 border border-gray-300 rounded-md bg-white flex items-center gap-2 text-sm">
+                  <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">
+                    {formData.lop}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData({ ...formData, lop: "" })
+                        setShowClassLookup(false)
+                        setLopSearch("")
+                      }}
+                      className="hover:text-blue-900"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                </div>
+              )}
+            </div>
+            {showClassLookup && filteredClassOptions.length > 0 && (
+              <div className="absolute top-full left-0 z-30 mt-1 w-full bg-white border border-gray-300 rounded-md shadow max-h-52 overflow-auto">
+                {filteredClassOptions.map((lopOption) => (
+                    <button
+                      type="button"
+                      key={lopOption}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        // Chọn xong thì set giá trị, ẩn dropdown và hiển thị chip
+                        setFormData({ ...formData, lop: lopOption })
+                        setShowClassLookup(false)
+                        setLopSearch("")
+                      }}
+                    >
+                      {lopOption}
+                    </button>
+                  ))}
+              </div>
+            )}
           </div>
           <div className="grid gap-2">
             <Label htmlFor="ngaySinh">Ngày sinh<span className="text-red-500">*</span></Label>

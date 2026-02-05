@@ -46,6 +46,24 @@ export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) 
   const hasUnmappedRequired = unmappedRequiredFields.length > 0
   const allMapped = Object.values(columnMappings).every(v => v !== '')
 
+  const handleFileSelect = (file: File) => {
+    if (file.size > 50 * 1024 * 1024) {
+      setImportError("File vượt quá dung lượng cho phép. Giới hạn tối đa: 50 MB.")
+      setImportFile(null)
+      return
+    }
+
+    const lowerName = file.name.toLowerCase()
+    if (!lowerName.endsWith('.xlsx') && !lowerName.endsWith('.xls')) {
+      setImportError("Định dạng file không hợp lệ, chỉ chấp nhận .xlsx")
+      setImportFile(null)
+      return
+    }
+
+    setImportError("")
+    setImportFile(file)
+  }
+
   const handleOpenChange = (newOpen: boolean) => {
     onOpenChange(newOpen);
     if (!newOpen) {
@@ -68,7 +86,21 @@ export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) 
             <AlertCircle className="h-4 w-4" /><span>{importError}</span>
           </div>
         )}
-        <div className={`border-2 border-dashed rounded-lg p-6 text-center ${importError ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}>
+        <div
+          className={`border-2 border-dashed rounded-lg p-6 text-center ${importError ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}
+          onDragOver={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            const file = e.dataTransfer.files?.[0]
+            if (file) {
+              handleFileSelect(file)
+            }
+          }}
+        >
           <div className="flex justify-center mb-3">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${importFile ? 'bg-blue-100' : 'bg-gray-100'}`}>
               {importFile ? <FileText className="h-5 w-5 text-blue-600" /> : <Upload className="h-5 w-5 text-gray-500" />}
@@ -91,9 +123,7 @@ export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) 
             input.onchange = (e) => {
               const file = (e.target as HTMLInputElement).files?.[0]
               if (file) {
-                if (file.size > 50 * 1024 * 1024) { setImportError("File vượt quá dung lượng cho phép. Giới hạn tối đa: 50 MB."); setImportFile(null); return }
-                if (!file.name.toLowerCase().endsWith('.xlsx') && !file.name.toLowerCase().endsWith('.xls')) { setImportError("Định dạng file không hợp lệ, chỉ chấp nhận .xlsx"); setImportFile(null); return }
-                setImportError(""); setImportFile(file)
+                handleFileSelect(file)
               }
             }
             input.click()
@@ -109,21 +139,21 @@ export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) 
 
   const mappingStepContent = (
     <>
-      <DialogHeader>
+      <DialogHeader className="pb-1">
         <DialogTitle>Xác minh tệp – Ánh xạ cột</DialogTitle>
-        <DialogDescription>Chọn cách bạn muốn nhập từng cột dữ liệu.</DialogDescription>
       </DialogHeader>
       <div className="border-b border-gray-200">
         <div className="flex gap-4">
-          <button className={`pb-2 text-sm font-medium border-b-2 transition-colors ${mappingTab === 'anh-xa-cot' ? 'border-[#167FFC] text-[#167FFC]' : 'border-transparent text-gray-500 hover:text-gray-700'}`} onClick={() => setMappingTab('anh-xa-cot')}>Ánh xạ cột</button>
-          <button className={`pb-2 text-sm font-medium border-b-2 transition-colors ${mappingTab === 'tong-quan-loi' ? 'border-[#167FFC] text-[#167FFC]' : 'border-transparent text-gray-500 hover:text-gray-700'}`} onClick={() => setMappingTab('tong-quan-loi')}>Tổng quan lỗi</button>
-          <button className={`pb-2 text-sm font-medium border-b-2 transition-colors ${mappingTab === 'chi-tiet-loi' ? 'border-[#167FFC] text-[#167FFC]' : 'border-transparent text-gray-500 hover:text-gray-700'}`} onClick={() => setMappingTab('chi-tiet-loi')}>Chi tiết lỗi ({errorDetails.length})</button>
+          <button className={`pb-1 text-sm font-medium border-b-2 transition-colors ${mappingTab === 'anh-xa-cot' ? 'border-[#167FFC] text-[#167FFC]' : 'border-transparent text-gray-500 hover:text-gray-700'}`} onClick={() => setMappingTab('anh-xa-cot')}>Ánh xạ cột</button>
+          <button className={`pb-1 text-sm font-medium border-b-2 transition-colors ${mappingTab === 'tong-quan-loi' ? 'border-[#167FFC] text-[#167FFC]' : 'border-transparent text-gray-500 hover:text-gray-700'}`} onClick={() => setMappingTab('tong-quan-loi')}>Tổng quan lỗi</button>
+          <button className={`pb-1 text-sm font-medium border-b-2 transition-colors ${mappingTab === 'chi-tiet-loi' ? 'border-[#167FFC] text-[#167FFC]' : 'border-transparent text-gray-500 hover:text-gray-700'}`} onClick={() => setMappingTab('chi-tiet-loi')}>Chi tiết lỗi ({errorDetails.length})</button>
         </div>
       </div>
-      <div className="py-4">
+      {/* Vùng giữa: chiếm phần còn lại, chỉ bảng bên trong được scroll */}
+      <div className="py-0 flex-1 flex flex-col min-h-0">
         {mappingTab === 'anh-xa-cot' && (
           <>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mt-1 mb-2 shrink-0">
               {hasUnmappedRequired ? (
                 <div className="flex items-center gap-2 text-red-600 text-sm"><AlertCircle className="h-4 w-4" /><span>Bạn còn {unmappedRequiredFields.length} cột chưa được ghép.</span></div>
               ) : allMapped ? (
@@ -136,16 +166,17 @@ export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) 
                 <SelectContent><SelectItem value="Sheet1">Sheet1</SelectItem><SelectItem value="Sheet2">Sheet2</SelectItem></SelectContent>
               </Select>
             </div>
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50 border-b border-gray-200">
-                    <TableHead className="text-xs font-semibold text-gray-700 px-4 py-3 w-1/3">Tên cột trong tệp</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-700 px-4 py-3 w-1/3">Thuộc tính</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-700 px-4 py-3 w-1/3 text-center">Trạng thái ghép</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+            <div className="border rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
+              {/* Header cố định */}
+              <div className="bg-gray-50 border-b border-gray-200 grid grid-cols-3">
+                <div className="text-sm font-semibold text-foreground px-4 py-3">Tên cột trong tệp</div>
+                <div className="text-sm font-semibold text-foreground px-4 py-3">Thuộc tính</div>
+                <div className="text-sm font-semibold text-foreground px-4 py-3 text-center">Trạng thái ghép</div>
+              </div>
+              {/* Body cuộn */}
+              <div className="flex-1 overflow-y-auto">
+                <Table>
+                  <TableBody>
                   {[{ key: 'mssv', label: 'MSSV', required: true }, { key: 'hoTen', label: 'Họ và tên', required: true }, { key: 'lop', label: 'Lớp', required: true }, { key: 'ngaySinh', label: 'Ngày sinh', required: true }, { key: 'ghiChu', label: 'Ghi chú', required: false }, { key: 'viDu', label: 'Ví dụ', required: false }].map((field) => (
                     <TableRow key={field.key} className={`border-b border-gray-200 hover:bg-gray-50 ${!columnMappings[field.key] && field.required ? 'bg-red-50' : ''}`}>
                       <TableCell className="px-4 py-3 text-sm text-gray-700 w-1/3">
@@ -169,37 +200,60 @@ export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) 
                       </TableCell>
                     </TableRow>
                   ))}
-                </TableBody>
-              </Table>
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </>
         )}
         {mappingTab === 'tong-quan-loi' && (
           <>
-            {errorSummary.valid === 0 && <div className="flex items-center gap-2 text-red-600 text-sm mb-4"><AlertCircle className="h-4 w-4" /><span>Không có bản ghi hợp lệ để import.</span></div>}
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader><TableRow className="bg-gray-50"><TableHead>Mục</TableHead><TableHead className="text-center">Số lượng</TableHead><TableHead>Ghi chú</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  <TableRow><TableCell>Hợp lệ</TableCell><TableCell className="text-center">{errorSummary.valid}</TableCell><TableCell></TableCell></TableRow>
-                  <TableRow><TableCell>MSSV trùng với hệ thống</TableCell><TableCell className="text-center">0{errorSummary.duplicateSystem}</TableCell><TableCell className="text-gray-500">Dòng 9</TableCell></TableRow>
-                  <TableRow><TableCell>MSSV trùng nhau trong tệp</TableCell><TableCell className="text-center">0{errorSummary.duplicateFile}</TableCell><TableCell className="text-gray-500">Dòng 3,12</TableCell></TableRow>
-                  <TableRow><TableCell>Lỗi dữ liệu khác</TableCell><TableCell className="text-center">0{errorSummary.dataError}</TableCell><TableCell></TableCell></TableRow>
-                </TableBody>
-              </Table>
+            <div className="border rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-gray-50">
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold pl-4">Mục</TableHead>
+                      <TableHead className="text-center font-semibold">Số lượng</TableHead>
+                      <TableHead className="font-semibold">Ghi chú</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow><TableCell className="pl-4">Hợp lệ</TableCell><TableCell className="text-center">{errorSummary.valid}</TableCell><TableCell></TableCell></TableRow>
+                    <TableRow><TableCell className="pl-4">MSSV trùng với hệ thống</TableCell><TableCell className="text-center">0{errorSummary.duplicateSystem}</TableCell><TableCell className="text-gray-500">Dòng 9</TableCell></TableRow>
+                    <TableRow><TableCell className="pl-4">MSSV trùng nhau trong tệp</TableCell><TableCell className="text-center">0{errorSummary.duplicateFile}</TableCell><TableCell className="text-gray-500">Dòng 3,12</TableCell></TableRow>
+                    <TableRow><TableCell className="pl-4">Lỗi dữ liệu khác</TableCell><TableCell className="text-center">0{errorSummary.dataError}</TableCell><TableCell></TableCell></TableRow>
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </>
         )}
         {mappingTab === 'chi-tiet-loi' && (
           <>
-            <div className="mb-4"><h4 className="font-medium text-gray-900">Cập nhật tệp của bạn</h4><p className="text-sm text-gray-500">Kiểm tra và chỉnh sửa dữ liệu bên dưới trước khi tải lại tệp.</p></div>
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader><TableRow className="bg-gray-50"><TableHead>Số dòng</TableHead><TableHead>Tên cột</TableHead><TableHead>Giá trị</TableHead><TableHead>Loại lỗi</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {errorDetails.map((error, index) => (<TableRow key={index}><TableCell>{error.row}</TableCell><TableCell>{error.column}</TableCell><TableCell>{error.value || <span className="text-gray-400 italic">Trống</span>}</TableCell><TableCell className="text-red-600">{error.error}</TableCell></TableRow>))}
-                </TableBody>
-              </Table>
+            <div className="border rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-gray-50">
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold pl-4">Số dòng</TableHead>
+                      <TableHead className="font-semibold">Tên cột</TableHead>
+                      <TableHead className="font-semibold">Giá trị</TableHead>
+                      <TableHead className="font-semibold">Loại lỗi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {errorDetails.map((error, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="pl-4">{error.row}</TableCell>
+                        <TableCell>{error.column}</TableCell>
+                        <TableCell>{error.value || <span className="text-gray-400 italic">Trống</span>}</TableCell>
+                        <TableCell className="text-red-600">{error.error}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </>
         )}
@@ -214,7 +268,7 @@ export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className={importStep === 'mapping' ? "sm:max-w-[600px]" : "sm:max-w-[425px]"}>
+      <DialogContent className={importStep === 'mapping' ? "sm:max-w-[700px] max-h-[90vh] h-[560px] flex flex-col" : "sm:max-w-[425px]"}>
         {importStep === 'upload' ? uploadStepContent : mappingStepContent}
       </DialogContent>
     </Dialog>

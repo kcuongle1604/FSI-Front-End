@@ -70,7 +70,10 @@ export default function QuanLyKhoaPage() {
         {/* Header */}
         <div className="mb-4">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Quản lý khoá
+            Cài đặt
+            <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">
+              &gt; Quản lý khoá
+            </span>
           </h1>
         </div>
 

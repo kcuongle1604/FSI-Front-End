@@ -117,7 +117,10 @@ export default function QuanLyNguoiDungPage() {
         {/* Header */}
         <div className="mb-4">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Quản lý người dùng
+            Cài đặt
+            <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">
+              &gt; Quản lý người dùng
+            </span>
           </h1>
         </div>
 

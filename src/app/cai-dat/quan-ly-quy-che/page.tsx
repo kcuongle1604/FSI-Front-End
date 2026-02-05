@@ -59,7 +59,12 @@ export default function QuanLyQuyChePage() {
       <div className="h-full flex flex-col px-8 py-5 bg-slate-50/50">
         {/* Header */}
         <div className="mb-4">
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Quản lý quy chế</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Cài đặt
+            <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">
+              &gt; Quản lý quy chế
+            </span>
+          </h1>
         </div>
         {/* Search and Actions Bar */}
         <div className="flex items-center gap-3 mb-4">
