@@ -48,7 +48,7 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
     lop: 'Lớp',
     ngaySinh: 'Ngày sinh',
     ghiChu: 'Ghi chú',
-    viDu: '',
+    // Fields for other import types
     hoLot: '',
     ten: '',
     ele1: '',
@@ -90,33 +90,13 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
         { key: 'lop', label: 'Lớp', required: true },
         { key: 'ngaySinh', label: 'Ngày sinh', required: true },
         { key: 'ghiChu', label: 'Ghi chú', required: false },
-        { key: 'viDu', label: 'Ví dụ', required: false },
       ] as const)
 
-  const systemColumns = isEnglishScoreImport
-    ? [
-      { value: 'MSSV', label: 'MSSV' },
-      { value: 'ELE1', label: 'ELE1' },
-      { value: 'ELE2', label: 'ELE2' },
-      { value: 'EC1', label: 'EC1' },
-      { value: 'EC2', label: 'EC2' },
-      { value: 'B1', label: 'B1' },
-    ]
-    : isAggregateScoreImport
-      ? [
-        { value: 'Lớp', label: 'Lớp' },
-        { value: 'Họ lót', label: 'Họ lót' },
-        { value: 'Tên', label: 'Tên' },
-        { value: 'Ngày sinh', label: 'Ngày sinh' },
-      ]
-      : [
-        { value: 'MSSV', label: 'MSSV' },
-        { value: 'Họ và tên', label: 'Họ và tên' },
-        { value: 'Lớp', label: 'Lớp' },
-        { value: 'Ngày sinh', label: 'Ngày sinh' },
-        { value: 'Ghi chú', label: 'Ghi chú' },
-        { value: 'Ví dụ', label: 'Ví dụ' },
-      ]
+  // Use actual CSV headers instead of hardcoded values
+  const systemColumns = csvHeaders.map(header => ({
+    value: header,
+    label: header
+  }))
   const errorSummary = { valid: 0, notFoundInSystem: 1, duplicateScore: 2, dataError: 3 }
   const errorDetails = [
     { row: 3, column: 'Họ và tên', value: 'Nguyễn Văn', error: 'Giá trị không hợp lệ' },
@@ -139,14 +119,20 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
         const headers = lines[0].split(',').map(h => h.trim().replace(/\r$/, ''))
         setCsvHeaders(headers)
 
-        // Auto-map if column names match
+        // Auto-map if column names match - using correct keys from columnMappings
         const autoMapping: Record<string, string> = {}
-        if (headers.includes('Mã sinh viên')) autoMapping.student_id = 'Mã sinh viên'
-        if (headers.includes('Họ và tên')) autoMapping.full_name = 'Họ và tên'
-        if (headers.includes('Lớp')) autoMapping.class_name = 'Lớp'
-        if (headers.includes('Ngày sinh')) autoMapping.dob = 'Ngày sinh'
 
-        setColumnMappings(autoMapping)
+        // For student import mode
+        if (!isAggregateScoreImport && !isEnglishScoreImport) {
+          if (headers.includes('Mã sinh viên')) autoMapping.mssv = 'Mã sinh viên'
+          if (headers.includes('MSSV')) autoMapping.mssv = 'MSSV'
+          if (headers.includes('Họ và tên')) autoMapping.hoTen = 'Họ và tên'
+          if (headers.includes('Lớp')) autoMapping.lop = 'Lớp'
+          if (headers.includes('Ngày sinh')) autoMapping.ngaySinh = 'Ngày sinh'
+          if (headers.includes('Ghi chú')) autoMapping.ghiChu = 'Ghi chú'
+        }
+
+        setColumnMappings(prev => ({ ...prev, ...autoMapping }))
       }
     } catch (error) {
       console.error('Error parsing CSV headers:', error)
@@ -181,11 +167,21 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
       setLoading(true)
       setImportError("")
 
-      // Build column mapping for API (only include mapped fields)
+      // Transform frontend keys to backend keys
+      const keyMapping: Record<string, string> = {
+        'mssv': 'student_id',
+        'hoTen': 'full_name',
+        'lop': 'class_name',
+        'ngaySinh': 'dob',
+        'ghiChu': 'notes'
+      }
+
+      // Build column mapping for API with transformed keys
       const apiColumnMapping: ColumnMapping = {}
-      Object.entries(columnMappings).forEach(([key, value]) => {
-        if (value) {
-          apiColumnMapping[key] = value
+      Object.entries(columnMappings).forEach(([frontendKey, csvColumn]) => {
+        if (csvColumn) {
+          const backendKey = keyMapping[frontendKey] || frontendKey
+          apiColumnMapping[backendKey] = csvColumn
         }
       })
 
@@ -212,12 +208,29 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
       setLoading(true)
       setImportError("")
 
-      // Build column mapping for API
+      // Transform frontend keys to backend keys
+      const keyMapping: Record<string, string> = {
+        'mssv': 'student_id',
+        'hoTen': 'full_name',
+        'lop': 'class_name',
+        'ngaySinh': 'dob',
+        'ghiChu': 'notes'
+      }
+
+      // Build column mapping for API with transformed keys
       const apiColumnMapping: ColumnMapping = {}
-      Object.entries(columnMappings).forEach(([key, value]) => {
-        if (value) {
-          apiColumnMapping[key] = value
+      Object.entries(columnMappings).forEach(([frontendKey, csvColumn]) => {
+        if (csvColumn) {
+          // Convert frontend key to backend key
+          const backendKey = keyMapping[frontendKey] || frontendKey
+          apiColumnMapping[backendKey] = csvColumn
         }
+      })
+
+      console.log('🚀 Import Request:', {
+        file: importFile.name,
+        dry_run: false,
+        column_mapping: apiColumnMapping
       })
 
       const response = await importStudents(importFile, false, apiColumnMapping)
@@ -229,6 +242,8 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
         onImportSuccess()
       }
     } catch (error: any) {
+      console.error("❌ Import error:", error)
+      console.error("❌ Error response:", error.response?.data)
       setImportError(error.response?.data?.detail || "Lỗi khi import. Vui lòng thử lại.")
     } finally {
       setLoading(false)
@@ -585,10 +600,17 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
         <Button variant="outline" onClick={() => setImportStep('upload')}>Trở lại</Button>
         <Button
           className="bg-[#167FFC] hover:bg-[#1470E3]"
-          disabled={hasUnmappedRequired}
-          onClick={() => { handleOpenChange(false) }}
+          disabled={hasUnmappedRequired || loading}
+          onClick={handleActualImport}
         >
-          Import
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Đang import...
+            </>
+          ) : (
+            'Import'
+          )}
         </Button>
       </DialogFooter>
     </>
