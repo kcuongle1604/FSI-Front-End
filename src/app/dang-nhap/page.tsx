@@ -37,6 +37,10 @@ export default function LoginPage() {
 
       // ✅ LƯU TOKEN
       localStorage.setItem("access_token", res.access_token)
+      // Optional: lưu token_type nếu cần dùng sau này
+      if (res.token_type) {
+        localStorage.setItem("token_type", res.token_type)
+      }
 
       // (optional) remember me
       if (rememberMe) {
@@ -45,8 +49,9 @@ export default function LoginPage() {
 
       // ✅ REDIRECT SAU LOGIN
       router.push("/nghiep-vu-dao-tao/xet-tot-nghiep")
-    } catch (err) {
-      setError("Email hoặc mật khẩu không đúng")
+    } catch (err: any) {
+      console.error("Login error:", err)
+      setError(err.response?.data?.detail || "Email hoặc mật khẩu không đúng")
     } finally {
       setLoading(false)
     }

@@ -20,9 +20,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { 
-  Edit, 
-  Trash2, 
+import {
+  Edit,
+  Trash2,
   Plus,
   MoreVertical,
   Search,
@@ -48,15 +48,16 @@ import ImportDialog from "./components/ImportDialog"
 import ImportHistoryTab from "./components/ImportHistoryTab"
 
 // API & Types
-import { getStudents } from "./student.api"
+import { getStudents, getClasses } from "./student.api"
 import type { Student, ImportHistory } from "./types"
-import { sampleStudents, classesByCourse } from "./data"
+import { sampleStudents } from "./data"
 
 export default function SinhVienPage() {
   const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien")
   const [searchQuery, setSearchQuery] = useState("")
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(false)
+  const [classes, setClasses] = useState<any[]>([])
 
   const [selectedKhoa, setSelectedKhoa] = useState<string | undefined>()
   const [selectedLop, setSelectedLop] = useState<string | undefined>()
@@ -70,48 +71,86 @@ export default function SinhVienPage() {
   const [importHistory] = useState<ImportHistory[]>([])
 
   // ===== FIX: LOAD DATA TỪ API =====
-  useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        setLoading(true)
-        const res = await getStudents()
+  // Convert yyyy-mm-dd to dd/mm/yyyy for display
+  const convertDateToDisplay = (isoDate: string | null): string => {
+    if (!isoDate) return ""
+    const parts = isoDate.split("-")
+    if (parts.length !== 3) return isoDate
+    const [year, month, day] = parts
+    return `${day}/${month}/${year}`
+  }
 
-        const apiStudents = Array.isArray(res?.data?.students) ? res.data.students : []
+  const fetchStudents = async () => {
+    try {
+      setLoading(true)
 
-        if (apiStudents.length > 0) {
-          // map đúng structure FE
-          const mapped: Student[] = apiStudents.map((s: any) => ({
-            id: s.student_id,
-            mssv: s.mssv,
-            hoTen: s.ho_ten,
-            lop: s.lop,
-            ngaySinh: s.ngay_sinh,
-            ghiChu: s.ghi_chu ?? "",
-          }))
-
-          setStudents(mapped)
-        } else {
-          // fallback: hiển thị 5 bản ghi mẫu
-          setStudents(sampleStudents.slice(0, 5))
-        }
-      } catch (err) {
-        console.error("Load sinh viên thất bại", err)
-        // fallback khi API lỗi: hiển thị 5 bản ghi mẫu
-        setStudents(sampleStudents.slice(0, 5))
-      } finally {
-        setLoading(false)
+      // Build query params
+      const params: any = {}
+      if (selectedLop && selectedLop !== "all") {
+        params.class_name = selectedLop
       }
-    }
 
+      const res = await getStudents(params)
+
+      const apiStudents = Array.isArray(res?.data?.students) ? res.data.students : []
+
+      if (apiStudents.length > 0) {
+        // Map đúng structure từ API response
+        const mapped: Student[] = apiStudents.map((s: any) => ({
+          id: s.student_id,
+          mssv: s.student_id, // API không có mssv riêng, dùng student_id
+          hoTen: s.full_name,
+          lop: s.class_name,
+          ngaySinh: convertDateToDisplay(s.dob), // Convert yyyy-mm-dd to dd/mm/yyyy
+          ghiChu: s.notes ?? "",
+        }))
+
+        setStudents(mapped)
+      } else {
+        // fallback: hiển thị 5 bản ghi mẫu
+        setStudents(sampleStudents.slice(0, 5))
+      }
+    } catch (err) {
+      console.error("Load sinh viên thất bại", err)
+      // fallback khi API lỗi: hiển thị 5 bản ghi mẫu
+      setStudents(sampleStudents.slice(0, 5))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchClasses = async () => {
+    try {
+      const res = await getClasses()
+      if (res?.data) {
+        setClasses(Array.isArray(res.data) ? res.data : [])
+      }
+    } catch (err) {
+      console.error("Load classes failed", err)
+    }
+  }
+
+  useEffect(() => {
     fetchStudents()
+    fetchClasses()
   }, [])
 
-  // ===== Lọc theo Khóa, Lớp và tìm kiếm =====
-  const allClasses = Object.values(classesByCourse).flat()
+  // Refetch students when selectedLop changes
+  useEffect(() => {
+    if (selectedLop) {
+      fetchStudents()
+    }
+  }, [selectedLop])
 
+  // ===== Lọc theo Khóa, Lớp và tìm kiếm =====
   const availableClasses = !selectedKhoa || selectedKhoa === "all"
-    ? allClasses
-    : (classesByCourse[selectedKhoa] || [])
+    ? classes.map((c: any) => c.class_name || c.name || c)
+    : classes
+      .filter((c: any) => {
+        const className = c.class_name || c.name || c
+        return String(className).startsWith(selectedKhoa)
+      })
+      .map((c: any) => c.class_name || c.name || c)
 
   const filteredStudents = students.filter((student) => {
     // Chưa chọn lớp => không hiển thị dữ liệu
@@ -162,16 +201,16 @@ export default function SinhVienPage() {
   return (
     <AppLayout showSearch={false}>
       <div className="h-full flex flex-col px-8 py-5 bg-slate-50/50">
-        
+
         {/* Header */}
-              <div className="mb-4">
-                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                  Quản lý dữ liệu
-                  <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">
-                    &gt; Sinh viên
-                  </span>
-                </h1>
-              </div>
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Quản lý dữ liệu
+            <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">
+              &gt; Sinh viên
+            </span>
+          </h1>
+        </div>
 
         <Tabs
           value={activeTab}
@@ -181,8 +220,8 @@ export default function SinhVienPage() {
           {/* TabsList – GIỮ NGUYÊN */}
           <div className="border-b border-slate-200">
             <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start">
-              <TabsTrigger 
-                value="thong-tin-sinh-vien" 
+              <TabsTrigger
+                value="thong-tin-sinh-vien"
                 className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
               >
                 <div className="flex items-center gap-2">
@@ -191,7 +230,7 @@ export default function SinhVienPage() {
                 </div>
               </TabsTrigger>
 
-              <TabsTrigger 
+              <TabsTrigger
                 value="lich-su-import"
                 className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
               >
@@ -244,7 +283,7 @@ export default function SinhVienPage() {
                     </SelectContent>
                   </Select>
                   <Select value={selectedLop} onValueChange={setSelectedLop}>
-                    <SelectTrigger className="h-9 w-[140px] bg-white">
+                    <SelectTrigger className="h-9 w-[180px] bg-white">
                       <SelectValue placeholder="Lớp" />
                     </SelectTrigger>
                     <SelectContent
@@ -253,7 +292,8 @@ export default function SinhVienPage() {
                       align="center"
                       className="w-[var(--radix-select-trigger-width)]"
                     >
-                      {availableClasses.map((lop) => (
+                      <SelectItem value="all">Tất cả</SelectItem>
+                      {availableClasses.map((lop: string) => (
                         <SelectItem key={lop} value={lop}>
                           {lop}
                         </SelectItem>
@@ -263,7 +303,7 @@ export default function SinhVienPage() {
                 </div>
 
                 <div className="flex items-center gap-2 ml-auto">
-                  <Button 
+                  <Button
                     onClick={handleAdd}
                     className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm"
                   >
@@ -432,9 +472,19 @@ export default function SinhVienPage() {
       </div>
 
       {/* Dialogs */}
-      <StudentFormDialog open={isFormOpen} onOpenChange={setIsFormOpen} student={selectedStudent} />
-      <DeleteDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen} student={selectedStudent} />
-      <ImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
+      <StudentFormDialog
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        student={selectedStudent}
+        onSuccess={fetchStudents}
+      />
+      <DeleteDialog
+        open={isDeleteOpen}
+        onOpenChange={setIsDeleteOpen}
+        student={selectedStudent}
+        onSuccess={fetchStudents}
+      />
+      <ImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} onImportSuccess={fetchStudents} />
     </AppLayout>
   )
 }

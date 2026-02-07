@@ -29,3 +29,29 @@ export interface ImportHistory {
   importedAt: string
   status: string
 }
+
+export interface ImportResponse {
+  status: string
+  success_count: number
+  failure_count: number
+  message: string
+  errors?: ImportError[]
+}
+
+export interface ImportError {
+  row: number
+  column: string
+  value: string
+  error: string
+}
+
+export type ColumnMapping = Record<string, string>
+
+export interface UpdateStudentRequest {
+  student_id: number
+  full_name: string
+  dob: string
+  class_name: string
+  notes?: string
+  status?: boolean
+}
