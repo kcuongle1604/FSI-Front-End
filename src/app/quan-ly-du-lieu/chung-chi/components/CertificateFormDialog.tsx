@@ -1,19 +1,14 @@
 "use client"
 
-import { useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
+import { useEffect, useState } from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { MultiSelect } from "@/components/ui/multi-select"
+import { Search, X } from "lucide-react"
 import { Certificate, CertificateFormData } from "../types"
+import { sampleCertificates } from "../data"
 
 interface CertificateFormDialogProps {
   open: boolean
@@ -28,7 +23,10 @@ export default function CertificateFormDialog({
   certificate,
   onSubmit,
 }: CertificateFormDialogProps) {
+  const isEdit = !!certificate
+
   const [formData, setFormData] = useState<CertificateFormData>({
+    mssv: certificate?.mssv || "",
     hoLot: certificate?.hoLot || "",
     ten: certificate?.ten || "",
     lop: certificate?.lop || "",
@@ -44,12 +42,64 @@ export default function CertificateFormDialog({
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  const [selectedStudent, setSelectedStudent] = useState<Certificate | null>(
+    certificate ?? null
+  )
+  const [studentSearch, setStudentSearch] = useState("")
+  const [showStudentLookup, setShowStudentLookup] = useState(false)
+
+  const studentOptions = sampleCertificates
+
+  const filteredStudentOptions = studentOptions.filter((s) => {
+    const keyword = studentSearch.trim().toLowerCase()
+    if (!keyword) return true
+    return `${String(s.mssv)} ${s.hoLot} ${s.ten}`.toLowerCase().includes(keyword)
+  })
+
+  useEffect(() => {
+    if (certificate) {
+      setSelectedStudent(certificate)
+      setFormData({
+        mssv: certificate.mssv || "",
+        hoLot: certificate.hoLot,
+        ten: certificate.ten,
+        lop: certificate.lop,
+        ngaySinh: certificate.ngaySinh,
+        donTN: certificate.donTN || false,
+        kiemDiem: certificate.kiemDiem || false,
+        quanSu: certificate.quanSu || false,
+        theDuc: certificate.theDuc || false,
+        ngoaiNgu: certificate.ngoaiNgu || false,
+        tinhHoc: certificate.tinhHoc || false,
+        ghiChu: certificate.ghiChu || "",
+      })
+    } else {
+      setSelectedStudent(null)
+      setFormData({
+        mssv: "",
+        hoLot: "",
+        ten: "",
+        lop: "",
+        ngaySinh: "",
+        donTN: false,
+        kiemDiem: false,
+        quanSu: false,
+        theDuc: false,
+        ngoaiNgu: false,
+        tinhHoc: false,
+        ghiChu: "",
+      })
+    }
+
+    setStudentSearch("")
+    setShowStudentLookup(false)
+  }, [certificate, open])
+
   const validate = () => {
     const newErrors: Record<string, string> = {}
-    if (!formData.hoLot.trim()) newErrors.hoLot = "Họ lót là bắt buộc"
-    if (!formData.ten.trim()) newErrors.ten = "Tên là bắt buộc"
-    if (!formData.lop.trim()) newErrors.lop = "Lớp là bắt buộc"
-    if (!formData.ngaySinh.trim()) newErrors.ngaySinh = "Ngày sinh là bắt buộc"
+    if (!selectedStudent && !String(formData.mssv).trim()) {
+      newErrors.mssv = "Sinh viên là bắt buộc"
+    }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -63,155 +113,161 @@ export default function CertificateFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>
             {certificate ? "Chỉnh sửa thông tin chứng chỉ" : "Thêm mới thông tin chứng chỉ"}
           </DialogTitle>
-          <DialogDescription>
-            {certificate ? "Cập nhật thông tin chứng chỉ của sinh viên" : "Nhập thông tin chứng chỉ mới"}
-          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Lớp */}
-          <div>
-            <Label className="text-sm font-medium text-gray-700">
-              Lớp <span className="text-red-500">*</span>
+        <div className="grid gap-4 py-4">
+          {/* Sinh viên */}
+          <div className="grid gap-2 relative">
+            <Label>
+              Sinh viên <span className="text-red-500">*</span>
             </Label>
-            <Select value={formData.lop} onValueChange={(value) => setFormData({ ...formData, lop: value })}>
-              <SelectTrigger className={`h-9 ${errors.lop ? "border-red-500" : ""}`}>
-                <SelectValue placeholder="Chọn lớp" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="48K05">48K05</SelectItem>
-                <SelectItem value="48K14.1">48K14.1</SelectItem>
-                <SelectItem value="48K14.2">48K14.2</SelectItem>
-                <SelectItem value="48K21.2">48K21.2</SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.lop && <p className="text-red-500 text-xs mt-1">{errors.lop}</p>}
-          </div>
-
-          {/* Họ lót */}
-          <div>
-            <Label className="text-sm font-medium text-gray-700">
-              Họ lót <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              placeholder="Nhập họ lót"
-              value={formData.hoLot}
-              onChange={(e) => setFormData({ ...formData, hoLot: e.target.value })}
-              className={`h-9 ${errors.hoLot ? "border-red-500" : ""}`}
-            />
-            {errors.hoLot && <p className="text-red-500 text-xs mt-1">{errors.hoLot}</p>}
-          </div>
-
-          {/* Tên */}
-          <div>
-            <Label className="text-sm font-medium text-gray-700">
-              Tên <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              placeholder="Nhập tên"
-              value={formData.ten}
-              onChange={(e) => setFormData({ ...formData, ten: e.target.value })}
-              className={`h-9 ${errors.ten ? "border-red-500" : ""}`}
-            />
-            {errors.ten && <p className="text-red-500 text-xs mt-1">{errors.ten}</p>}
-          </div>
-
-          {/* Ngày sinh */}
-          <div>
-            <Label className="text-sm font-medium text-gray-700">
-              Ngày sinh <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              placeholder="DD/MM/YYYY"
-              value={formData.ngaySinh}
-              onChange={(e) => setFormData({ ...formData, ngaySinh: e.target.value })}
-              className={`h-9 ${errors.ngaySinh ? "border-red-500" : ""}`}
-            />
-            {errors.ngaySinh && <p className="text-red-500 text-xs mt-1">{errors.ngaySinh}</p>}
+            {isEdit ? (
+              <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm text-gray-700 cursor-default">
+                {selectedStudent
+                  ? `${selectedStudent.mssv} - ${selectedStudent.hoLot} ${selectedStudent.ten}`
+                  : ""}
+              </div>
+            ) : (
+              <>
+                <div className="relative">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  {!selectedStudent && (
+                    <Input
+                      placeholder="Nhập MSSV/Họ và tên"
+                      value={studentSearch}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setStudentSearch(value)
+                        setShowStudentLookup(value.trim().length > 0)
+                      }}
+                      onClick={() => {
+                        if (
+                          studentSearch.trim().length > 0 ||
+                          filteredStudentOptions.length > 0
+                        ) {
+                          setShowStudentLookup(true)
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault()
+                          if ((e.currentTarget.value || "").trim().length > 0) {
+                            setShowStudentLookup(true)
+                          }
+                        }
+                      }}
+                      onBlur={() =>
+                        setTimeout(() => {
+                          if (!selectedStudent) {
+                            setStudentSearch("")
+                          }
+                          setShowStudentLookup(false)
+                        }, 120)
+                      }
+                      autoComplete="off"
+                      className={`pr-9 ${errors.mssv ? "border-red-500" : ""}`}
+                    />
+                  )}
+                  {selectedStudent && (
+                    <div className="w-full pr-9 px-3 py-2 border border-gray-300 rounded-md bg-white flex items-center gap-2 text-sm">
+                      <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">
+                        {`${selectedStudent.mssv} - ${selectedStudent.hoLot} ${selectedStudent.ten}`}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedStudent(null)
+                            setStudentSearch("")
+                            setShowStudentLookup(false)
+                            setFormData({ ...formData, mssv: "" })
+                          }}
+                          className="hover:text-blue-900"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {showStudentLookup && filteredStudentOptions.length > 0 && (
+                  <div className="absolute top-full left-0 z-30 mt-1 w-full bg-white border border-gray-300 rounded-md shadow max-h-52 overflow-auto">
+                    {filteredStudentOptions.map((s) => (
+                      <button
+                        type="button"
+                        key={s.id}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setSelectedStudent(s)
+                          setShowStudentLookup(false)
+                          setStudentSearch("")
+                          setFormData({
+                            ...formData,
+                            mssv: s.mssv,
+                            hoLot: s.hoLot,
+                            ten: s.ten,
+                            lop: s.lop,
+                            ngaySinh: s.ngaySinh,
+                          })
+                          setErrors((prev) => {
+                            const { mssv, ...rest } = prev
+                            return rest
+                          })
+                        }}
+                      >
+                        {`${s.mssv} - ${s.hoLot} ${s.ten}`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {errors.mssv && !selectedStudent && (
+                  <p className="text-red-500 text-xs mt-1">{errors.mssv}</p>
+                )}
+              </>
+            )}
           </div>
 
           {/* Các loại chứng chỉ */}
-          <div>
-            <Label className="text-sm font-medium text-gray-700 mb-3 block">Các loại chứng chỉ</Label>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="donTN"
-                  checked={formData.donTN}
-                  onCheckedChange={(checked) => setFormData({ ...formData, donTN: checked as boolean })}
-                />
-                <label htmlFor="donTN" className="text-sm text-gray-700 cursor-pointer">
-                  Đơn xin công nhân TN
-                </label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="kiemDiem"
-                  checked={formData.kiemDiem}
-                  onCheckedChange={(checked) => setFormData({ ...formData, kiemDiem: checked as boolean })}
-                />
-                <label htmlFor="kiemDiem" className="text-sm text-gray-700 cursor-pointer">
-                  Bản kiểm điểm
-                </label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="quanSu"
-                  checked={formData.quanSu}
-                  onCheckedChange={(checked) => setFormData({ ...formData, quanSu: checked as boolean })}
-                />
-                <label htmlFor="quanSu" className="text-sm text-gray-700 cursor-pointer">
-                  Cc Quân sự
-                </label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="theDuc"
-                  checked={formData.theDuc}
-                  onCheckedChange={(checked) => setFormData({ ...formData, theDuc: checked as boolean })}
-                />
-                <label htmlFor="theDuc" className="text-sm text-gray-700 cursor-pointer">
-                  Cc Thể dục
-                </label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="ngoaiNgu"
-                  checked={formData.ngoaiNgu}
-                  onCheckedChange={(checked) => setFormData({ ...formData, ngoaiNgu: checked as boolean })}
-                />
-                <label htmlFor="ngoaiNgu" className="text-sm text-gray-700 cursor-pointer">
-                  Cc Ngoại ngữ
-                </label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="tinhHoc"
-                  checked={formData.tinhHoc}
-                  onCheckedChange={(checked) => setFormData({ ...formData, tinhHoc: checked as boolean })}
-                />
-                <label htmlFor="tinhHoc" className="text-sm text-gray-700 cursor-pointer">
-                  Cc Tin học
-                </label>
-              </div>
-            </div>
-          </div>
-
-          {/* Ghi chú */}
-          <div>
-            <Label className="text-sm font-medium text-gray-700">Ghi chú</Label>
-            <Input
-              placeholder="Nhập ghi chú"
-              value={formData.ghiChu}
-              onChange={(e) => setFormData({ ...formData, ghiChu: e.target.value })}
-              className="h-9"
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">
+              Các loại chứng chỉ
+            </Label>
+            <MultiSelect
+              options={[
+                "Đơn xin công nhận TN",
+                "Bản kiểm điểm cá nhân",
+                "Cc Quân sự",
+                "Cc Thể dục",
+                "Cc Ngoại ngữ",
+                "Cc Tin học",
+              ]}
+              value={[
+                formData.donTN ? "Đơn xin công nhận TN" : "",
+                formData.kiemDiem ? "Bản kiểm điểm cá nhân" : "",
+                formData.quanSu ? "Cc Quân sự" : "",
+                formData.theDuc ? "Cc Thể dục" : "",
+                formData.ngoaiNgu ? "Cc Ngoại ngữ" : "",
+                formData.tinhHoc ? "Cc Tin học" : "",
+              ].filter(Boolean) as string[]}
+              onChange={(selected) => {
+                setFormData({
+                  ...formData,
+                  donTN: selected.includes("Đơn xin công nhận TN"),
+                  kiemDiem: selected.includes("Bản kiểm điểm cá nhân"),
+                  quanSu: selected.includes("Cc Quân sự"),
+                  theDuc: selected.includes("Cc Thể dục"),
+                  ngoaiNgu: selected.includes("Cc Ngoại ngữ"),
+                  tinhHoc: selected.includes("Cc Tin học"),
+                })
+              }}
+              placeholder="Chọn loại chứng chỉ"
             />
           </div>
+
         </div>
 
         <DialogFooter>

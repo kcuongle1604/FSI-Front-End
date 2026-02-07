@@ -26,9 +26,20 @@ interface ImportDialogProps {
   onOpenChange: (open: boolean) => void
   importTypeOptions?: ImportTypeOption[]
   classOptions?: { value: string; label: string }[]
+  // Dùng cho các màn import học phần (CTĐT)
+  isCourseImport?: boolean
 }
 
-export default function ImportDialog({ open, onOpenChange, importTypeOptions, classOptions }: ImportDialogProps) {
+// isCertificateImport: dùng cho màn Import Chứng chỉ (mssv + các loại chứng chỉ)
+export default function ImportDialog({
+  open,
+  onOpenChange,
+  importTypeOptions,
+  classOptions,
+  isCourseImport = false,
+  // @ts-expect-error kept for backward compatibility in other modules
+  isCertificateImport = false,
+}: ImportDialogProps & { isCertificateImport?: boolean }) {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importError, setImportError] = useState<string>("")
   const [importStep, setImportStep] = useState<'upload' | 'mapping'>('upload')
@@ -53,13 +64,46 @@ export default function ImportDialog({ open, onOpenChange, importTypeOptions, cl
     ec1: '',
     ec2: '',
     b1: '',
+    maHocPhan: '',
+    tenHocPhan: '',
+    soTinChi: '',
+    batBuoc: '',
+    tuChon: '',
+    // các cột cho chứng chỉ
+    donTN: '',
+    kiemDiem: '',
+    quanSu: '',
+    theDuc: '',
+    ngoaiNgu: '',
+    tinhHoc: '',
   })
 
   const isAggregateScoreImport = importType === 'diem-tong-hop'
   const isEnglishScoreImport = importType === 'diem-tieng-anh'
 
   // Cấu hình cột hiển thị & bắt buộc theo loại import
-  const mappingFields = isEnglishScoreImport
+  const mappingFields = isCourseImport
+    ? ([
+        { key: 'maHocPhan', label: 'Mã học phần', required: true },
+        { key: 'tenHocPhan', label: 'Tên học phần', required: true },
+        { key: 'soTinChi', label: 'Số tín chỉ', required: true },
+        { key: 'batBuoc', label: 'Bắt buộc', required: true },
+        { key: 'tuChon', label: 'Tự chọn', required: true },
+      ] as const)
+    : isCertificateImport
+    ? ([
+        { key: 'lop', label: 'Lớp', required: true },
+        { key: 'hoLot', label: 'Họ lót', required: true },
+        { key: 'ten', label: 'Tên', required: true },
+        { key: 'ngaySinh', label: 'Ngày sinh', required: true },
+        { key: 'donTN', label: 'Đơn xin công nhận TN', required: false },
+        { key: 'kiemDiem', label: 'Bản kiểm điểm cá nhân', required: false },
+        { key: 'quanSu', label: 'CC Quân sự', required: false },
+        { key: 'theDuc', label: 'CC Thể dục', required: false },
+        { key: 'ngoaiNgu', label: 'CC Ngoại ngữ', required: false },
+        { key: 'tinhHoc', label: 'CC Tin học', required: false },
+      ] as const)
+    : isEnglishScoreImport
     ? ([
         { key: 'mssv', label: 'MSSV', required: true },
         { key: 'ele1', label: 'ELE1', required: true },
@@ -82,9 +126,30 @@ export default function ImportDialog({ open, onOpenChange, importTypeOptions, cl
         { key: 'ngaySinh', label: 'Ngày sinh', required: true },
         { key: 'ghiChu', label: 'Ghi chú', required: false },
         { key: 'viDu', label: 'Ví dụ', required: false },
-      ] as const)
+        ] as const)
 
-  const systemColumns = isEnglishScoreImport
+      const systemColumns = isCourseImport
+    ? [
+        { value: 'Mã học phần', label: 'Mã học phần' },
+        { value: 'Tên học phần', label: 'Tên học phần' },
+        { value: 'Số tín chỉ', label: 'Số tín chỉ' },
+        { value: 'Bắt buộc', label: 'Bắt buộc' },
+        { value: 'Tự chọn', label: 'Tự chọn' },
+      ]
+    : isCertificateImport
+    ? [
+        { value: 'Lớp', label: 'Lớp' },
+        { value: 'Họ lót', label: 'Họ lót' },
+        { value: 'Tên', label: 'Tên' },
+        { value: 'Ngày sinh', label: 'Ngày sinh' },
+        { value: 'Đơn xin công nhận TN', label: 'Đơn xin công nhận TN' },
+        { value: 'Bản kiểm điểm cá nhân', label: 'Bản kiểm điểm cá nhân' },
+        { value: 'CC Quân sự', label: 'CC Quân sự' },
+        { value: 'CC Thể dục', label: 'CC Thể dục' },
+        { value: 'CC Ngoại ngữ', label: 'CC Ngoại ngữ' },
+        { value: 'CC Tin học', label: 'CC Tin học' },
+      ]
+    : isEnglishScoreImport
     ? [
         { value: 'MSSV', label: 'MSSV' },
         { value: 'ELE1', label: 'ELE1' },
@@ -107,8 +172,13 @@ export default function ImportDialog({ open, onOpenChange, importTypeOptions, cl
         { value: 'Ngày sinh', label: 'Ngày sinh' },
         { value: 'Ghi chú', label: 'Ghi chú' },
         { value: 'Ví dụ', label: 'Ví dụ' },
-        ]
-      const errorSummary = { valid: 0, notFoundInSystem: 1, duplicateScore: 2, dataError: 3 }
+      ]
+
+  const errorSummary = isCourseImport
+    ? { valid: 10, duplicateWithSystem: 1, duplicateInFile: 2, dataError: 3 }
+    : isCertificateImport
+    ? { valid: 20, notFoundInSystem: 1, duplicateCertificate: 2, dataError: 3 }
+    : { valid: 0, notFoundInSystem: 1, duplicateScore: 2, dataError: 3 }
   const errorDetails = [
     { row: 3, column: 'Họ và tên', value: 'Nguyễn Văn', error: 'Giá trị không hợp lệ' },
     { row: 5, column: 'MSSV', value: '', error: 'Thiếu giá trị' },
@@ -328,26 +398,76 @@ export default function ImportDialog({ open, onOpenChange, importTypeOptions, cl
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow>
-                      <TableCell className="pl-4">Hợp lệ</TableCell>
-                      <TableCell className="text-center">{errorSummary.valid}</TableCell>
-                      <TableCell></TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="pl-4">Không tìm thấy Sinh viên trong hệ thống</TableCell>
-                      <TableCell className="text-center">0{errorSummary.notFoundInSystem}</TableCell>
-                      <TableCell></TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="pl-4">Thông tin Điểm trùng nhau trong tệp</TableCell>
-                      <TableCell className="text-center">0{errorSummary.duplicateScore}</TableCell>
-                      <TableCell></TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="pl-4">Lỗi dữ liệu khác</TableCell>
-                      <TableCell className="text-center">0{errorSummary.dataError}</TableCell>
-                      <TableCell></TableCell>
-                    </TableRow>
+                    {isCourseImport ? (
+                      <>
+                        <TableRow>
+                          <TableCell className="pl-4">Hợp lệ</TableCell>
+                          <TableCell className="text-center">{errorSummary.valid}</TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="pl-4">Mã học phần trùng với hệ thống</TableCell>
+                          <TableCell className="text-center">{String(errorSummary.duplicateWithSystem ?? 0).padStart(2, "0")}</TableCell>
+                          <TableCell>Dòng 9</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="pl-4">Mã học phần trùng nhau trong tệp</TableCell>
+                          <TableCell className="text-center">{String(errorSummary.duplicateInFile ?? 0).padStart(2, "0")}</TableCell>
+                          <TableCell>Dòng 3,12</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="pl-4">Lỗi dữ liệu khác</TableCell>
+                          <TableCell className="text-center">{String(errorSummary.dataError).padStart(2, "0")}</TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                      </>
+                    ) : isCertificateImport ? (
+                      <>
+                        <TableRow>
+                          <TableCell className="pl-4">Hợp lệ</TableCell>
+                          <TableCell className="text-center">{errorSummary.valid}</TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="pl-4">Không tìm thấy Sinh viên trong hệ thống</TableCell>
+                          <TableCell className="text-center">0{errorSummary.notFoundInSystem}</TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="pl-4">Thông tin Chứng chỉ trùng nhau trong tệp</TableCell>
+                          <TableCell className="text-center">0{errorSummary.duplicateCertificate}</TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="pl-4">Lỗi dữ liệu khác</TableCell>
+                          <TableCell className="text-center">0{errorSummary.dataError}</TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                      </>
+                    ) : (
+                      <>
+                        <TableRow>
+                          <TableCell className="pl-4">Hợp lệ</TableCell>
+                          <TableCell className="text-center">{errorSummary.valid}</TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="pl-4">Không tìm thấy Sinh viên trong hệ thống</TableCell>
+                          <TableCell className="text-center">0{errorSummary.notFoundInSystem}</TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="pl-4">Thông tin Điểm trùng nhau trong tệp</TableCell>
+                          <TableCell className="text-center">0{errorSummary.duplicateScore}</TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="pl-4">Lỗi dữ liệu khác</TableCell>
+                          <TableCell className="text-center">0{errorSummary.dataError}</TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                      </>
+                    )}
                   </TableBody>
                 </Table>
               </div>
