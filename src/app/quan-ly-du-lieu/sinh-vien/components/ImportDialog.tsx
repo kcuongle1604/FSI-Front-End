@@ -33,20 +33,16 @@ interface ImportDialogProps {
   isCourseImport?: boolean
 }
 
-<<<<<<< HEAD
 // isCertificateImport: dùng cho màn Import Chứng chỉ (mssv + các loại chứng chỉ)
 export default function ImportDialog({
   open,
   onOpenChange,
+  onImportSuccess,
   importTypeOptions,
   classOptions,
   isCourseImport = false,
-  // @ts-expect-error kept for backward compatibility in other modules
   isCertificateImport = false,
 }: ImportDialogProps & { isCertificateImport?: boolean }) {
-=======
-export default function ImportDialog({ open, onOpenChange, onImportSuccess, importTypeOptions, classOptions }: ImportDialogProps) {
->>>>>>> ec2d2df28c76686ae5c8ec4e6fe8e1b9d8044b93
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importError, setImportError] = useState<string>("")
   const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'result'>('upload')
@@ -186,16 +182,12 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
         { value: 'Ghi chú', label: 'Ghi chú' },
         { value: 'Ví dụ', label: 'Ví dụ' },
       ]
-<<<<<<< HEAD
 
   const errorSummary = isCourseImport
     ? { valid: 10, duplicateWithSystem: 1, duplicateInFile: 2, dataError: 3 }
     : isCertificateImport
     ? { valid: 20, notFoundInSystem: 1, duplicateCertificate: 2, dataError: 3 }
     : { valid: 0, notFoundInSystem: 1, duplicateScore: 2, dataError: 3 }
-=======
-  const errorSummary = { valid: 0, notFoundInSystem: 1, duplicateScore: 2, dataError: 3 }
->>>>>>> ec2d2df28c76686ae5c8ec4e6fe8e1b9d8044b93
   const errorDetails = [
     { row: 3, column: 'Họ và tên', value: 'Nguyễn Văn', error: 'Giá trị không hợp lệ' },
     { row: 5, column: 'MSSV', value: '', error: 'Thiếu giá trị' },

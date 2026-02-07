@@ -457,6 +457,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
           initialValues={{
             specialization: title,
           }}
+          appliedCourses={program?.appliedCourses}
         />
 
         <CourseFormDialog
@@ -475,6 +476,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
             credits: editingCourse?.credits ?? 0,
             type: editingCourse?.type ?? "bat-buoc",
           }}
+          appliedCourses={program?.appliedCourses}
         />
 
         <DeleteCourseDialog

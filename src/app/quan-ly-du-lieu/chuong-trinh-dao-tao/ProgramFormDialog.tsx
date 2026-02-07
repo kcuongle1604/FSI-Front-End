@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -17,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { MultiSelect } from "@/components/ui/multi-select"
 
 const SPECIALIZATIONS = [
   "Quản trị hệ thống thông tin",
@@ -24,9 +24,12 @@ const SPECIALIZATIONS = [
   "Thống kê",
 ]
 
+const COURSES = ["48K", "49K", "50K", "51K", "52K"]
+
 export type ProgramFormValues = {
+  id?: number
   specialization: string
-  name: string
+  appliedCourses: string[]
 }
 
 type ProgramFormDialogProps = {
@@ -34,6 +37,7 @@ type ProgramFormDialogProps = {
   onOpenChange: (open: boolean) => void
   onSave: (data: ProgramFormValues) => void
   existingProgramNames?: string[]
+  initialData?: ProgramFormValues | null
 }
 
 export default function ProgramFormDialog({
@@ -41,28 +45,45 @@ export default function ProgramFormDialog({
   onOpenChange,
   onSave,
   existingProgramNames = [],
+  initialData,
 }: ProgramFormDialogProps) {
   const [specialization, setSpecialization] = useState("")
-  const [errors, setErrors] = useState<{ specialization?: string }>({})
+  const [appliedCourses, setAppliedCourses] = useState<string[]>([])
+  const [errors, setErrors] = useState<{ specialization?: string; appliedCourses?: string }>({})
+
+  useEffect(() => {
+    if (open && initialData) {
+      setSpecialization(initialData.specialization)
+      setAppliedCourses(initialData.appliedCourses)
+      setErrors({})
+    }
+    if (open && !initialData) {
+      setSpecialization("")
+      setAppliedCourses([])
+      setErrors({})
+    }
+  }, [open, initialData])
 
   const resetForm = () => {
     setSpecialization("")
+    setAppliedCourses([])
     setErrors({})
   }
 
   const handleSave = () => {
-    const newErrors: { specialization?: string } = {}
+    const newErrors: { specialization?: string; appliedCourses?: string } = {}
     if (!specialization) {
       newErrors.specialization = "Vui lòng chọn chuyên ngành"
-    } else if (existingProgramNames.includes(specialization)) {
-      newErrors.specialization =
-        "Đã tồn tại chương trình đào tạo cho chuyên ngành này. Vui lòng chọn chuyên ngành khác."
+    }
+
+    if (appliedCourses.length === 0) {
+      newErrors.appliedCourses = "Vui lòng chọn ít nhất một khóa áp dụng"
     }
 
     setErrors(newErrors)
     if (Object.keys(newErrors).length > 0) return
 
-    onSave({ specialization, name: specialization })
+    onSave({ id: initialData?.id, specialization, appliedCourses })
     resetForm()
     onOpenChange(false)
   }
@@ -74,9 +95,11 @@ export default function ProgramFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Thêm mới chương trình đào tạo</DialogTitle>
+          <DialogTitle>
+            {initialData ? "Sửa chương trình đào tạo" : "Thêm mới chương trình đào tạo"}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -86,6 +109,7 @@ export default function ProgramFormDialog({
             </Label>
             <Select
               value={specialization}
+              disabled={!!initialData}
               onValueChange={(value) => {
                 setSpecialization(value)
                 if (errors.specialization) {
@@ -93,7 +117,9 @@ export default function ProgramFormDialog({
                 }
               }}
             >
-              <SelectTrigger className={`w-full ${errors.specialization ? "border-red-500" : "border-gray-300"}`}>
+              <SelectTrigger
+                className={`w-full ${errors.specialization ? "border-red-500" : "border-gray-300"} ${initialData ? "bg-gray-100 cursor-not-allowed" : ""}`}
+              >
                 <SelectValue placeholder="Chọn chuyên ngành" />
               </SelectTrigger>
               <SelectContent>
@@ -111,13 +137,22 @@ export default function ProgramFormDialog({
 
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-800">
-              Tên chương trình đào tạo<span className="text-red-500">*</span>
+              Khóa áp dụng<span className="text-red-500">*</span>
             </Label>
-            <Input
-              value={specialization}
-              readOnly
-              className="w-full border-gray-300 bg-gray-100 text-gray-700"
+            <MultiSelect
+              options={COURSES}
+              value={appliedCourses}
+              onChange={(vals) => {
+                setAppliedCourses(vals)
+                if (errors.appliedCourses) {
+                  setErrors((prev) => ({ ...prev, appliedCourses: undefined }))
+                }
+              }}
+              placeholder="Chọn khoá áp dụng"
             />
+            {errors.appliedCourses && (
+              <p className="text-xs text-red-500">{errors.appliedCourses}</p>
+            )}
           </div>
         </div>
 

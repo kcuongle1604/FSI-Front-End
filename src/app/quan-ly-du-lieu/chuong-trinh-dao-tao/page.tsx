@@ -45,12 +45,13 @@ import ProgramFormDialog, { ProgramFormValues } from "./ProgramFormDialog"
 export type Program = {
   id: number
   name: string
+  appliedCourses: string[]
 }
 
 export const INITIAL_PROGRAMS: Program[] = [
-  { id: 1, name: "Quản trị hệ thống thông tin" },
-  { id: 2, name: "Tin học quản lý" },
-  { id: 3, name: "Thống kê" },
+  { id: 1, name: "Quản trị hệ thống thông tin", appliedCourses: ["48K"] },
+  { id: 2, name: "Tin học quản lý", appliedCourses: ["49K"] },
+  { id: 3, name: "Thống kê", appliedCourses: ["50K"] },
 ]
 
 export default function ChuongTrinhDaoTaoPage() {
@@ -69,6 +70,7 @@ export default function ChuongTrinhDaoTaoPage() {
 
   const [importHistory] = useState<ImportHistory[]>([])
   const [programs, setPrograms] = useState<Program[]>(INITIAL_PROGRAMS)
+  const [editingProgram, setEditingProgram] = useState<Program | null>(null)
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -105,7 +107,10 @@ export default function ChuongTrinhDaoTaoPage() {
     const query = searchQuery.toLowerCase()
     if (!query) return true
 
-    return p.name.toLowerCase().includes(query)
+    return (
+      p.name.toLowerCase().includes(query) ||
+      p.appliedCourses.some((c) => c.toLowerCase().includes(query))
+    )
   })
 
   const PAGE_SIZE = 30
@@ -125,14 +130,32 @@ export default function ChuongTrinhDaoTaoPage() {
 
   const handleAdd = () => {
     setSelectedStudent(null)
+    setEditingProgram(null)
     setIsFormOpen(true)
   }
 
   const handleSaveProgram = (data: ProgramFormValues) => {
     setPrograms((prev) => {
+      if (data.id) {
+        return prev.map((p) =>
+          p.id === data.id
+            ? { ...p, name: data.specialization, appliedCourses: data.appliedCourses }
+            : p,
+        )
+      }
+
       const nextId = prev.length > 0 ? Math.max(...prev.map((p) => p.id)) + 1 : 1
-      return [...prev, { id: nextId, name: data.name }]
+      return [
+        ...prev,
+        { id: nextId, name: data.specialization, appliedCourses: data.appliedCourses },
+      ]
     })
+    setEditingProgram(null)
+  }
+
+  const handleEditProgram = (program: Program) => {
+    setEditingProgram(program)
+    setIsFormOpen(true)
   }
 
   return (
@@ -215,7 +238,13 @@ export default function ChuongTrinhDaoTaoPage() {
                             STT
                           </TableHead>
                           <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
-                            TÊN CHƯƠNG TRÌNH ĐÀO TẠO
+                            CHUYÊN NGÀNH
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                            KHÓA ÁP DỤNG
+                          </TableHead>
+                          <TableHead className="h-10 px-4 w-[60px] text-right text-sm font-semibold text-gray-700">
+                            THAO TÁC
                           </TableHead>
                         </TableRow>
                       </TableHeader>
@@ -237,6 +266,30 @@ export default function ChuongTrinhDaoTaoPage() {
                               >
                                 {program.name}
                               </button>
+                            </TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600">
+                              {program.appliedCourses.join(", ")}
+                            </TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600 text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 hover:bg-gray-100"
+                                  >
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-24">
+                                  <DropdownMenuItem
+                                    className="text-sm"
+                                    onClick={() => handleEditProgram(program)}
+                                  >
+                                    Sửa
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -307,6 +360,15 @@ export default function ChuongTrinhDaoTaoPage() {
         onOpenChange={setIsFormOpen}
         onSave={handleSaveProgram}
         existingProgramNames={programs.map((p) => p.name)}
+        initialData={
+          editingProgram
+            ? {
+                id: editingProgram.id,
+                specialization: editingProgram.name,
+                appliedCourses: editingProgram.appliedCourses,
+              }
+            : null
+        }
       />
       <DeleteDialog
         open={isDeleteOpen}
