@@ -9,47 +9,126 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import {
-  Select, SelectTrigger, SelectContent, SelectItem, SelectValue
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
 } from "@/components/ui/select"
 import { importStudents } from "../student.api"
 import type { ImportResponse, ImportError, ColumnMapping } from "../types"
+
+interface ImportTypeOption {
+  value: string
+  label: string
+}
 
 interface ImportDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onImportSuccess?: () => void
+  importTypeOptions?: ImportTypeOption[]
+  classOptions?: { value: string; label: string }[]
 }
 
-export default function ImportDialog({ open, onOpenChange, onImportSuccess }: ImportDialogProps) {
+export default function ImportDialog({ open, onOpenChange, onImportSuccess, importTypeOptions, classOptions }: ImportDialogProps) {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importError, setImportError] = useState<string>("")
   const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'result'>('upload')
   const [mappingTab, setMappingTab] = useState<'anh-xa-cot' | 'tong-quan-loi' | 'chi-tiet-loi'>('anh-xa-cot')
+  const [selectedSheet, setSelectedSheet] = useState('Sheet1')
+  const [importType, setImportType] = useState<string>(
+    importTypeOptions && importTypeOptions.length > 0 ? importTypeOptions[0].value : ""
+  )
+  const [targetClass, setTargetClass] = useState<string>("")
+
+  const [columnMappings, setColumnMappings] = useState<Record<string, string>>({
+    mssv: 'MSSV',
+    hoTen: '',
+    lop: 'Lớp',
+    ngaySinh: 'Ngày sinh',
+    ghiChu: 'Ghi chú',
+    viDu: '',
+    hoLot: '',
+    ten: '',
+    ele1: '',
+    ele2: '',
+    ec1: '',
+    ec2: '',
+    b1: '',
+  })
+
+  // API integration states
   const [loading, setLoading] = useState(false)
   const [dryRunResult, setDryRunResult] = useState<ImportResponse | null>(null)
   const [importResult, setImportResult] = useState<ImportResponse | null>(null)
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
 
-  const [columnMappings, setColumnMappings] = useState<Record<string, string>>({
-    student_id: '',
-    full_name: '',
-    class_name: '',
-    dob: ''
-  })
+  const isAggregateScoreImport = importType === 'diem-tong-hop'
+  const isEnglishScoreImport = importType === 'diem-tieng-anh'
 
-  // Constants
-  const requiredFields = ['student_id', 'full_name', 'class_name', 'dob']
-  const systemFields = [
-    { key: 'student_id', label: 'Mã sinh viên', required: true },
-    { key: 'full_name', label: 'Họ và tên', required: true },
-    { key: 'class_name', label: 'Lớp', required: true },
-    { key: 'dob', label: 'Ngày sinh', required: true },
+  // Cấu hình cột hiển thị & bắt buộc theo loại import
+  const mappingFields = isEnglishScoreImport
+    ? ([
+      { key: 'mssv', label: 'MSSV', required: true },
+      { key: 'ele1', label: 'ELE1', required: true },
+      { key: 'ele2', label: 'ELE2', required: true },
+      { key: 'ec1', label: 'EC1', required: true },
+      { key: 'ec2', label: 'EC2', required: true },
+      { key: 'b1', label: 'B1', required: true },
+    ] as const)
+    : isAggregateScoreImport
+      ? ([
+        { key: 'lop', label: 'Lớp', required: true },
+        { key: 'hoLot', label: 'Họ lót', required: true },
+        { key: 'ten', label: 'Tên', required: true },
+        { key: 'ngaySinh', label: 'Ngày sinh', required: true },
+      ] as const)
+      : ([
+        { key: 'mssv', label: 'MSSV', required: true },
+        { key: 'hoTen', label: 'Họ và tên', required: true },
+        { key: 'lop', label: 'Lớp', required: true },
+        { key: 'ngaySinh', label: 'Ngày sinh', required: true },
+        { key: 'ghiChu', label: 'Ghi chú', required: false },
+        { key: 'viDu', label: 'Ví dụ', required: false },
+      ] as const)
+
+  const systemColumns = isEnglishScoreImport
+    ? [
+      { value: 'MSSV', label: 'MSSV' },
+      { value: 'ELE1', label: 'ELE1' },
+      { value: 'ELE2', label: 'ELE2' },
+      { value: 'EC1', label: 'EC1' },
+      { value: 'EC2', label: 'EC2' },
+      { value: 'B1', label: 'B1' },
+    ]
+    : isAggregateScoreImport
+      ? [
+        { value: 'Lớp', label: 'Lớp' },
+        { value: 'Họ lót', label: 'Họ lót' },
+        { value: 'Tên', label: 'Tên' },
+        { value: 'Ngày sinh', label: 'Ngày sinh' },
+      ]
+      : [
+        { value: 'MSSV', label: 'MSSV' },
+        { value: 'Họ và tên', label: 'Họ và tên' },
+        { value: 'Lớp', label: 'Lớp' },
+        { value: 'Ngày sinh', label: 'Ngày sinh' },
+        { value: 'Ghi chú', label: 'Ghi chú' },
+        { value: 'Ví dụ', label: 'Ví dụ' },
+      ]
+  const errorSummary = { valid: 0, notFoundInSystem: 1, duplicateScore: 2, dataError: 3 }
+  const errorDetails = [
+    { row: 3, column: 'Họ và tên', value: 'Nguyễn Văn', error: 'Giá trị không hợp lệ' },
+    { row: 5, column: 'MSSV', value: '', error: 'Thiếu giá trị' },
+    { row: 10, column: 'Ngày sinh', value: 'Mười hai tháng 3', error: 'Sai kiểu dữ liệu' },
   ]
 
-  const unmappedRequiredFields = requiredFields.filter(field => !columnMappings[field])
+  const unmappedRequiredFields = mappingFields.filter(
+    (field) => field.required && !columnMappings[field.key]
+  )
   const hasUnmappedRequired = unmappedRequiredFields.length > 0
-  const errorDetails: ImportError[] = dryRunResult?.errors || []
-  const hasErrors = errorDetails.length > 0
+  const allMapped = mappingFields.every((field) => !!columnMappings[field.key])
 
   // Parse CSV headers when file is selected
   const parseCSVHeaders = async (file: File) => {
@@ -182,7 +261,39 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess }: Im
         <DialogTitle>Tải tệp lên</DialogTitle>
         <DialogDescription>Chọn file CSV chứa dữ liệu sinh viên</DialogDescription>
       </DialogHeader>
-      <div className="py-4">
+      <div className="pt-0 pb-4">
+        {(importTypeOptions && importTypeOptions.length > 0) || (classOptions && classOptions.length > 0) ? (
+          <div className="flex items-center justify-end gap-2 mt-2 mb-2">
+            {importTypeOptions && importTypeOptions.length > 0 && (
+              <Select value={importType} onValueChange={setImportType}>
+                <SelectTrigger className="h-8 w-auto min-w-[130px]">
+                  <SelectValue placeholder="Loại import" />
+                </SelectTrigger>
+                <SelectContent>
+                  {importTypeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {classOptions && classOptions.length > 0 && (
+              <Select value={targetClass} onValueChange={setTargetClass}>
+                <SelectTrigger className="h-8 w-[120px]">
+                  <SelectValue placeholder="Lớp" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        ) : null}
         {importError && (
           <div className="flex items-center gap-2 text-red-600 text-sm mb-3">
             <AlertCircle className="h-4 w-4" /><span>{importError}</span>
@@ -267,6 +378,12 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess }: Im
               ) : (
                 <div className="flex items-center gap-2 text-green-600 text-sm"><CheckCircle2 className="h-4 w-4" /><span>Tất cả các cột bắt buộc đã được ghép.</span></div>
               )}
+              <div className="flex items-center gap-2">
+                <Select value={selectedSheet} onValueChange={setSelectedSheet}>
+                  <SelectTrigger className="w-[100px] h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="Sheet1">Sheet1</SelectItem><SelectItem value="Sheet2">Sheet2</SelectItem></SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="border rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
               {/* Header cố định */}
@@ -279,7 +396,7 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess }: Im
               <div className="flex-1 overflow-y-auto">
                 <Table>
                   <TableBody>
-                    {systemFields.map((field) => (
+                    {mappingFields.map((field) => (
                       <TableRow key={field.key} className={`border-b border-gray-200 hover:bg-gray-50 ${!columnMappings[field.key] && field.required ? 'bg-red-50' : ''}`}>
                         <TableCell className="px-4 py-3 text-sm text-gray-700 w-1/3">
                           <span>{field.label}</span>
@@ -288,7 +405,7 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess }: Im
                         <TableCell className="px-4 py-3 w-1/3">
                           <Select value={columnMappings[field.key] || "none"} onValueChange={(value) => setColumnMappings(prev => ({ ...prev, [field.key]: value === "none" ? "" : value }))}>
                             <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="---" /></SelectTrigger>
-                            <SelectContent><SelectItem value="none">---</SelectItem>{csvHeaders.map((header) => (<SelectItem key={header} value={header}>{header}</SelectItem>))}</SelectContent>
+                            <SelectContent><SelectItem value="none">---</SelectItem>{systemColumns.map(col => (<SelectItem key={col.value} value={col.value}>{col.label}</SelectItem>))}</SelectContent>
                           </Select>
                         </TableCell>
                         <TableCell className="px-4 py-3 text-center w-1/3">
@@ -300,6 +417,73 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess }: Im
                             <span className="text-gray-300">–</span>
                           )}
                         </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </>
+        )}
+        {mappingTab === 'tong-quan-loi' && (
+          <>
+            <div className="border rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-gray-50">
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold pl-4">Mục</TableHead>
+                      <TableHead className="text-center font-semibold">Số lượng</TableHead>
+                      <TableHead className="font-semibold">Ghi chú</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="pl-4">Hợp lệ</TableCell>
+                      <TableCell className="text-center">{errorSummary.valid}</TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-4">Không tìm thấy Sinh viên trong hệ thống</TableCell>
+                      <TableCell className="text-center">0{errorSummary.notFoundInSystem}</TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-4">Thông tin Điểm trùng nhau trong tệp</TableCell>
+                      <TableCell className="text-center">0{errorSummary.duplicateScore}</TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-4">Lỗi dữ liệu khác</TableCell>
+                      <TableCell className="text-center">0{errorSummary.dataError}</TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </>
+        )}
+        {mappingTab === 'chi-tiet-loi' && (
+          <>
+            <div className="border rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-gray-50">
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold pl-4">Số dòng</TableHead>
+                      <TableHead className="font-semibold">Tên cột</TableHead>
+                      <TableHead className="font-semibold">Giá trị</TableHead>
+                      <TableHead className="font-semibold">Loại lỗi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {errorDetails.map((error, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="pl-4">{error.row}</TableCell>
+                        <TableCell>{error.column}</TableCell>
+                        <TableCell>{error.value || <span className="text-gray-400 italic">Trống</span>}</TableCell>
+                        <TableCell className="text-red-600">{error.error}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -400,18 +584,11 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess }: Im
         <Button variant="outline" onClick={() => { setImportStep('upload'); handleOpenChange(false); }}>Hủy</Button>
         <Button variant="outline" onClick={() => setImportStep('upload')}>Trở lại</Button>
         <Button
-          variant="outline"
-          onClick={handleDryRun}
-          disabled={hasUnmappedRequired || loading}
-        >
-          {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Đang kiểm tra...</> : 'Kiểm tra'}
-        </Button>
-        <Button
           className="bg-[#167FFC] hover:bg-[#1470E3]"
-          disabled={hasUnmappedRequired || loading}
-          onClick={handleActualImport}
+          disabled={hasUnmappedRequired}
+          onClick={() => { handleOpenChange(false) }}
         >
-          {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Đang import...</> : 'Import'}
+          Import
         </Button>
       </DialogFooter>
     </>

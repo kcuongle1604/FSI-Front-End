@@ -175,11 +175,10 @@ export default function DiemPage() {
 
   const PAGE_SIZE = 30
   const hasFilter = !!selectedLop && selectedLop !== "all"
-  const visibleStudents = hasFilter
-    ? filteredStudents.slice(0, PAGE_SIZE)
-    : mockStudents.slice(0, PAGE_SIZE)
+  const visibleStudents = hasFilter ? filteredStudents.slice(0, PAGE_SIZE) : []
 
-  const lookupStudents = hasFilter ? filteredStudents : mockStudents
+  // Dùng danh sách lọc theo Lớp nếu có, nếu không thì dùng toàn bộ sinh viên
+  const lookupStudents = hasFilter ? filteredStudents : students
   const courseOptions = [
     "Học phần 1",
     "Học phần 2",
@@ -193,9 +192,9 @@ export default function DiemPage() {
     "Học phần 10",
   ]
 
-  const totalRecords = hasFilter ? filteredStudents.length : mockStudents.length
+  const totalRecords = hasFilter ? filteredStudents.length : 0
   const displayCount = Math.min(PAGE_SIZE, totalRecords)
-  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(Math.max(totalRecords, 1) / PAGE_SIZE))
 
   const handleEdit = (student: Student) => {
     setSelectedStudent(student)
@@ -293,7 +292,21 @@ export default function DiemPage() {
                       <SelectItem value="50K">50K</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={selectedLop} onValueChange={setSelectedLop}>
+                  <Select
+                    value={selectedLop}
+                    onValueChange={(value) => {
+                      setSelectedLop(value)
+                      // Nếu chưa chọn Khóa, tự suy ra từ tiền tố của Lớp (vd: 48K21.2 -> 48K)
+                      if (!selectedKhoa || selectedKhoa === "all") {
+                        const matchedKhoa = ["48K", "49K", "50K"].find((khoa) =>
+                          String(value).startsWith(khoa)
+                        )
+                        if (matchedKhoa) {
+                          setSelectedKhoa(matchedKhoa)
+                        }
+                      }
+                    }}
+                  >
                     <SelectTrigger className="h-9 w-[140px] bg-white">
                       <SelectValue placeholder="Lớp" />
                     </SelectTrigger>
@@ -553,7 +566,15 @@ export default function DiemPage() {
         onOpenChange={setIsDeleteOpen}
         student={selectedStudent}
       />
-      <ImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
+      <ImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        importTypeOptions={[
+          { value: "diem-tong-hop", label: "Điểm tổng hợp" },
+          { value: "diem-tieng-anh", label: "Điểm tiếng anh" },
+        ]}
+        classOptions={allClasses.map((lop) => ({ value: lop, label: lop }))}
+      />
     </AppLayout>
   )
 }
