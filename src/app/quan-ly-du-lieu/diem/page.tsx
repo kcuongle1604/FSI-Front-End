@@ -41,14 +41,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-// Dùng lại toàn bộ component & dữ liệu của Sinh viên
+// Components and APIs
 import ScoreFormDialog from "./components/ScoreFormDialog"
 import DeleteScoreDialog from "./components/DeleteScoreDialog"
-import ImportDialog from "../sinh-vien/components/ImportDialog"
+import ScoreImportDialog from "./components/ScoreImportDialog"
 import ImportHistoryTab from "../sinh-vien/components/ImportHistoryTab"
-import { getStudents } from "../sinh-vien/student.api"
-import type { Student, ImportHistory } from "../sinh-vien/types"
-import { sampleStudents, classesByCourse } from "../sinh-vien/data"
+import { getScoreMatrix, getClasses } from "./score.api"
+import type { ImportHistory } from "../sinh-vien/types"
+import type { ScoreImportResponse, StudentScore } from "./types"
 
 function splitHoTen(fullName: string): { hoLot: string; ten: string } {
   const parts = fullName.trim().split(" ")
@@ -61,147 +61,88 @@ function splitHoTen(fullName: string): { hoLot: string; ten: string } {
   }
 }
 
-const sampleScores = [
-  { hp1: 3.0, hp2: 3.0, hp3: 3.0, hp4: 3.0 },
-  { hp1: 2.7, hp2: 3.0, hp3: 3.3, hp4: 3.0 },
-  { hp1: 3.0, hp2: 2.5, hp3: 3.2, hp4: 2.8 },
-  { hp1: 2.5, hp2: 2.7, hp3: 3.0, hp4: 3.2 },
-  { hp1: 3.2, hp2: 3.0, hp3: 2.8, hp4: 3.0 },
-  { hp1: 2.3, hp2: 2.5, hp3: 2.7, hp4: 3.0 },
-  { hp1: 3.3, hp2: 3.2, hp3: 3.0, hp4: 3.5 },
-  { hp1: 2.8, hp2: 3.0, hp3: 2.5, hp4: 2.7 },
-  { hp1: 3.0, hp2: 3.5, hp3: 3.2, hp4: 3.3 },
-  { hp1: 2.0, hp2: 2.3, hp3: 2.5, hp4: 2.7 },
-  { hp1: 3.4, hp2: 3.5, hp3: 3.3, hp4: 3.2 },
-  { hp1: 2.6, hp2: 2.8, hp3: 3.0, hp4: 2.9 },
-  { hp1: 3.1, hp2: 3.0, hp3: 3.2, hp4: 3.0 },
-  { hp1: 2.4, hp2: 2.6, hp3: 2.8, hp4: 3.0 },
-  { hp1: 3.0, hp2: 3.2, hp3: 3.1, hp4: 3.3 },
-  { hp1: 2.9, hp2: 3.0, hp3: 2.7, hp4: 2.8 },
-  { hp1: 3.2, hp2: 3.4, hp3: 3.5, hp4: 3.3 },
-  { hp1: 2.5, hp2: 2.7, hp3: 2.9, hp4: 3.0 },
-  { hp1: 3.0, hp2: 3.1, hp3: 3.0, hp4: 3.2 },
-  { hp1: 2.8, hp2: 3.0, hp3: 3.2, hp4: 3.1 },
-]
-
 export default function DiemPage() {
   const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien")
   const [searchQuery, setSearchQuery] = useState("")
-  const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(false)
 
-  const [selectedKhoa, setSelectedKhoa] = useState<string | undefined>()
-  const [selectedLop, setSelectedLop] = useState<string | undefined>()
+  // Score matrix data
+  const [scoreData, setScoreData] = useState<StudentScore[]>([])
+  const [subjects, setSubjects] = useState<string[]>([])
+  const [classes, setClasses] = useState<any[]>([]) // Using any[] to match student API response
+  const [selectedClass, setSelectedClass] = useState<string | undefined>()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
+  const [selectedStudent, setSelectedStudent] = useState<StudentScore | null>(null)
 
   const [importHistory] = useState<ImportHistory[]>([])
 
+  // Fetch available classes on mount
   useEffect(() => {
-    const fetchStudents = async () => {
+    const fetchClasses = async () => {
+      try {
+        const res = await getClasses()
+        setClasses(Array.isArray(res?.data) ? res.data : [])
+      } catch (err) {
+        console.error("Failed to load classes", err)
+      }
+    }
+    fetchClasses()
+  }, [])
+
+  // Fetch score matrix when class is selected
+  useEffect(() => {
+    if (!selectedClass || selectedClass === "all") {
+      setScoreData([])
+      setSubjects([])
+      return
+    }
+
+    const fetchScores = async () => {
       try {
         setLoading(true)
-        const res = await getStudents()
-        const apiStudents = Array.isArray(res?.data?.students) ? res.data.students : []
-
-        if (apiStudents.length > 0) {
-          const mapped: Student[] = apiStudents.map((s: any) => ({
-            id: s.student_id,
-            mssv: s.mssv,
-            hoTen: s.ho_ten,
-            lop: s.lop,
-            ngaySinh: s.ngay_sinh,
-            ghiChu: s.ghi_chu ?? "",
-          }))
-          setStudents(mapped)
-        } else {
-          setStudents(sampleStudents.slice(0, 5))
-        }
+        const res = await getScoreMatrix({ class_name: selectedClass })
+        setScoreData(res.data.students)
+        setSubjects(res.data.subjects)
       } catch (err) {
-        console.error("Load sinh viên thất bại", err)
-        setStudents(sampleStudents.slice(0, 5))
+        console.error("Failed to load scores", err)
+        setScoreData([])
+        setSubjects([])
       } finally {
         setLoading(false)
       }
     }
 
-    fetchStudents()
-  }, [])
+    fetchScores()
+  }, [selectedClass])
 
-  const allClasses = Object.values(classesByCourse).flat()
-
-  const availableClasses =
-    !selectedKhoa || selectedKhoa === "all"
-      ? allClasses
-      : classesByCourse[selectedKhoa] || []
-
-  const filteredStudents = students.filter((student) => {
-    if (!selectedLop || selectedLop === "all") {
-      return false
-    }
-
-    if (
-      selectedKhoa &&
-      selectedKhoa !== "all" &&
-      !String(student.lop).startsWith(selectedKhoa)
-    ) {
-      return false
-    }
-
-    if (selectedLop && selectedLop !== "all" && student.lop !== selectedLop) {
-      return false
-    }
-
+  // Filter score data by search query
+  const filteredScoreData = scoreData.filter((student) => {
     const query = searchQuery.toLowerCase()
     if (!query) return true
 
     return (
-      student.hoTen.toLowerCase().includes(query) ||
-      String(student.mssv).includes(searchQuery)
+      student.full_name.toLowerCase().includes(query) ||
+      String(student.student_id).includes(searchQuery)
     )
   })
 
-  const mockStudents: Student[] = Array.from({ length: 20 }).map((_, index) => ({
-    id: index + 1,
-    mssv: String(221121521206 + index),
-    hoTen: "Nguyễn Văn Linh",
-    lop: "48K21.2",
-    ngaySinh: "16/04/2004",
-    ghiChu: "",
-  }))
-
   const PAGE_SIZE = 30
-  const hasFilter = !!selectedLop && selectedLop !== "all"
-  const visibleStudents = hasFilter ? filteredStudents.slice(0, PAGE_SIZE) : []
+  const hasData = selectedClass && selectedClass !== "all"
+  const visibleStudents = filteredScoreData.slice(0, PAGE_SIZE)
 
-  // Dùng danh sách lọc theo Lớp nếu có, nếu không thì dùng toàn bộ sinh viên
-  const lookupStudents = hasFilter ? filteredStudents : students
-  const courseOptions = [
-    "Học phần 1",
-    "Học phần 2",
-    "Học phần 3",
-    "Học phần 4",
-    "Học phần 5",
-    "Học phần 6",
-    "Học phần 7",
-    "Học phần 8",
-    "Học phần 9",
-    "Học phần 10",
-  ]
-
-  const totalRecords = hasFilter ? filteredStudents.length : 0
+  const totalRecords = filteredScoreData.length
   const displayCount = Math.min(PAGE_SIZE, totalRecords)
   const totalPages = Math.max(1, Math.ceil(Math.max(totalRecords, 1) / PAGE_SIZE))
 
-  const handleEdit = (student: Student) => {
+  const handleEdit = (student: StudentScore) => {
     setSelectedStudent(student)
     setIsFormOpen(true)
   }
 
-  const handleDelete = (student: Student) => {
+  const handleDelete = (student: StudentScore) => {
     setSelectedStudent(student)
     setIsDeleteOpen(true)
   }
@@ -257,12 +198,12 @@ export default function DiemPage() {
               value="thong-tin-sinh-vien"
               className="m-0 h-full outline-none flex flex-col"
             >
-              {/* Search & Actions – giống Quản lý người dùng */}
+              {/* Search & Actions */}
               <div className="flex items-center gap-3 mb-4">
                 <div className="relative w-[250px]">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Nhập MSSV..."
+                    placeholder="Nhập MSSV hoặc tên..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-9 h-9 bg-white"
@@ -271,14 +212,11 @@ export default function DiemPage() {
 
                 <div className="flex items-center gap-2">
                   <Select
-                    value={selectedKhoa}
-                    onValueChange={(value) => {
-                      setSelectedKhoa(value)
-                      setSelectedLop(undefined)
-                    }}
+                    value={selectedClass}
+                    onValueChange={setSelectedClass}
                   >
-                    <SelectTrigger className="h-9 w-[120px] bg-white">
-                      <SelectValue placeholder="Khóa" />
+                    <SelectTrigger className="h-9 w-[200px] bg-white">
+                      <SelectValue placeholder="Chọn lớp" />
                     </SelectTrigger>
                     <SelectContent
                       position="popper"
@@ -287,40 +225,13 @@ export default function DiemPage() {
                       className="w-[var(--radix-select-trigger-width)]"
                     >
                       <SelectItem value="all">Tất cả</SelectItem>
-                      <SelectItem value="48K">48K</SelectItem>
-                      <SelectItem value="49K">49K</SelectItem>
-                      <SelectItem value="50K">50K</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={selectedLop}
-                    onValueChange={(value) => {
-                      setSelectedLop(value)
-                      // Nếu chưa chọn Khóa, tự suy ra từ tiền tố của Lớp (vd: 48K21.2 -> 48K)
-                      if (!selectedKhoa || selectedKhoa === "all") {
-                        const matchedKhoa = ["48K", "49K", "50K"].find((khoa) =>
-                          String(value).startsWith(khoa)
-                        )
-                        if (matchedKhoa) {
-                          setSelectedKhoa(matchedKhoa)
-                        }
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="h-9 w-[140px] bg-white">
-                      <SelectValue placeholder="Lớp" />
-                    </SelectTrigger>
-                    <SelectContent
-                      position="popper"
-                      side="bottom"
-                      align="center"
-                      className="w-[var(--radix-select-trigger-width)]"
-                    >
-                      {availableClasses.map((lop) => (
-                        <SelectItem key={lop} value={lop}>
-                          {lop}
-                        </SelectItem>
-                      ))}
+                      {classes
+                        .map((c: any) => c.class_name || c.name || c)
+                        .map((className: string) => (
+                          <SelectItem key={className} value={className}>
+                            {className}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -353,145 +264,112 @@ export default function DiemPage() {
                 </div>
               </div>
 
-              {/* Card bảng – giống UserManagementTable */}
+              {/* Score Table */}
               <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
                 <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                   <div className="overflow-auto">
-                    <Table className="w-full min-w-[1100px]" style={{ borderCollapse: "collapse" }}>
+                    <Table className="w-full" style={{ borderCollapse: "collapse" }}>
                       <TableHeader>
                         <TableRow
                           className="border-b border-gray-200 bg-blue-50"
                           style={{ position: "sticky", top: 0, zIndex: 10 }}
                         >
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: 0, zIndex: 20, minWidth: "60px", width: "60px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
                             STT
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "60px", zIndex: 20, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
                             LỚP
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "180px", zIndex: 20, minWidth: "150px", width: "150px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
                             HỌ LÓT
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "330px", zIndex: 20, minWidth: "100px", width: "100px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
                             TÊN
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "430px", zIndex: 20, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
                             NGÀY SINH
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">
-                            HỌC PHẦN 1
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">
-                            HỌC PHẦN 2
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">
-                            HỌC PHẦN 3
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">
-                            HỌC PHẦN 4
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">
-                            HỌC PHẦN 5
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">
-                            HỌC PHẦN 6
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">
-                            HỌC PHẦN 7
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">
-                            HỌC PHẦN 8
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">
-                            HỌC PHẦN 9
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">
-                            HỌC PHẦN 10
-                          </TableHead>
+                          {subjects.map((subject) => (
+                            <TableHead
+                              key={subject}
+                              className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50 whitespace-nowrap"
+                            >
+                              {subject.toUpperCase()}
+                            </TableHead>
+                          ))}
                           <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-12" />
                         </TableRow>
                       </TableHeader>
 
                       <TableBody>
-                        {visibleStudents.map((student, index) => (
-                          <TableRow
-                            key={student.id}
-                            className="border-b border-gray-200 hover:bg-gray-50"
-                          >
-                            {(() => {
-                              const { hoLot, ten } = splitHoTen(student.hoTen)
-                              return (
-                                <>
-                                  <TableCell className="h-12 px-4 text-sm text-gray-600">
-                                    {String(index + 1).padStart(2, "0")}
-                                  </TableCell>
-                                  <TableCell className="h-12 px-4 text-sm text-gray-600">
-                                    {student.lop}
-                                  </TableCell>
-                                  <TableCell className="h-12 px-4 text-sm text-gray-600">
-                                    {hoLot}
-                                  </TableCell>
-                                  <TableCell className="h-12 px-4 text-sm text-gray-600">
-                                    {ten}
-                                  </TableCell>
-                                  <TableCell className="h-12 px-4 text-sm text-gray-600">
-                                    {student.ngaySinh}
-                                  </TableCell>
-                                  <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
-                                    {sampleScores[index]?.hp1 ?? "-"}
-                                  </TableCell>
-                                  <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
-                                    {sampleScores[index]?.hp2 ?? "-"}
-                                  </TableCell>
-                                  <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
-                                    {sampleScores[index]?.hp3 ?? "-"}
-                                  </TableCell>
-                                  <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
-                                    {sampleScores[index]?.hp4 ?? "-"}
-                                  </TableCell>
-                                  <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
-                                    -
-                                  </TableCell>
-                                  <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
-                                    -
-                                  </TableCell>
-                                  <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
-                                    -
-                                  </TableCell>
-                                  <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
-                                    -
-                                  </TableCell>
-                                  <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
-                                    -
-                                  </TableCell>
-                                  <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
-                                    -
-                                  </TableCell>
-                                </>
-                              )
-                            })()}
-                            <TableCell className="h-12 px-4 text-right w-12">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="start" sideOffset={8}>
-                                  <DropdownMenuItem onClick={() => handleEdit(student)}>
-                                    <Edit className="h-4 w-4 mr-2" /> Sửa
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="text-red-600"
-                                    onClick={() => handleDelete(student)}
+                        {visibleStudents.length > 0 ? (
+                          visibleStudents.map((student, index) => {
+                            const { hoLot, ten } = splitHoTen(student.full_name)
+                            return (
+                              <TableRow
+                                key={student.student_id}
+                                className="border-b border-gray-200 hover:bg-gray-50"
+                              >
+                                <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: 0, zIndex: 5, minWidth: "60px", width: "60px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
+                                  {String(index + 1).padStart(2, "0")}
+                                </TableCell>
+                                <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "60px", zIndex: 5, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
+                                  {student.class_name}
+                                </TableCell>
+                                <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "180px", zIndex: 5, minWidth: "150px", width: "150px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
+                                  {hoLot}
+                                </TableCell>
+                                <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "330px", zIndex: 5, minWidth: "100px", width: "100px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
+                                  {ten}
+                                </TableCell>
+                                <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "430px", zIndex: 5, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
+                                  {student.dob}
+                                </TableCell>
+                                {subjects.map((subject) => (
+                                  <TableCell
+                                    key={subject}
+                                    className="h-12 px-4 text-sm text-gray-600 text-center"
                                   >
-                                    <Trash2 className="h-4 w-4 mr-2" /> Xóa
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                                    {student.scores[subject] ?? "-"}
+                                  </TableCell>
+                                ))}
+                                <TableCell className="h-12 px-4 text-right w-12">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start" sideOffset={8}>
+                                      <DropdownMenuItem onClick={() => handleEdit(student)}>
+                                        <Edit className="h-4 w-4 mr-2" /> Sửa
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        className="text-red-600"
+                                        onClick={() => handleDelete(student)}
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" /> Xóa
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })
+                        ) : (
+                          <TableRow>
+                            <TableCell
+                              colSpan={6 + subjects.length}
+                              className="h-32 text-center text-gray-500"
+                            >
+                              {loading
+                                ? "Đang tải..."
+                                : !hasData
+                                  ? "Vui lòng chọn  lớp để xem điểm"
+                                  : "Không có dữ liệu"}
                             </TableCell>
                           </TableRow>
-                        ))}
+                        )}
                       </TableBody>
                     </Table>
                   </div>
@@ -558,22 +436,27 @@ export default function DiemPage() {
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         student={selectedStudent}
-        studentOptions={lookupStudents}
-        courseOptions={courseOptions}
+        studentOptions={scoreData}
+        courseOptions={subjects}
       />
       <DeleteScoreDialog
         open={isDeleteOpen}
         onOpenChange={setIsDeleteOpen}
         student={selectedStudent}
       />
-      <ImportDialog
+      <ScoreImportDialog
         open={isImportOpen}
         onOpenChange={setIsImportOpen}
-        importTypeOptions={[
-          { value: "diem-tong-hop", label: "Điểm tổng hợp" },
-          { value: "diem-tieng-anh", label: "Điểm tiếng anh" },
-        ]}
-        classOptions={allClasses.map((lop) => ({ value: lop, label: lop }))}
+        onImportSuccess={(result: ScoreImportResponse) => {
+          console.log('Score import successful:', result)
+          // Refresh scores if a class is selected
+          if (selectedClass && selectedClass !== "all") {
+            getScoreMatrix({ class_name: selectedClass }).then((res) => {
+              setScoreData(res.data.students)
+              setSubjects(res.data.subjects)
+            })
+          }
+        }}
       />
     </AppLayout>
   )
