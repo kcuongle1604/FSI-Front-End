@@ -1,0 +1,6 @@
+student_id,full_name,dob,class_name,birthplace,phone_number,gpa
+20210001,Nguyễn Văn An,01/01/2003,CNTT-K63,Hà Nội,0912345678,3.5
+20210002,Trần Thị Bình,15/03/2003,CNTT-K63,Hải Phòng,0923456789,3.2
+20210003,Lê Văn Cường,20/05/2003,KTPM-K63,Đà Nẵng,0934567890,3.8
+20210004,Phạm Thị Duyên,10/07/2003,KTPM-K63,TP.HCM,0945678901,3.6
+20210005,Hoàng Văn Em,25/09/2003,KHMT-K63,Cần Thơ,0956789012,3.4
