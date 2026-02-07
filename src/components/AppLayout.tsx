@@ -45,8 +45,8 @@ const menuStructure = [
     children: [
       { id: 'import-students', label: 'Sinh viên', icon: Users, path: '/quan-ly-du-lieu/sinh-vien' },
       { id: 'import-scores', label: 'Điểm', icon: FileText, path: '/quan-ly-du-lieu/diem' },
-      { id: 'import-programs', label: 'Chương trình đào tạo', icon: BookOpen, path: '/quan-ly-du-lieu/chuong-trinh-dao-tao' },
       { id: 'import-credits', label: 'Chứng chỉ', icon: Award, path: '/quan-ly-du-lieu/chung-chi' },
+      { id: 'import-programs', label: 'Chương trình đào tạo', icon: BookOpen, path: '/quan-ly-du-lieu/chuong-trinh-dao-tao' },
     ]
   },
   {

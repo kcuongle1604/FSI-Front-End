@@ -104,11 +104,6 @@ export default function ScoreFormDialog({
                     setStudentSearch(value)
                     setShowStudentLookup(value.trim().length > 0)
                   }}
-                  onFocus={() => {
-                    if (filteredStudentOptions.length > 0) {
-                      setShowStudentLookup(true)
-                    }
-                  }}
                   onClick={() => {
                     if (studentSearch.trim().length > 0 || filteredStudentOptions.length > 0) {
                       setShowStudentLookup(true)

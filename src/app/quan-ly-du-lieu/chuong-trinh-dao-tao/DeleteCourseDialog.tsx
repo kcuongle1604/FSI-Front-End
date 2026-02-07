@@ -3,35 +3,32 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 
-interface DeleteCertificateDialogProps {
+interface DeleteCourseDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  certificateName: string
+  courseLabel: string
   onConfirm: () => void
 }
 
-export default function DeleteCertificateDialog({
+export default function DeleteCourseDialog({
   open,
   onOpenChange,
-  certificateName,
+  courseLabel,
   onConfirm,
-}: DeleteCertificateDialogProps) {
-  const studentLabel = certificateName || "sinh viên này"
+}: DeleteCourseDialogProps) {
+  const label = courseLabel || "học phần này"
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[420px]">
         <DialogHeader>
-          <DialogTitle>Xóa thông tin chứng chỉ?</DialogTitle>
+          <DialogTitle>Xóa học phần?</DialogTitle>
         </DialogHeader>
         <div className="py-4">
           <p className="text-gray-600">
-            Bạn có chắc chắn muốn <strong>Xóa thông tin chứng chỉ</strong> của sinh viên
-            {" "}
-            <strong>{studentLabel}</strong> khỏi hệ thống không?
+            Bạn có chắc chắn muốn <strong>Xóa học phần</strong> <strong>{label}</strong> khỏi chương trình đào tạo không?
           </p>
         </div>
-
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Hủy
@@ -51,4 +48,4 @@ export default function DeleteCertificateDialog({
   )
 }
 
-export type { DeleteCertificateDialogProps }
+export type { DeleteCourseDialogProps }

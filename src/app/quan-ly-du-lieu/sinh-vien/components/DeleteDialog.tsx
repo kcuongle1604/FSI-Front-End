@@ -14,32 +14,7 @@ interface DeleteDialogProps {
   onSuccess?: () => void
 }
 
-export default function DeleteDialog({ open, onOpenChange, student, onSuccess }: DeleteDialogProps) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-
-  const handleDelete = async () => {
-    if (!student) return
-
-    try {
-      setLoading(true)
-      setError("")
-
-      await deleteStudent(student.id)
-
-      // Success - close dialog and refresh list
-      onOpenChange(false)
-      if (onSuccess) {
-        onSuccess()
-      }
-    } catch (err: any) {
-      console.error("Delete student error:", err)
-      setError(err.response?.data?.detail || "Có lỗi xảy ra khi xóa sinh viên")
-    } finally {
-      setLoading(false)
-    }
-  }
-
+export default function DeleteDialog({ open, onOpenChange, student }: DeleteDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[350px]">
@@ -47,9 +22,7 @@ export default function DeleteDialog({ open, onOpenChange, student, onSuccess }:
           <DialogTitle>Xóa sinh viên?</DialogTitle>
         </DialogHeader>
         <div className="py-4">
-          <p className="text-gray-600">
-            Bạn có chắc chắn muốn <strong>Xóa</strong> sinh viên <strong>{student?.hoTen}</strong> (MSSV: {student?.mssv}) khỏi hệ thống không?
-          </p>
+          <p className="text-gray-600">Bạn có chắc chắn muốn <strong>Xóa</strong> sinh viên này khỏi hệ thống không?</p>
         </div>
         {error && (
           <div className="text-red-600 text-sm px-6">{error}</div>
@@ -59,18 +32,15 @@ export default function DeleteDialog({ open, onOpenChange, student, onSuccess }:
             Hủy
           </Button>
           <Button
-            className="bg-red-600 hover:bg-red-700 text-white"
-            onClick={handleDelete}
-            disabled={loading}
+            className="bg-[#167FFC] hover:bg-[#1470E3]"
+            onClick={async () => {
+              if (!student) return
+              await deleteStudent(student.id)
+              onOpenChange(false)
+              window.location.reload()
+            }}
           >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Đang xóa...
-              </>
-            ) : (
-              'Có'
-            )}
+            Có
           </Button>
         </DialogFooter>
       </DialogContent>

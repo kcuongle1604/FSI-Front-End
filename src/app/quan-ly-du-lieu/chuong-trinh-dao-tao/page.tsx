@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
 import { Users, History } from "lucide-react"
@@ -26,31 +27,34 @@ import {
   Plus,
   MoreVertical,
   Search,
-  Upload,
   Download,
   ChevronsLeft,
   ChevronLeft,
   ChevronRight,
   ChevronsRight,
 } from "lucide-react"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 
 // Dùng lại toàn bộ component & dữ liệu của Sinh viên
-import StudentFormDialog from "../sinh-vien/components/StudentFormDialog"
 import DeleteDialog from "../sinh-vien/components/DeleteDialog"
-import ImportDialog from "../sinh-vien/components/ImportDialog"
 import ImportHistoryTab from "../sinh-vien/components/ImportHistoryTab"
 import { getStudents } from "../sinh-vien/student.api"
 import type { Student, ImportHistory } from "../sinh-vien/types"
 import { sampleStudents, classesByCourse } from "../sinh-vien/data"
+import ProgramFormDialog, { ProgramFormValues } from "./ProgramFormDialog"
+
+export type Program = {
+  id: number
+  name: string
+}
+
+export const INITIAL_PROGRAMS: Program[] = [
+  { id: 1, name: "Quản trị hệ thống thông tin" },
+  { id: 2, name: "Tin học quản lý" },
+  { id: 3, name: "Thống kê" },
+]
 
 export default function ChuongTrinhDaoTaoPage() {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien")
   const [searchQuery, setSearchQuery] = useState("")
   const [students, setStudents] = useState<Student[]>([])
@@ -61,10 +65,10 @@ export default function ChuongTrinhDaoTaoPage() {
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [isImportOpen, setIsImportOpen] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
 
   const [importHistory] = useState<ImportHistory[]>([])
+  const [programs, setPrograms] = useState<Program[]>(INITIAL_PROGRAMS)
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -97,41 +101,15 @@ export default function ChuongTrinhDaoTaoPage() {
     fetchStudents()
   }, [])
 
-  const allClasses = Object.values(classesByCourse).flat()
-
-  const availableClasses =
-    !selectedKhoa || selectedKhoa === "all"
-      ? allClasses
-      : classesByCourse[selectedKhoa] || []
-
-  const filteredStudents = students.filter((student) => {
-    if (!selectedLop || selectedLop === "all") {
-      return false
-    }
-
-    if (
-      selectedKhoa &&
-      selectedKhoa !== "all" &&
-      !String(student.lop).startsWith(selectedKhoa)
-    ) {
-      return false
-    }
-
-    if (selectedLop && selectedLop !== "all" && student.lop !== selectedLop) {
-      return false
-    }
-
+  const filteredPrograms = programs.filter((p) => {
     const query = searchQuery.toLowerCase()
     if (!query) return true
 
-    return (
-      student.hoTen.toLowerCase().includes(query) ||
-      String(student.mssv).includes(searchQuery)
-    )
+    return p.name.toLowerCase().includes(query)
   })
 
   const PAGE_SIZE = 30
-  const totalRecords = filteredStudents.length
+  const totalRecords = filteredPrograms.length
   const displayCount = Math.min(PAGE_SIZE, totalRecords)
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
 
@@ -148,6 +126,13 @@ export default function ChuongTrinhDaoTaoPage() {
   const handleAdd = () => {
     setSelectedStudent(null)
     setIsFormOpen(true)
+  }
+
+  const handleSaveProgram = (data: ProgramFormValues) => {
+    setPrograms((prev) => {
+      const nextId = prev.length > 0 ? Math.max(...prev.map((p) => p.id)) + 1 : 1
+      return [...prev, { id: nextId, name: data.name }]
+    })
   }
 
   return (
@@ -201,53 +186,11 @@ export default function ChuongTrinhDaoTaoPage() {
                 <div className="relative w-[250px]">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Nhập MSSV..."
+                    placeholder="Nhập tên CTĐT..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-9 h-9 bg-white"
                   />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={selectedKhoa}
-                    onValueChange={(value) => {
-                      setSelectedKhoa(value)
-                      setSelectedLop(undefined)
-                    }}
-                  >
-                    <SelectTrigger className="h-9 w-[120px] bg-white">
-                      <SelectValue placeholder="Khóa" />
-                    </SelectTrigger>
-                    <SelectContent
-                      position="popper"
-                      side="bottom"
-                      align="center"
-                      className="w-[var(--radix-select-trigger-width)]"
-                    >
-                      <SelectItem value="all">Tất cả</SelectItem>
-                      <SelectItem value="48K">48K</SelectItem>
-                      <SelectItem value="49K">49K</SelectItem>
-                      <SelectItem value="50K">50K</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={selectedLop} onValueChange={setSelectedLop}>
-                    <SelectTrigger className="h-9 w-[140px] bg-white">
-                      <SelectValue placeholder="Lớp" />
-                    </SelectTrigger>
-                    <SelectContent
-                      position="popper"
-                      side="bottom"
-                      align="center"
-                      className="w-[var(--radix-select-trigger-width)]"
-                    >
-                      {availableClasses.map((lop) => (
-                        <SelectItem key={lop} value={lop}>
-                          {lop}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
 
                 <div className="flex items-center gap-2 ml-auto">
@@ -258,23 +201,6 @@ export default function ChuongTrinhDaoTaoPage() {
                     <Plus className="h-4 w-4" />
                     Thêm
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 gap-2 text-sm"
-                  >
-                    <Download className="h-4 w-4" />
-                    Mẫu
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 gap-2 text-sm"
-                    onClick={() => setIsImportOpen(true)}
-                  >
-                    <Upload className="h-4 w-4" />
-                    Import
-                  </Button>
                 </div>
               </div>
 
@@ -282,74 +208,35 @@ export default function ChuongTrinhDaoTaoPage() {
               <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
                 <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                   <div className="overflow-auto">
-                    <Table className="w-full min-w-[900px]">
+                    <Table className="w-full min-w-[500px]">
                       <TableHeader>
                         <TableRow className="border-b border-gray-200 bg-blue-50">
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                          <TableHead className="h-10 px-4 w-[80px] text-left text-sm font-semibold text-gray-700">
                             STT
                           </TableHead>
                           <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
-                            MSSV
+                            TÊN CHƯƠNG TRÌNH ĐÀO TẠO
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
-                            HỌ VÀ TÊN
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
-                            LỚP
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
-                            NGÀY SINH
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
-                            GHI CHÚ
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 w-12" />
                         </TableRow>
                       </TableHeader>
 
                       <TableBody>
-                        {filteredStudents.map((student, index) => (
+                        {filteredPrograms.map((program, index) => (
                           <TableRow
-                            key={student.id}
+                            key={program.id}
                             className="border-b border-gray-200 hover:bg-gray-50"
                           >
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
+                            <TableCell className="h-12 px-4 w-[80px] text-sm text-gray-600">
                               {String(index + 1).padStart(2, "0")}
                             </TableCell>
                             <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.mssv}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.hoTen}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.lop}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.ngaySinh}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.ghiChu}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-right w-12">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="start" sideOffset={8}>
-                                  <DropdownMenuItem onClick={() => handleEdit(student)}>
-                                    <Edit className="h-4 w-4 mr-2" /> Sửa
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="text-red-600"
-                                    onClick={() => handleDelete(student)}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" /> Xóa
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              <button
+                                type="button"
+                                className="text-blue-700 hover:underline font-medium outline-none"
+                                onClick={() => router.push(`/quan-ly-du-lieu/chuong-trinh-dao-tao/${program.id}`)}
+                              >
+                                {program.name}
+                              </button>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -415,17 +302,17 @@ export default function ChuongTrinhDaoTaoPage() {
         </Tabs>
       </div>
 
-      <StudentFormDialog
+      <ProgramFormDialog
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
-        student={selectedStudent}
+        onSave={handleSaveProgram}
+        existingProgramNames={programs.map((p) => p.name)}
       />
       <DeleteDialog
         open={isDeleteOpen}
         onOpenChange={setIsDeleteOpen}
         student={selectedStudent}
       />
-      <ImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
     </AppLayout>
   )
 }

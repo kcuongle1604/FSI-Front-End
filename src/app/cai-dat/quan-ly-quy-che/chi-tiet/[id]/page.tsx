@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { RegulationCondition, regulations } from "../../page";
 import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 // Dữ liệu mẫu điều kiện giống màn hình trong thiết kế
 const demoConditions: RegulationCondition[] = [
@@ -24,6 +24,7 @@ const demoConditions: RegulationCondition[] = [
 ];
 
 export default function RegulationDetailPage() {
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const regulationId = Number(params?.id);
   const regulation = regulations.find((r) => r.id === regulationId);
@@ -52,17 +53,29 @@ export default function RegulationDetailPage() {
   return (
     <AppLayout showSearch={false}>
       <div className="h-full flex flex-col px-8 py-5 bg-slate-50/50">
-        {/* Header */}
-        <div className="mb-2">
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Quản lý quy chế</h1>
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Cài đặt
+            <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">
+              &gt;{' '}
+              <button
+                type="button"
+                onClick={() => router.push("/cai-dat/quan-ly-quy-che")}
+                className="text-blue-700 hover:underline"
+              >
+                Quản lý quy chế
+              </button>
+              {regulationTitle && (
+                <>
+                  <span className="mx-1">&gt;</span>
+                  {regulationTitle}
+                </>
+              )}
+            </span>
+          </h1>
         </div>
-        {/* Thanh thông tin thay cho thanh tìm kiếm ở màn danh sách */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-9 flex items-center text-base text-gray-600 font-medium">
-            {regulationTitle}
-          </div>
-        </div>
-        {/* Bảng điều kiện */}
+        {/* Spacer giữ vị trí bảng giống trước, không hiển thị tiêu đề */}
+        <div className="mb-6 h-9" />
         <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
           <div className="flex-1 flex flex-col min-h-0">
             <div className="flex-1 overflow-auto min-h-0">

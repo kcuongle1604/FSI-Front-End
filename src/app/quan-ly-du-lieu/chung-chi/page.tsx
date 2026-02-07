@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
 import { Users, History } from "lucide-react"
@@ -40,71 +40,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 
-// Dùng lại toàn bộ component & dữ liệu của Sinh viên
-import StudentFormDialog from "../sinh-vien/components/StudentFormDialog"
-import DeleteDialog from "../sinh-vien/components/DeleteDialog"
+import CertificateFormDialog from "./components/CertificateFormDialog"
+import DeleteCertificateDialog from "./components/DeleteCertificateDialog"
 import ImportDialog from "../sinh-vien/components/ImportDialog"
 import ImportHistoryTab from "../sinh-vien/components/ImportHistoryTab"
-import { getStudents } from "../sinh-vien/student.api"
-import type { Student, ImportHistory } from "../sinh-vien/types"
-import { sampleStudents, classesByCourse } from "../sinh-vien/data"
+import type { Certificate, CertificateFormData } from "./types"
+import { sampleCertificates, batchesAndClasses } from "./data"
+import type { ImportHistory } from "../sinh-vien/types"
 
 export default function ChungChiPage() {
   const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien")
   const [searchQuery, setSearchQuery] = useState("")
-  const [students, setStudents] = useState<Student[]>([])
-  const [loading, setLoading] = useState(false)
-
   const [selectedKhoa, setSelectedKhoa] = useState<string | undefined>()
   const [selectedLop, setSelectedLop] = useState<string | undefined>()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
-
+  const [selectedCertificate, setSelectedCertificate] = useState<Certificate | null>(null)
+  const [certificates, setCertificates] = useState<Certificate[]>(sampleCertificates)
   const [importHistory] = useState<ImportHistory[]>([])
 
-  useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        setLoading(true)
-        const res = await getStudents()
-        const apiStudents = Array.isArray(res?.data?.students) ? res.data.students : []
-
-        if (apiStudents.length > 0) {
-          const mapped: Student[] = apiStudents.map((s: any) => ({
-            id: s.student_id,
-            mssv: s.mssv,
-            hoTen: s.ho_ten,
-            lop: s.lop,
-            ngaySinh: s.ngay_sinh,
-            ghiChu: s.ghi_chu ?? "",
-          }))
-          setStudents(mapped)
-        } else {
-          setStudents(sampleStudents.slice(0, 5))
-        }
-      } catch (err) {
-        console.error("Load sinh viên thất bại", err)
-        setStudents(sampleStudents.slice(0, 5))
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchStudents()
-  }, [])
-
-  const allClasses = Object.values(classesByCourse).flat()
+  const allClasses = Object.values(batchesAndClasses).flat()
 
   const availableClasses =
     !selectedKhoa || selectedKhoa === "all"
       ? allClasses
-      : classesByCourse[selectedKhoa] || []
+      : batchesAndClasses[selectedKhoa] || []
 
-  const filteredStudents = students.filter((student) => {
+  const filteredCertificates = certificates.filter((certificate) => {
     if (!selectedLop || selectedLop === "all") {
       return false
     }
@@ -112,12 +78,12 @@ export default function ChungChiPage() {
     if (
       selectedKhoa &&
       selectedKhoa !== "all" &&
-      !String(student.lop).startsWith(selectedKhoa)
+      !String(certificate.lop).startsWith(selectedKhoa)
     ) {
       return false
     }
 
-    if (selectedLop && selectedLop !== "all" && student.lop !== selectedLop) {
+    if (selectedLop && selectedLop !== "all" && certificate.lop !== selectedLop) {
       return false
     }
 
@@ -125,29 +91,41 @@ export default function ChungChiPage() {
     if (!query) return true
 
     return (
-      student.hoTen.toLowerCase().includes(query) ||
-      String(student.mssv).includes(searchQuery)
+      `${certificate.hoLot} ${certificate.ten}`.toLowerCase().includes(query)
     )
   })
 
   const PAGE_SIZE = 30
-  const totalRecords = filteredStudents.length
+  const totalRecords = filteredCertificates.length
   const displayCount = Math.min(PAGE_SIZE, totalRecords)
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
 
-  const handleEdit = (student: Student) => {
-    setSelectedStudent(student)
+  const handleEdit = (certificate: Certificate) => {
+    setSelectedCertificate(certificate)
     setIsFormOpen(true)
   }
 
-  const handleDelete = (student: Student) => {
-    setSelectedStudent(student)
+  const handleDelete = (certificate: Certificate) => {
+    setSelectedCertificate(certificate)
     setIsDeleteOpen(true)
   }
 
   const handleAdd = () => {
-    setSelectedStudent(null)
+    setSelectedCertificate(null)
     setIsFormOpen(true)
+  }
+
+  const handleSubmitCertificate = (data: CertificateFormData) => {
+    setCertificates((prev) => {
+      if (selectedCertificate) {
+        return prev.map((item) =>
+          item.id === selectedCertificate.id ? { ...item, ...data } : item
+        )
+      }
+
+      const newId = prev.length > 0 ? Math.max(...prev.map((c) => c.id)) + 1 : 1
+      return [...prev, { id: newId, ...data }]
+    })
   }
 
   return (
@@ -201,7 +179,7 @@ export default function ChungChiPage() {
                 <div className="relative w-[250px]">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Nhập MSSV..."
+                    placeholder="Nhập tên sinh viên..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-9 h-9 bg-white"
@@ -282,77 +260,145 @@ export default function ChungChiPage() {
               <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
                 <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                   <div className="overflow-auto">
-                    <Table className="w-full min-w-[900px]">
+                    <Table className="w-full min-w-[1000px]">
                       <TableHeader>
                         <TableRow className="border-b border-gray-200 bg-blue-50">
                           <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
                             STT
                           </TableHead>
                           <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
-                            MSSV
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
-                            HỌ VÀ TÊN
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
                             LỚP
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                            HỌ LÓT
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                            TÊN
                           </TableHead>
                           <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
                             NGÀY SINH
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
-                            GHI CHÚ
+                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">
+                            ĐƠN XIN CÔNG NHẬN TN
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">
+                            BẢN KIỂM ĐIỂM CÁ NHÂN
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">
+                            CC QUÂN SỰ
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">
+                            CC THỂ DỤC
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">
+                            CC NGOẠI NGỮ
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">
+                            CC TIN HỌC
                           </TableHead>
                           <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 w-12" />
                         </TableRow>
                       </TableHeader>
 
                       <TableBody>
-                        {filteredStudents.map((student, index) => (
-                          <TableRow
-                            key={student.id}
-                            className="border-b border-gray-200 hover:bg-gray-50"
-                          >
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {String(index + 1).padStart(2, "0")}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.mssv}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.hoTen}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.lop}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.ngaySinh}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.ghiChu}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-right w-12">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="start" sideOffset={8}>
-                                  <DropdownMenuItem onClick={() => handleEdit(student)}>
-                                    <Edit className="h-4 w-4 mr-2" /> Sửa
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="text-red-600"
-                                    onClick={() => handleDelete(student)}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" /> Xóa
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {filteredCertificates.map((certificate, index) => {
+                          return (
+                            <TableRow
+                              key={certificate.id}
+                              className="border-b border-gray-200 hover:bg-gray-50"
+                            >
+                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                                {String(index + 1).padStart(2, "0")}
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                                {certificate.lop}
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                                {certificate.hoLot}
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                                {certificate.ten}
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                                {certificate.ngaySinh}
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
+                                <div className="flex justify-center">
+                                  <Checkbox
+                                    checked={certificate.donTN}
+                                    disabled
+                                    className="pointer-events-none data-[state=unchecked]:bg-transparent"
+                                  />
+                                </div>
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
+                                <div className="flex justify-center">
+                                  <Checkbox
+                                    checked={certificate.kiemDiem}
+                                    disabled
+                                    className="pointer-events-none data-[state=unchecked]:bg-transparent"
+                                  />
+                                </div>
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
+                                <div className="flex justify-center">
+                                  <Checkbox
+                                    checked={certificate.quanSu}
+                                    disabled
+                                    className="pointer-events-none data-[state=unchecked]:bg-transparent"
+                                  />
+                                </div>
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
+                                <div className="flex justify-center">
+                                  <Checkbox
+                                    checked={certificate.theDuc}
+                                    disabled
+                                    className="pointer-events-none data-[state=unchecked]:bg-transparent"
+                                  />
+                                </div>
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
+                                <div className="flex justify-center">
+                                  <Checkbox
+                                    checked={certificate.ngoaiNgu}
+                                    disabled
+                                    className="pointer-events-none data-[state=unchecked]:bg-transparent"
+                                  />
+                                </div>
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
+                                <div className="flex justify-center">
+                                  <Checkbox
+                                    checked={certificate.tinhHoc}
+                                    disabled
+                                    className="pointer-events-none data-[state=unchecked]:bg-transparent"
+                                  />
+                                </div>
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-right w-12">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="start" sideOffset={8}>
+                                    <DropdownMenuItem onClick={() => handleEdit(certificate)}>
+                                      <Edit className="h-4 w-4 mr-2" /> Sửa
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="text-red-600"
+                                      onClick={() => handleDelete(certificate)}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" /> Xóa
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
                       </TableBody>
                     </Table>
                   </div>
@@ -415,17 +461,38 @@ export default function ChungChiPage() {
         </Tabs>
       </div>
 
-      <StudentFormDialog
+      <CertificateFormDialog
         open={isFormOpen}
-        onOpenChange={setIsFormOpen}
-        student={selectedStudent}
+        onOpenChange={(open) => {
+          setIsFormOpen(open)
+          if (!open) {
+            setSelectedCertificate(null)
+          }
+        }}
+        certificate={selectedCertificate ?? undefined}
+        onSubmit={handleSubmitCertificate}
       />
-      <DeleteDialog
+      <DeleteCertificateDialog
         open={isDeleteOpen}
-        onOpenChange={setIsDeleteOpen}
-        student={selectedStudent}
+        onOpenChange={(open) => {
+          setIsDeleteOpen(open)
+          if (!open) {
+            setSelectedCertificate(null)
+          }
+        }}
+        certificateName={selectedCertificate ? `${selectedCertificate.hoLot} ${selectedCertificate.ten}` : ""}
+        onConfirm={() => {
+          if (!selectedCertificate) return
+          setCertificates((prev) => prev.filter((item) => item.id !== selectedCertificate.id))
+          setSelectedCertificate(null)
+        }}
       />
-      <ImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
+      <ImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        isCertificateImport
+        classOptions={allClasses.map((lop) => ({ value: lop, label: lop }))}
+      />
     </AppLayout>
   )
 }
