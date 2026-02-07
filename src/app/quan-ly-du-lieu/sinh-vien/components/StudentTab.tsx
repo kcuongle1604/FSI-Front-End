@@ -158,14 +158,14 @@ export default function StudentTab({ data, onAdd, onImport, onEdit, onDelete }: 
             <div className="overflow-auto">
               <Table className="min-w-max">
                 <TableHeader>
-                  <TableRow className="border-b border-gray-200">
-                    <TableHead className="px-4 text-center text-sm font-medium text-gray-700" style={{ position: 'sticky', top: 0, zIndex: 20, background: '#fff', borderBottom: '1px solid #E5E7EB', paddingTop: '10px', paddingBottom: '10px' }}>STT</TableHead>
-                    <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700" style={{ position: 'sticky', top: 0, zIndex: 20, background: '#fff', borderBottom: '1px solid #E5E7EB', paddingTop: '10px', paddingBottom: '10px' }}>MSSV</TableHead>
-                    <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700" style={{ position: 'sticky', top: 0, zIndex: 20, background: '#fff', borderBottom: '1px solid #E5E7EB', paddingTop: '10px', paddingBottom: '10px' }}>Họ và tên</TableHead>
-                    <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700" style={{ position: 'sticky', top: 0, zIndex: 20, background: '#fff', borderBottom: '1px solid #E5E7EB', paddingTop: '10px', paddingBottom: '10px' }}>Lớp</TableHead>
-                    <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700" style={{ position: 'sticky', top: 0, zIndex: 20, background: '#fff', borderBottom: '1px solid #E5E7EB', paddingTop: '10px', paddingBottom: '10px' }}>Ngày sinh</TableHead>
-                    <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700" style={{ position: 'sticky', top: 0, zIndex: 20, background: '#fff', borderBottom: '1px solid #E5E7EB', paddingTop: '10px', paddingBottom: '10px' }}>Ghi chú</TableHead>
-                    <TableHead className="h-10 px-4 text-center text-sm font-medium text-gray-700 w-10" style={{ position: 'sticky', top: 0, zIndex: 20, background: '#fff', borderBottom: '1px solid #E5E7EB', paddingTop: '10px', paddingBottom: '10px' }}></TableHead>
+                  <TableRow className="border-b border-gray-200 bg-[#F3F8FF]">
+                    <TableHead className="px-4 text-center text-sm font-medium text-gray-700" style={{ position: 'sticky', top: 0, zIndex: 20, background: '#F3F8FF', borderBottom: '1px solid #E5E7EB', paddingTop: '10px', paddingBottom: '10px' }}>STT</TableHead>
+                    <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700" style={{ position: 'sticky', top: 0, zIndex: 20, background: '#F3F8FF', borderBottom: '1px solid #E5E7EB', paddingTop: '10px', paddingBottom: '10px' }}>MSSV</TableHead>
+                    <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700" style={{ position: 'sticky', top: 0, zIndex: 20, background: '#F3F8FF', borderBottom: '1px solid #E5E7EB', paddingTop: '10px', paddingBottom: '10px' }}>Họ và tên</TableHead>
+                    <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700" style={{ position: 'sticky', top: 0, zIndex: 20, background: '#F3F8FF', borderBottom: '1px solid #E5E7EB', paddingTop: '10px', paddingBottom: '10px' }}>Lớp</TableHead>
+                    <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700" style={{ position: 'sticky', top: 0, zIndex: 20, background: '#F3F8FF', borderBottom: '1px solid #E5E7EB', paddingTop: '10px', paddingBottom: '10px' }}>Ngày sinh</TableHead>
+                    <TableHead className="h-10 px-4 text-left text-sm font-medium text-gray-700" style={{ position: 'sticky', top: 0, zIndex: 20, background: '#F3F8FF', borderBottom: '1px solid #E5E7EB', paddingTop: '10px', paddingBottom: '10px' }}>Ghi chú</TableHead>
+                    <TableHead className="h-10 px-4 text-center text-sm font-medium text-gray-700 w-10" style={{ position: 'sticky', top: 0, zIndex: 20, background: '#F3F8FF', borderBottom: '1px solid #E5E7EB', paddingTop: '10px', paddingBottom: '10px' }}></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

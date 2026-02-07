@@ -57,7 +57,7 @@ export default function ImportHistoryTab({ history }: ImportHistoryTabProps) {
             <Table className="min-w-max">
               <TableHeader>
                 <TableRow className="border-b border-gray-200 bg-[#F3F8FF]">
-                  <TableHead className="h-10 px-0 text-left text-sm font-semibold text-gray-800">STT</TableHead>
+                  <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-800">STT</TableHead>
                   <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-800">TÊN FILE</TableHead>
                   <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-800">TRẠNG THÁI</TableHead>
                   <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-800">THÀNH CÔNG</TableHead>
@@ -70,7 +70,7 @@ export default function ImportHistoryTab({ history }: ImportHistoryTabProps) {
               <TableBody>
                 {paginatedImportHistory.map((doc, index) => (
                   <TableRow key={doc.id} className="border-b border-gray-200 hover:bg-gray-50">
-                    <TableCell className="h-12 px-0 text-sm text-gray-600">
+                    <TableCell className="h-12 px-4 text-center text-sm text-gray-600">
                       {String((importPage - 1) * importPageSize + index + 1).padStart(2, '0')}
                     </TableCell>
                     <TableCell className="h-12 px-4 text-sm font-medium text-gray-900">{doc.fileName}</TableCell>

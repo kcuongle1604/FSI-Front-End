@@ -61,12 +61,12 @@ export default function StudentFormDialog({ open, onOpenChange, student }: Stude
   const handleNgaySinhChange = (raw: string) => {
     const digits = raw.replace(/\D/g, "").slice(0, 8)
     let formatted = ""
-    if (digits.length <= 2) {
+    if (digits.length <= 4) {
       formatted = digits
-    } else if (digits.length <= 4) {
-      formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`
+    } else if (digits.length <= 6) {
+      formatted = `${digits.slice(0, 4)}/${digits.slice(4)}`
     } else {
-      formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+      formatted = `${digits.slice(0, 4)}/${digits.slice(4, 6)}/${digits.slice(6)}`
     }
     setFormData({ ...formData, ngaySinh: formatted })
   }
@@ -172,7 +172,7 @@ export default function StudentFormDialog({ open, onOpenChange, student }: Stude
               id="ngaySinh"
               value={formData.ngaySinh}
               onChange={(e) => handleNgaySinhChange(e.target.value)}
-              placeholder="dd/mm/yyyy"
+              placeholder="yyyy/mm/dd"
               inputMode="numeric"
             />
           </div>

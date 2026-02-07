@@ -243,7 +243,21 @@ export default function SinhVienPage() {
                       <SelectItem value="50K">50K</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={selectedLop} onValueChange={setSelectedLop}>
+                  <Select
+                    value={selectedLop}
+                    onValueChange={(value) => {
+                      setSelectedLop(value)
+                      // Nếu chưa chọn Khóa, tự suy ra từ tiền tố của Lớp (vd: 48K21.2 -> 48K)
+                      if (!selectedKhoa || selectedKhoa === "all") {
+                        const matchedKhoa = ["48K", "49K", "50K"].find((khoa) =>
+                          String(value).startsWith(khoa)
+                        )
+                        if (matchedKhoa) {
+                          setSelectedKhoa(matchedKhoa)
+                        }
+                      }
+                    }}
+                  >
                     <SelectTrigger className="h-9 w-[140px] bg-white">
                       <SelectValue placeholder="Lớp" />
                     </SelectTrigger>
