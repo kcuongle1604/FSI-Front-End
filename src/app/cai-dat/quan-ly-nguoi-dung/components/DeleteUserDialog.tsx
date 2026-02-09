@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -7,15 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-
-type Account = {
-  id: number
-  name: string
-  email: string
-  role: string
-  status: string
-  isBan: boolean
-}
+import { Account } from "../page"
 
 type DeleteUserDialogProps = {
   open: boolean
@@ -25,11 +18,18 @@ type DeleteUserDialogProps = {
 }
 
 export function DeleteUserDialog({ open, onOpenChange, account, onConfirm }: DeleteUserDialogProps) {
-  const handleConfirm = () => {
-    if (onConfirm) {
-      onConfirm()
+  const [loading, setLoading] = useState(false)
+
+  const handleConfirm = async () => {
+    try {
+      setLoading(true)
+      if (onConfirm) {
+        await onConfirm()
+      }
+    } finally {
+      setLoading(false)
+      onOpenChange(false)
     }
-    onOpenChange(false)
   }
 
   const handleCancel = () => {
@@ -45,7 +45,7 @@ export function DeleteUserDialog({ open, onOpenChange, account, onConfirm }: Del
 
         <div className="space-y-6">
           <p className="text-sm text-gray-700">
-            Bạn có chắc chắn muốn <span className="font-semibold">xóa người dùng {account?.name}</span> khỏi hệ thống không?
+            Bạn có chắc chắn muốn <span className="font-semibold">xóa người dùng {account?.username}</span> khỏi hệ thống không?
           </p>
 
           {/* Action Buttons */}
@@ -54,14 +54,16 @@ export function DeleteUserDialog({ open, onOpenChange, account, onConfirm }: Del
               variant="outline"
               onClick={handleCancel}
               className="px-6 bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
+              disabled={loading}
             >
               Hủy
             </Button>
             <Button
               onClick={handleConfirm}
               className="px-6 bg-red-600 hover:bg-red-700 text-white"
+              disabled={loading}
             >
-              Có
+              {loading ? "Đang xóa..." : "Có"}
             </Button>
           </div>
         </div>

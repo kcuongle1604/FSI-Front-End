@@ -15,15 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-
-type Account = {
-  id: number
-  name: string
-  email: string
-  role: string
-  status: string
-  isBan: boolean
-}
+import { Account } from "../page"
 
 interface UserManagementTableProps {
   accounts: Account[]
@@ -63,31 +55,31 @@ export default function UserManagementTable({
             </TableHeader>
             <TableBody>
               {accounts.slice(0, 30).map((account, index) => (
-                <TableRow key={account.id} className="border-b border-gray-200 hover:bg-gray-50">
+                <TableRow key={account.user_id} className="border-b border-gray-200 hover:bg-gray-50">
                   <TableCell className="h-12 px-4 text-sm text-gray-600">
                     {String(index + 1).padStart(2, '0')}
                   </TableCell>
                   <TableCell className="h-12 px-4 text-right pr-8">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">{account.name}</span>
-                      {account.isBan && (
+                      <span className="text-sm text-gray-600">{account.username}</span>
+                      {account.is_active && (
                         <Badge className="bg-[#E8F2FF] text-[#167FFC] hover:bg-[#E8F2FF] text-xs px-2 py-0.5">
-                          BAN
+                          ACTIVE
                         </Badge>
                       )}
                     </div>
                   </TableCell>
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{account.email}</TableCell>
-                  <TableCell className="h-12 px-4 text-sm text-gray-600">{account.role}</TableCell>
+                  <TableCell className="h-12 px-4 text-sm text-gray-600">{account.role?.name}</TableCell>
                   <TableCell className="h-12 px-4 w-[160px] whitespace-nowrap">
                     <div 
                       className="flex items-center gap-2 cursor-pointer hover:text-[#167FFC] transition-colors w-fit"
                       onClick={() => onStatusClick(account)}
                     >
                       <span className={`w-1.5 h-1.5 rounded-full ${
-                        userStatuses[account.id] === "Hoạt động" ? "bg-green-500" : "bg-red-500"
+                        userStatuses[account.user_id] === "Hoạt động" ? "bg-green-500" : "bg-red-500"
                       }`}></span>
-                      <span className="text-sm text-gray-900">{userStatuses[account.id]}</span>
+                      <span className="text-sm text-gray-900">{userStatuses[account.user_id]}</span>
                     </div>
                   </TableCell>
                   <TableCell className="h-12 px-4 text-right w-12">

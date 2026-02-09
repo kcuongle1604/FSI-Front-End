@@ -18,17 +18,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { MultiSelect } from "@/components/ui/multi-select"
+import { Account } from "../page"
+import { User, UserUpdateRequest } from "@/lib/user.api"
 
 const CLASSES = ["48K05", "48K14.1", "48K14.2", "48K21.1", "48K21.2"]
-
-type Account = {
-  id: number
-  name: string
-  email: string
-  role: string
-  status: string
-  isBan: boolean
-}
 
 type EditUserDialogProps = {
   open: boolean
@@ -38,25 +31,21 @@ type EditUserDialogProps = {
 }
 
 export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUserDialogProps) {
-  const [formData, setFormData] = useState({
-    role: "",
-    assignClasses: [] as string[],
+  const [formData, setFormData] = useState<UserUpdateRequest>({
+    role_id: "",
     email: "",
-    fullName: "",
+    username: "",
     password: "",
-    confirmPassword: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (account && open) {
       setFormData({
-        role: account.role,
-        assignClasses: account.role === "Giáo viên chủ nhiệm" ? ["48K05"] : [],
+        role_id: account.role?.role_id.toString() || "",
         email: account.email,
-        fullName: account.name,
-        password: "",
-        confirmPassword: "",
+        username: account.username,
       })
       setErrors({})
     }
@@ -84,23 +73,23 @@ export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUs
     }
   }
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.role) newErrors.role = "Vui lòng chọn vai trò"
-    if (formData.role === "Giáo viên chủ nhiệm" && formData.assignClasses.length === 0) {
-      newErrors.assignClasses = "Vui lòng chọn ít nhất một lớp"
-    }
+    if (!formData.role_id) newErrors.role = "Vui lòng chọn vai trò"
+    // if (formData.role_id === "Giáo viên chủ nhiệm" && formData.assignClasses.length === 0) {
+    //   newErrors.assignClasses = "Vui lòng chọn ít nhất một lớp"
+    // }
     if (!formData.email) newErrors.email = "Vui lòng nhập email"
-    if (!formData.fullName) newErrors.fullName = "Vui lòng nhập họ và tên"
+    if (!formData.username) newErrors.username = "Vui lòng nhập họ và tên"
 
     // Only validate password if provided
     if (formData.password) {
-      if (!formData.confirmPassword) {
-        newErrors.confirmPassword = "Vui lòng xác nhận mật khẩu"
-      } else if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = "Mật khẩu xác nhận không khớp"
-      }
+      // if (!formData.confirmPassword) {
+      //   newErrors.confirmPassword = "Vui lòng xác nhận mật khẩu"
+      // } else if (formData.password !== formData.confirmPassword) {
+      //   newErrors.confirmPassword = "Mật khẩu xác nhận không khớp"
+      // }
     }
 
     setErrors(newErrors)
@@ -109,31 +98,39 @@ export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUs
       return
     }
 
-    if (onUpdate) {
-      onUpdate(formData)
+    try {
+      setLoading(true)
+      if (onUpdate) {
+        await onUpdate(formData)
+      }
+
+      setFormData({
+        role_id: "",
+        //assignClasses: [],
+        email: "",
+        username: "",
+        password: "",
+        //confirmPassword: "",
+      })
+      setErrors({})
+
+      onOpenChange(false)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to update user"
+      setErrors({ submit: errorMessage })
+    } finally {
+      setLoading(false)
     }
-
-    setFormData({
-      role: "",
-      assignClasses: [],
-      email: "",
-      fullName: "",
-      password: "",
-      confirmPassword: "",
-    })
-    setErrors({})
-
-    onOpenChange(false)
   }
 
   const handleCancel = () => {
     setFormData({
-      role: "",
-      assignClasses: [],
+      role_id: "",
+      //assignClasses: [],
       email: "",
-      fullName: "",
+      username: "",
       password: "",
-      confirmPassword: "",
+      //confirmPassword: "",
     })
     setErrors({})
     onOpenChange(false)
@@ -147,12 +144,19 @@ export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUs
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Error Message */}
+          {errors.submit && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-700">{errors.submit}</p>
+            </div>
+          )}
+
           {/* Role */}
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-800">
               Vai trò<span className="text-red-500">*</span>
             </Label>
-            <Select value={formData.role} onValueChange={(value) => handleInputChange("role", value)}>
+            <Select value={formData.role_id} onValueChange={(value) => handleInputChange("role", value)}>
               <SelectTrigger className="w-full border-gray-300">
                 <SelectValue placeholder="Chọn vai trò" />
               </SelectTrigger>
@@ -165,7 +169,7 @@ export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUs
           </div>
 
           {/* Assign Class */}
-          <div className="space-y-2">
+          {/*<div className="space-y-2">
             <Label className="text-sm font-medium text-gray-800">
               Gán lớp<span className="text-red-500">*</span>
             </Label>
@@ -173,11 +177,12 @@ export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUs
               options={CLASSES}
               value={formData.assignClasses}
               onChange={(classes) => setFormData(prev => ({ ...prev, assignClasses: classes }))}
-              disabled={formData.role !== "Giáo viên chủ nhiệm"}
+              disabled={formData.role_id !== "Giáo viên chủ nhiệm"}
               placeholder="Chọn lớp"
             />
             {errors.assignClasses && <p className="text-xs text-red-500">{errors.assignClasses}</p>}
           </div>
+          */}
 
           {/* Email */}
           <div className="space-y-2">
@@ -207,7 +212,7 @@ export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUs
               id="fullName"
               type="text"
               placeholder="Nhập họ và tên"
-              value={formData.fullName}
+              value={formData.username}
               onChange={(e) => {
                 handleInputChange("fullName", e.target.value)
                 if (errors.fullName) setErrors(prev => ({ ...prev, fullName: "" }))
@@ -237,7 +242,7 @@ export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUs
           </div>
 
           {/* Confirm Password */}
-          {formData.password && (
+          {/*formData.password && (
             <div className="space-y-2">
               <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-800">
                 Xác nhận lại mật khẩu<span className="text-red-500">*</span>
@@ -255,7 +260,7 @@ export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUs
               />
               {errors.confirmPassword && <p className="text-xs text-red-500">{errors.confirmPassword}</p>}
             </div>
-          )}
+          )*/}
         </div>
 
         {/* Action Buttons */}
@@ -264,14 +269,16 @@ export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUs
             variant="outline"
             onClick={handleCancel}
             className="px-6 bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
+            disabled={loading}
           >
             Hủy
           </Button>
           <Button
             onClick={handleUpdate}
             className="px-6 bg-[#167FFC] hover:bg-[#1470E3] text-white"
+            disabled={loading}
           >
-            Cập nhật
+            {loading ? "Đang cập nhật..." : "Cập nhật"}
           </Button>
         </div>
       </DialogContent>
