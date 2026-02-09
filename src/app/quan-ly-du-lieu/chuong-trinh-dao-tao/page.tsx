@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
-import { Users, History } from "lucide-react"
+import { BookOpen, History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -56,7 +56,7 @@ export const INITIAL_PROGRAMS: Program[] = [
 
 export default function ChuongTrinhDaoTaoPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien")
+  const [activeTab, setActiveTab] = useState("chuong-trinh-dao-tao")
   const [searchQuery, setSearchQuery] = useState("")
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(false)
@@ -178,12 +178,12 @@ export default function ChuongTrinhDaoTaoPage() {
           <div className="border-b border-slate-200">
             <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start">
               <TabsTrigger
-                value="thong-tin-sinh-vien"
-                className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
+                value="chuong-trinh-dao-tao"
+                className="relative min-w-[180px] justify-center flex rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
               >
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Thông tin sinh viên
+                <div className="flex items-center justify-center gap-2 w-full">
+                  <BookOpen className="w-4 h-4" />
+                  Chương trình đào tạo
                 </div>
               </TabsTrigger>
 
@@ -201,7 +201,7 @@ export default function ChuongTrinhDaoTaoPage() {
 
           <div className="flex-1 min-h-0 mt-5 flex flex-col">
             <TabsContent
-              value="thong-tin-sinh-vien"
+              value="chuong-trinh-dao-tao"
               className="m-0 h-full outline-none flex flex-col"
             >
               {/* Search & Actions – giống Quản lý người dùng */}

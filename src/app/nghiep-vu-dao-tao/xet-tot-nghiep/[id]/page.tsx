@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, ArrowLeft } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { ChevronDown, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -77,15 +77,25 @@ const students: Record<string, StudentDetail> = {
 
 const courseData: CourseData[] = [
   { id: 1, code: "MIS1600340", name: "Hệ thống thông tin quản lý", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
-  { id: 2, code: "MIS1600340", name: "Hệ thống thông tin quản lý", credits: 3, type: "Tự chọn", status: "Đã học (Đạt)" },
-  { id: 3, code: "MIS1600340", name: "Hệ thống thông tin quản lý", credits: 3, type: "Tự chọn", status: "Chưa học" },
-  { id: 4, code: "MIS1600340", name: "Hệ thống thông tin quản lý", credits: 3, type: "Bắt buộc", status: "Chưa học" },
-  { id: 5, code: "MIS1600340", name: "Hệ thống thông tin quản lý", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
-  { id: 6, code: "MIS1600340", name: "Hệ thống thông tin quản lý", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
-  { id: 7, code: "MIS1600340", name: "Hệ thống thông tin quản lý", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
-  { id: 8, code: "MIS1600340", name: "Hệ thống thông tin quản lý", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
-  { id: 9, code: "MIS1600340", name: "Hệ thống thông tin quản lý", credits: 3, type: "Bắt buộc", status: "Đã học (Chưa đạt)" },
-  { id: 10, code: "MIS1600340", name: "Hệ thống thông tin quản lý", credits: 3, type: "Bắt buộc", status: "Đã học (Chưa đạt)" },
+  { id: 2, code: "MIS1600341", name: "Cơ sở dữ liệu", credits: 3, type: "Tự chọn", status: "Đã học (Đạt)" },
+  { id: 3, code: "MIS1600342", name: "Lập trình nâng cao", credits: 3, type: "Tự chọn", status: "Chưa học" },
+  { id: 4, code: "MIS1600343", name: "Mạng máy tính", credits: 3, type: "Bắt buộc", status: "Chưa học" },
+  { id: 5, code: "MIS1600344", name: "Phân tích thiết kế Hệ thống", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
+  { id: 6, code: "MIS1600345", name: "Kiến trúc máy tính", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
+  { id: 7, code: "MIS1600346", name: "Hệ điều hành", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
+  { id: 8, code: "MIS1600347", name: "Kỹ thuật phần mềm", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
+  { id: 9, code: "MIS1600348", name: "Thiết kế web", credits: 3, type: "Tự chọn", status: "Đã học (Chưa đạt)" },
+  { id: 10, code: "MIS1600349", name: "Trí tuệ nhân tạo cơ bản", credits: 3, type: "Tự chọn", status: "Đã học (Chưa đạt)" },
+  { id: 11, code: "MIS1600350", name: "Thiết kế giao diện người dùng", credits: 2, type: "Tự chọn", status: "Đã học (Đạt)" },
+  { id: 12, code: "MIS1600351", name: "Bảo mật thông tin", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
+  { id: 13, code: "MIS1600352", name: "Toán rời rạc", credits: 3, type: "Bắt buộc", status: "Chưa học" },
+  { id: 14, code: "MIS1600353", name: "Phân tích dữ liệu", credits: 3, type: "Tự chọn", status: "Đã học (Đạt)" },
+  { id: 15, code: "MIS1600354", name: "Công nghệ đám mây", credits: 3, type: "Tự chọn", status: "Đã học (Đạt)" },
+  { id: 16, code: "MIS1600355", name: "Quản trị hệ thống cơ sở dữ liệu", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
+  { id: 17, code: "MIS1600356", name: "Kiểm thử phần mềm", credits: 2, type: "Tự chọn", status: "Chưa học" },
+  { id: 18, code: "MIS1600357", name: "Phát triển ứng dụng di động", credits: 3, type: "Tự chọn", status: "Đã học (Đạt)" },
+  { id: 19, code: "MIS1600358", name: "Khung pháp lý CNTT", credits: 2, type: "Tự chọn", status: "Đã học (Chưa đạt)" },
+  { id: 20, code: "MIS1600359", name: "Luận văn/Đồ án tốt nghiệp", credits: 6, type: "Bắt buộc", status: "Chưa học" },
 ]
 
 const certificateData: CertificateData[] = [
@@ -96,35 +106,43 @@ const certificateData: CertificateData[] = [
   { id: 5, name: "Chứng chỉ tin học", status: true, note: "" },
 ]
 
-export default function XetTotNghiepDetailPage({ params }: { params: { id: string } }) {
+export default function XetTotNghiepDetailPage({ params }: any) {
   const router = useRouter()
   const student = students["221121521260"] // In real app, fetch by params.id
   const [activeTab, setActiveTab] = useState("chuong-trinh")
 
+  const searchParams = useSearchParams()
+
+  const goToList = () => {
+    const qs = searchParams?.toString() ?? ""
+    const path = "/nghiep-vu-dao-tao/xet-tot-nghiep" + (qs ? "?" + qs : "")
+    router.push(path)
+  }
+
   return (
     <AppLayout showSearch={false}>
-      <div className="h-full flex flex-col px-8 py-5 bg-slate-50/50">
-        
-        {/* Header with Back Button */}
-        <div className="mb-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.back()}
-            className="h-9 w-9 hover:bg-gray-200"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+      <div className="flex-1 flex flex-col min-h-0 px-8 py-6 bg-[var(--background)]">
+
+        {/* Header breadcrumb */}
+        <div className="mb-4">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Xét tốt nghiệp
+            <button
+              type="button"
+              onClick={goToList}
+              className="text-blue-700 hover:underline font-semibold mr-2"
+            >
+              Xét tốt nghiệp
+            </button>
+            <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">
+              &gt; <span className="ml-1">{student.name}</span>
+            </span>
           </h1>
         </div>
 
-        {/* Detail Card */}
-        <div className="flex-1 flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
-          
-          {/* Student Info */}
-          <div className="px-6 py-4 border-b border-gray-200">
+        <div className="flex-1 flex flex-col gap-4">
+
+          {/* Student Info Card */}
+          <div className="bg-white rounded-xl border border-[var(--border)] p-6 shadow-sm">
             <div className="grid grid-cols-2 gap-8">
               <div className="space-y-3">
                 <div className="flex gap-4">
@@ -169,164 +187,105 @@ export default function XetTotNghiepDetailPage({ params }: { params: { id: strin
             </div>
           </div>
 
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-            <div className="px-6 pt-4 border-b border-gray-200">
-              <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start border-b-2 border-gray-200">
-                <TabsTrigger 
-                  value="chuong-trinh"
-                  className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 font-semibold"
-                >
-                  Chương trình học
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="chung-chi"
-                  className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 font-semibold"
-                >
-                  Chứng chỉ đầu ra
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            {/* Chương trình học Tab */}
-            <TabsContent value="chuong-trinh" className="flex-1 overflow-auto px-6 py-4">
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-blue-100 border-b border-gray-200">
-                      <TableHead className="h-10 px-4 text-center text-sm font-semibold">STT</TableHead>
-                      <TableHead className="h-10 px-4 text-left text-sm font-semibold">MÃ HỌC PHẦN</TableHead>
-                      <TableHead className="h-10 px-4 text-left text-sm font-semibold">TÊN HỌC PHẦN</TableHead>
-                      <TableHead className="h-10 px-4 text-center text-sm font-semibold">SỐ TC</TableHead>
-                      <TableHead className="h-10 px-4 text-left text-sm font-semibold">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <div className="flex items-center gap-1 cursor-pointer hover:text-gray-700">
-                              PHÂN LOẠI
-                              <ChevronDown className="w-4 h-4" />
-                            </div>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-48">
-                            <DropdownMenuCheckboxItem checked>Tất cả</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem>Bắt buộc</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem>Tự chọn</DropdownMenuCheckboxItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableHead>
-                      <TableHead className="h-10 px-4 text-left text-sm font-semibold">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <div className="flex items-center gap-1 cursor-pointer hover:text-gray-700">
-                              TRẠNG THÁI
-                              <ChevronDown className="w-4 h-4" />
-                            </div>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-48">
-                            <DropdownMenuCheckboxItem checked>Tất cả</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem>Đã học (Đạt)</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem>Chưa học</DropdownMenuCheckboxItem>
-                            <DropdownMenuCheckboxItem>Đã học (Chưa đạt)</DropdownMenuCheckboxItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {courseData.map((course, index) => (
-                      <TableRow key={course.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <TableCell className="h-12 px-4 text-center text-sm text-gray-600">
-                          {String(index + 1).padStart(2, '0')}
-                        </TableCell>
-                        <TableCell className="h-12 px-4 text-sm text-gray-600">{course.code}</TableCell>
-                        <TableCell className="h-12 px-4 text-sm text-gray-600">{course.name}</TableCell>
-                        <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{course.credits}</TableCell>
-                        <TableCell className="h-12 px-4 text-sm text-gray-600">
-                          <span className={course.type === "Tự chọn" ? "text-blue-600" : "text-gray-700"}>
-                            {course.type}
-                          </span>
-                        </TableCell>
-                        <TableCell className="h-12 px-4 text-sm">
-                          <span className={course.status.includes("Đạt") ? "text-green-600 font-medium" : course.status === "Chưa học" ? "text-gray-600" : "text-red-600 font-medium"}>
-                            {course.status}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+          {/* Tabs Card */}
+          <div className="flex-1 flex flex-col bg-white rounded-xl border border-[var(--border)] overflow-hidden min-h-0 shadow-sm">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+              <div className="px-6 pt-4 border-b border-[var(--border)]">
+                <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start">
+                  <TabsTrigger value="chuong-trinh" className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 font-semibold">
+                    Chương trình học
+                  </TabsTrigger>
+                  <TabsTrigger value="chung-chi" className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 font-semibold">
+                    Chứng chỉ đầu ra
+                  </TabsTrigger>
+                </TabsList>
               </div>
 
-              {/* Pagination */}
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-                <div className="text-sm text-gray-600">Hiển thị 10/40 dòng</div>
-                <div className="flex items-center gap-1">
-                  <Button variant="outline" size="icon" className="h-8 w-8">
-                    <ChevronsLeft className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon" className="h-8 w-8">
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <div className="px-3 text-sm font-medium">1 / 4</div>
-                  <Button variant="outline" size="icon" className="h-8 w-8">
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon" className="h-8 w-8">
-                    <ChevronsRight className="h-4 w-4" />
-                  </Button>
+              <TabsContent value="chuong-trinh" className="flex-1 flex flex-col px-6 py-4">
+                <div className="border border-[var(--border)] rounded-lg overflow-hidden flex flex-col flex-1">
+                  <div className="overflow-auto flex-1">
+                    <Table className="min-w-max w-full">
+                      <TableHeader>
+                        <TableRow style={{ position: 'sticky', top: 0, zIndex: 10 }} className="border-b border-gray-200 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">STT</TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">MÃ HỌC PHẦN</TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">TÊN HỌC PHẦN</TableHead>
+                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">SỐ TC</TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">PHÂN LOẠI</TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">TRẠNG THÁI</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {courseData.map((course, index) => (
+                          <TableRow key={course.id} className="border-b border-transparent odd:bg-white even:bg-slate-50 hover:bg-slate-100">
+                            <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{String(index + 1).padStart(2, '0')}</TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600">{course.code}</TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600">{course.name}</TableCell>
+                            <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{course.credits}</TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600"><span className={course.type === "Tự chọn" ? "text-blue-600" : "text-gray-700"}>{course.type}</span></TableCell>
+                            <TableCell className="h-12 px-4 text-sm"><span className={course.status.includes("Đạt") ? "text-green-600 font-medium" : course.status === "Chưa học" ? "text-gray-600" : "text-red-600 font-medium"}>{course.status}</span></TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-gray-200 sticky bottom-0 z-10 bg-white">
+                    <div className="flex items-center justify-between px-6 py-3">
+                      <div className="text-sm text-gray-600">Hiển thị 10/40 dòng</div>
+                      <div className="flex items-center gap-1">
+                        <Button variant="outline" size="icon" className="h-8 w-8"><ChevronsLeft className="h-4 w-4" /></Button>
+                        <Button variant="outline" size="icon" className="h-8 w-8"><ChevronLeft className="h-4 w-4" /></Button>
+                        <div className="px-3 text-sm font-medium">1 / 4</div>
+                        <Button variant="outline" size="icon" className="h-8 w-8"><ChevronRight className="h-4 w-4" /></Button>
+                        <Button variant="outline" size="icon" className="h-8 w-8"><ChevronsRight className="h-4 w-4" /></Button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </TabsContent>
+              </TabsContent>
 
-            {/* Chứng chỉ đầu ra Tab */}
-            <TabsContent value="chung-chi" className="flex-1 overflow-auto px-6 py-4">
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-blue-100 border-b border-gray-200">
-                      <TableHead className="h-10 px-4 text-center text-sm font-semibold">STT</TableHead>
-                      <TableHead className="h-10 px-4 text-left text-sm font-semibold">LOẠI CHỨNG CHỈ</TableHead>
-                      <TableHead className="h-10 px-4 text-center text-sm font-semibold">TRẠNG THÁI</TableHead>
-                      <TableHead className="h-10 px-4 text-left text-sm font-semibold">GHI CHÚ</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {certificateData.map((cert, index) => (
-                      <TableRow key={cert.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <TableCell className="h-12 px-4 text-center text-sm text-gray-600">
-                          {String(index + 1).padStart(2, '0')}
-                        </TableCell>
-                        <TableCell className="h-12 px-4 text-sm text-gray-600">{cert.name}</TableCell>
-                        <TableCell className="h-12 px-4 text-center">
-                          <Checkbox checked={cert.status} disabled />
-                        </TableCell>
-                        <TableCell className="h-12 px-4 text-sm text-gray-600">{cert.note}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <TabsContent value="chung-chi" className="flex-1 flex flex-col px-6 py-4">
+                <div className="border border-[var(--border)] rounded-lg overflow-hidden flex flex-col flex-1">
+                  <div className="overflow-auto flex-1">
+                    <Table className="min-w-max w-full">
+                      <TableHeader>
+                        <TableRow style={{ position: 'sticky', top: 0, zIndex: 10 }} className="border-b border-gray-200 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">STT</TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">LOẠI CHỨNG CHỈ</TableHead>
+                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">TRẠNG THÁI</TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">GHI CHÚ</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {certificateData.map((cert, index) => (
+                          <TableRow key={cert.id} className="border-b border-transparent odd:bg-white even:bg-slate-50 hover:bg-slate-100">
+                            <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{String(index + 1).padStart(2, '0')}</TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600">{cert.name}</TableCell>
+                            <TableCell className="h-12 px-4 text-center"><Checkbox checked={cert.status} disabled /></TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600">{cert.note}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
 
-              {/* Pagination */}
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-                <div className="text-sm text-gray-600">Hiển thị 05/05 dòng</div>
-                <div className="flex items-center gap-1">
-                  <Button variant="outline" size="icon" className="h-8 w-8">
-                    <ChevronsLeft className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon" className="h-8 w-8">
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <div className="px-3 text-sm font-medium">1 / 1</div>
-                  <Button variant="outline" size="icon" className="h-8 w-8">
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon" className="h-8 w-8">
-                    <ChevronsRight className="h-4 w-4" />
-                  </Button>
+                  <div className="mt-4 pt-4 border-t border-gray-200 sticky bottom-0 z-10 bg-white">
+                    <div className="flex items-center justify-between px-6 py-3">
+                      <div className="text-sm text-gray-600">Hiển thị 05/05 dòng</div>
+                      <div className="flex items-center gap-1">
+                        <Button variant="outline" size="icon" className="h-8 w-8"><ChevronsLeft className="h-4 w-4" /></Button>
+                        <Button variant="outline" size="icon" className="h-8 w-8"><ChevronLeft className="h-4 w-4" /></Button>
+                        <div className="px-3 text-sm font-medium">1 / 1</div>
+                        <Button variant="outline" size="icon" className="h-8 w-8"><ChevronRight className="h-4 w-4" /></Button>
+                        <Button variant="outline" size="icon" className="h-8 w-8"><ChevronsRight className="h-4 w-4" /></Button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </TabsContent>
-          </Tabs>
+              </TabsContent>
+            </Tabs>
+          </div>
         </div>
       </div>
     </AppLayout>

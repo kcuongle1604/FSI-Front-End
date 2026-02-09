@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
-import { Users, History } from "lucide-react"
+import { Users, FileText } from "lucide-react"
+import { History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -222,9 +223,9 @@ export default function SinhVienPage() {
             <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start">
               <TabsTrigger
                 value="thong-tin-sinh-vien"
-                className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
+                className="relative min-w-[180px] justify-center flex rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2 w-full">
                   <Users className="w-4 h-4" />
                   Thông tin sinh viên
                 </div>

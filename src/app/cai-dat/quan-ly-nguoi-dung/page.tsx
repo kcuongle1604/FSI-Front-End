@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -55,6 +55,9 @@ const accounts = [
 
 export default function QuanLyNguoiDungPage() {
   const [searchQuery, setSearchQuery] = useState("")
+  const routerImport = require("next/navigation")
+  const router = routerImport.useRouter()
+  const searchParams = routerImport.useSearchParams()
   const [openAddDialog, setOpenAddDialog] = useState(false)
   const [openEditDialog, setOpenEditDialog] = useState(false)
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false)
@@ -69,6 +72,32 @@ export default function QuanLyNguoiDungPage() {
     account.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     account.role.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  useEffect(() => {
+    // initialize from URL when the page mounts
+    try {
+      const q = searchParams?.get("q") ?? ""
+      if (q !== searchQuery) setSearchQuery(q)
+    } catch (e) {
+      // ignore in non-browser environments
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    // sync search query to URL so returning preserves filters
+    try {
+      const params = new URLSearchParams(Array.from(searchParams?.entries() ?? []))
+      if (searchQuery) params.set("q", searchQuery)
+      else params.delete("q")
+      const queryString = params.toString()
+      const href = queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname
+      router.replace(href, { scroll: false })
+    } catch (e) {
+      // noop
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery])
 
   const handleEditClick = (account: Account) => {
     setSelectedAccount(account)
@@ -112,7 +141,7 @@ export default function QuanLyNguoiDungPage() {
 
   return (
     <AppLayout showSearch={false}>
-      <div className="h-full flex flex-col px-8 py-5 bg-slate-50/50">
+      <div className="flex-1 flex flex-col min-h-0 px-8 py-5 bg-slate-50/50">
         
         {/* Header */}
         <div className="mb-4">

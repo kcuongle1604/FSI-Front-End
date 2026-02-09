@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
-import { Users, History } from "lucide-react"
+import { Award, History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -51,7 +51,7 @@ import { sampleCertificates, batchesAndClasses } from "./data"
 import type { ImportHistory } from "../sinh-vien/types"
 
 export default function ChungChiPage() {
-  const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien")
+  const [activeTab, setActiveTab] = useState("chung-chi")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedKhoa, setSelectedKhoa] = useState<string | undefined>()
   const [selectedLop, setSelectedLop] = useState<string | undefined>()
@@ -148,12 +148,12 @@ export default function ChungChiPage() {
           <div className="border-b border-slate-200">
             <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start">
               <TabsTrigger
-                value="thong-tin-sinh-vien"
-                className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
+                value="chung-chi"
+                className="relative min-w-[180px] justify-center flex rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
               >
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Thông tin sinh viên
+                <div className="flex items-center justify-center gap-2 w-full">
+                  <Award className="w-4 h-4" />
+                  Chứng chỉ
                 </div>
               </TabsTrigger>
 
@@ -171,7 +171,7 @@ export default function ChungChiPage() {
 
           <div className="flex-1 min-h-0 mt-5 flex flex-col">
             <TabsContent
-              value="thong-tin-sinh-vien"
+              value="chung-chi"
               className="m-0 h-full outline-none flex flex-col"
             >
               {/* Search & Actions – giống Quản lý người dùng */}

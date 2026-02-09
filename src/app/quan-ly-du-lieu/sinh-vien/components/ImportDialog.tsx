@@ -37,10 +37,10 @@ interface ImportDialogProps {
 export default function ImportDialog({
   open,
   onOpenChange,
-  onImportSuccess,
   importTypeOptions,
   classOptions,
   isCourseImport = false,
+  // @ts-expect-error kept for backward compatibility in other modules
   isCertificateImport = false,
 }: ImportDialogProps & { isCertificateImport?: boolean }) {
   const [importFile, setImportFile] = useState<File | null>(null)

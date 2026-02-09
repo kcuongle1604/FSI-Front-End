@@ -20,7 +20,7 @@ import {
   Download,
   Upload,
   MoreVertical,
-  Users,
+  BookOpen,
   History,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
@@ -109,7 +109,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
   const title = program?.name ?? "Chương trình đào tạo";
 
   const PAGE_SIZE = 10;
-  const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien");
+  const [activeTab, setActiveTab] = useState("chuong-trinh-dao-tao");
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [courses, setCourses] = useState<ProgramCourse[]>(INITIAL_COURSES);
@@ -223,12 +223,12 @@ export default function ChuongTrinhDaoTaoDetailPage() {
           <div className="border-b border-slate-200">
             <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start">
               <TabsTrigger
-                value="thong-tin-sinh-vien"
-                className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
+                value="chuong-trinh-dao-tao"
+                className="relative min-w-[180px] justify-center flex rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
               >
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Thông tin sinh viên
+                <div className="flex items-center justify-center gap-2 w-full">
+                  <BookOpen className="w-4 h-4" />
+                  Chương trình đào tạo
                 </div>
               </TabsTrigger>
 
@@ -246,7 +246,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
 
           <div className="flex-1 min-h-0 mt-5 flex flex-col">
             <TabsContent
-              value="thong-tin-sinh-vien"
+              value="chuong-trinh-dao-tao"
               className="m-0 h-full outline-none flex flex-col"
             >
               {/* Thanh tìm kiếm & nút hành động giống màn danh sách CTĐT */}

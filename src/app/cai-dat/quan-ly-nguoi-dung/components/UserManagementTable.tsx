@@ -45,9 +45,9 @@ export default function UserManagementTable({
 
   return (
     <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
-      {/* Table */}
+      {/* Table with fixed header and footer */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-        <div className="overflow-auto">
+        <div className="flex-1 overflow-auto min-h-0" style={{ maxHeight: 520 }}>
           <Table className="w-full" style={{ borderCollapse: 'collapse' }}>
             <TableHeader>
               <TableRow className="border-b border-gray-200 bg-blue-50" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
@@ -118,7 +118,7 @@ export default function UserManagementTable({
         </div>
       </div>
 
-      {/* Pagination */}
+      {/* Pagination - sticky bottom */}
       <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50 sticky bottom-0 z-10">
         <div className="text-sm text-gray-600">
           Hiển thị {displayCount}/{totalRecords} dòng

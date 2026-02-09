@@ -1,11 +1,9 @@
 // Popup Xóa
 "use client"
-import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Student } from "../types"
 import { deleteStudent } from "../student.api"
-import { Loader2 } from "lucide-react"
 
 interface DeleteDialogProps {
   open: boolean
@@ -24,11 +22,8 @@ export default function DeleteDialog({ open, onOpenChange, student }: DeleteDial
         <div className="py-4">
           <p className="text-gray-600">Bạn có chắc chắn muốn <strong>Xóa</strong> sinh viên này khỏi hệ thống không?</p>
         </div>
-        {error && (
-          <div className="text-red-600 text-sm px-6">{error}</div>
-        )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Hủy
           </Button>
           <Button

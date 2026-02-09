@@ -1,9 +1,16 @@
 "use client"
 
 import { useState } from "react"
-import { Download } from "lucide-react"
+import { Download, GraduationCap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import {
   Select,
   SelectContent,
@@ -29,6 +36,12 @@ type XetTotNghiep = {
   ccdr: string
   program: string
   status: string
+}
+
+const YEAR_LABELS: Record<string, string> = {
+  "Kỳ 1 - 2024 - 2025": "Kỳ 1/2024-2025",
+  "Kỳ 2 - 2024 - 2025": "Kỳ 2/2024-2025",
+  "Kỳ 2 - 2023 - 2024": "Kỳ 2/2023-2024",
 }
 
 const students: XetTotNghiep[] = [
@@ -59,6 +72,8 @@ export default function XetTotNghiepPage() {
   const [selectedYear, setSelectedYear] = useState("all")
   const [selectedCourse, setSelectedCourse] = useState("all")
   const [selectedClass, setSelectedClass] = useState("all")
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [evaluatedCombos, setEvaluatedCombos] = useState<string[]>([])
 
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.mssv.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -78,6 +93,9 @@ export default function XetTotNghiepPage() {
 
   const hasRequiredFilters = selectedYear !== "all" && selectedClass !== "all"
   const visibleStudents = hasRequiredFilters ? filteredStudents : []
+  const selectedYearLabel = selectedYear !== "all" ? YEAR_LABELS[selectedYear] ?? selectedYear : ""
+  const currentComboKey = hasRequiredFilters ? `${selectedClass}__${selectedYear}` : null
+  const isCurrentComboEvaluated = currentComboKey ? evaluatedCombos.includes(currentComboKey) : false
 
   return (
     <AppLayout showSearch={false}>
@@ -97,7 +115,7 @@ export default function XetTotNghiepPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 type="text"
-                placeholder="Nhập MSSV"
+                placeholder="Nhập MSSV..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 h-9 bg-white"
@@ -164,14 +182,54 @@ export default function XetTotNghiepPage() {
             </div>
           </div>
 
-          <Button className="ml-auto bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm">
-            <Download className="h-4 w-4" />
-            Mẫu
-          </Button>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm"
+              disabled={!hasRequiredFilters || visibleStudents.length === 0 || isCurrentComboEvaluated}
+              onClick={() => setConfirmOpen(true)}
+            >
+              <GraduationCap className="h-4 w-4" />
+              Xét tốt nghiệp
+            </Button>
+            <Button className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm">
+              <Download className="h-4 w-4" />
+              Mẫu
+            </Button>
+          </div>
         </div>
 
         {/* Table */}
         <XetTotNghiepTab students={visibleStudents} />
+
+        {/* Confirm Dialog */}
+        <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <DialogContent className="sm:max-w-[430px]">
+            <DialogHeader>
+              <DialogTitle>Xét tốt nghiệp</DialogTitle>
+            </DialogHeader>
+            <div className="py-2">
+              <p className="text-gray-600">
+                Bạn có chắc chắn muốn <span className="font-semibold">Xét tốt nghiệp</span> cho các sinh viên lớp <span className="font-semibold">{selectedClass}</span> - <span className="font-semibold">{selectedYearLabel}</span> không?
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+                Hủy
+              </Button>
+              <Button
+                className="bg-[#167FFC] hover:bg-[#1470E3]"
+                onClick={() => {
+                  if (currentComboKey && !evaluatedCombos.includes(currentComboKey)) {
+                    setEvaluatedCombos((prev) => [...prev, currentComboKey])
+                  }
+                  setConfirmOpen(false)
+                }}
+              >
+                Có
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   )
