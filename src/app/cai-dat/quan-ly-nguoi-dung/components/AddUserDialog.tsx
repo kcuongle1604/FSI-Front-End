@@ -87,17 +87,17 @@ export function AddUserDialog({
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("access_token")}`,
         },
-       body: JSON.stringify({
-  username: formData.fullName,   // ← DÒNG NÀY
-  email: formData.email,
-  full_name: formData.fullName,
-  password: formData.password,
-  role: formData.role,
-  classes:
-    formData.role === "Giáo viên chủ nhiệm"
-      ? formData.assignClasses
-      : [],
-}),
+        body: JSON.stringify({
+          username: formData.fullName,
+          email: formData.email,
+          full_name: formData.fullName,
+          password: formData.password,
+          role: formData.role,
+          classes:
+            formData.role === "Giáo viên chủ nhiệm"
+              ? formData.assignClasses
+              : [],
+        }),
       })
 
       if (!res.ok) {
@@ -147,35 +147,35 @@ export function AddUserDialog({
 
         <div className="space-y-4">
           {/* Vai trò */}
-<div className="space-y-2">
-  <Label>
-    Vai trò<span className="text-red-500">*</span>
-  </Label>
+          <div className="space-y-2">
+            <Label>
+              Vai trò<span className="text-red-500">*</span>
+            </Label>
 
-  <Select
-    value={formData.role}
-    onValueChange={(v) => handleInputChange("role", v)}
-  >
-    <SelectTrigger className={errors.role ? "border-red-500" : ""}>
-      <SelectValue placeholder="Chọn vai trò" />
-    </SelectTrigger>
+            <Select
+              value={formData.role}
+              onValueChange={(v) => handleInputChange("role", v)}
+            >
+              <SelectTrigger className={errors.role ? "border-red-500" : ""}>
+                <SelectValue placeholder="Chọn vai trò" />
+              </SelectTrigger>
 
-    <SelectContent>
-      <SelectItem value="Giáo vụ khoa">Giáo vụ khoa</SelectItem>
-      <SelectItem value="Ban chủ nhiệm khoa">
-        Ban chủ nhiệm khoa
-      </SelectItem>
-      <SelectItem value="Giáo viên chủ nhiệm">
-        Giáo viên chủ nhiệm
-      </SelectItem>
-    </SelectContent>
-  </Select>
+              <SelectContent>
+                <SelectItem value="Giáo vụ khoa">Giáo vụ khoa</SelectItem>
+                <SelectItem value="Ban chủ nhiệm khoa">
+                  Ban chủ nhiệm khoa
+                </SelectItem>
+                <SelectItem value="Giáo viên chủ nhiệm">
+                  Giáo viên chủ nhiệm
+                </SelectItem>
+              </SelectContent>
+            </Select>
 
-  {/* MESSAGE LỖI – giống Gán lớp */}
-  {errors.role && (
-    <p className="text-xs text-red-500">{errors.role}</p>
-  )}
-</div>
+            {/* MESSAGE LỖI – giống Gán lớp */}
+            {errors.role && (
+              <p className="text-xs text-red-500">{errors.role}</p>
+            )}
+          </div>
 
 
           {/* Gán lớp */}

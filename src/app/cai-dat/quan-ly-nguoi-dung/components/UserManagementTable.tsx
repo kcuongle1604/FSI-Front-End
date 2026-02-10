@@ -62,11 +62,7 @@ export default function UserManagementTable({
                   <TableCell className="h-12 px-4 text-right pr-8">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-600">{account.username}</span>
-                      {account.is_active && (
-                        <Badge className="bg-[#E8F2FF] text-[#167FFC] hover:bg-[#E8F2FF] text-xs px-2 py-0.5">
-                          ACTIVE
-                        </Badge>
-                      )}
+                     
                     </div>
                   </TableCell>
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{account.email}</TableCell>
