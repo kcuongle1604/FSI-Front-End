@@ -147,26 +147,36 @@ export function AddUserDialog({
 
         <div className="space-y-4">
           {/* Vai trò */}
-          <div className="space-y-2">
-            <Label>Vai trò<span className="text-red-500">*</span></Label>
-            <Select
-              value={formData.role}
-              onValueChange={(v) => handleInputChange("role", v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Chọn vai trò" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Giáo vụ khoa">Giáo vụ khoa</SelectItem>
-                <SelectItem value="Ban chủ nhiệm khoa">
-                  Ban chủ nhiệm khoa
-                </SelectItem>
-                <SelectItem value="Giáo viên chủ nhiệm">
-                  Giáo viên chủ nhiệm
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+<div className="space-y-2">
+  <Label>
+    Vai trò<span className="text-red-500">*</span>
+  </Label>
+
+  <Select
+    value={formData.role}
+    onValueChange={(v) => handleInputChange("role", v)}
+  >
+    <SelectTrigger className={errors.role ? "border-red-500" : ""}>
+      <SelectValue placeholder="Chọn vai trò" />
+    </SelectTrigger>
+
+    <SelectContent>
+      <SelectItem value="Giáo vụ khoa">Giáo vụ khoa</SelectItem>
+      <SelectItem value="Ban chủ nhiệm khoa">
+        Ban chủ nhiệm khoa
+      </SelectItem>
+      <SelectItem value="Giáo viên chủ nhiệm">
+        Giáo viên chủ nhiệm
+      </SelectItem>
+    </SelectContent>
+  </Select>
+
+  {/* MESSAGE LỖI – giống Gán lớp */}
+  {errors.role && (
+    <p className="text-xs text-red-500">{errors.role}</p>
+  )}
+</div>
+
 
           {/* Gán lớp */}
           <div className="space-y-2">

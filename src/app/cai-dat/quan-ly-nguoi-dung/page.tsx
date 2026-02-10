@@ -23,6 +23,20 @@ import {
 
 export type Account = User
 
+// ================= MAP ROLE NAME -> ROLE_ID =================
+const mapRoleNameToId = (role: string) => {
+  switch (role) {
+    case "Giáo vụ khoa":
+      return 1
+    case "Ban chủ nhiệm khoa":
+      return 2
+    case "Giáo viên chủ nhiệm":
+      return 3
+    default:
+      return null
+  }
+}
+
 export default function QuanLyNguoiDungPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -92,6 +106,7 @@ export default function QuanLyNguoiDungPage() {
     setOpenSuspendDialog(true)
   }
 
+  // ⭐ FIX 422 Ở ĐÂY
   const handleUpdateUser = async (data: any) => {
     if (!selectedAccount) return
 
@@ -99,12 +114,15 @@ export default function QuanLyNguoiDungPage() {
       const payload: UserUpdateRequest = {
         username: data.fullName,
         email: data.email,
-        role_id: data.role,
+        role_id: mapRoleNameToId(data.role), // ✅ FIX
       }
 
-      if (data.password) payload.password = data.password
+      if (data.password) {
+        payload.password = data.password
+      }
 
       await updateUser(selectedAccount.user_id, payload)
+
       setOpenEditDialog(false)
       fetchUsers()
     } catch (err) {
@@ -152,15 +170,23 @@ export default function QuanLyNguoiDungPage() {
 
   // ================= UI =================
   return (
-    <AppLayout showSearch={false}>
-      <div className="h-full flex flex-col px-8 py-5 bg-slate-50/50">
-        <h1 className="text-2xl font-bold mb-4">Quản lý người dùng</h1>
+  <AppLayout showSearch={false}>
+  <div className="h-full flex flex-col px-8 py-5 bg-slate-50/50">
+    {/* Header */}
+    <div className="mb-4">
+      <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+        Cài đặt
+        <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">
+          &gt; Quản lý người dùng
+        </span>
+      </h1>
+    </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded">
-            {error}
-          </div>
-        )}
+    {error && (
+      <div className="mb-4 p-3 bg-red-50 text-red-700 rounded">
+        {error}
+      </div>
+    )}
 
         <div className="flex items-center gap-3 mb-4">
           <div className="relative w-[250px]">
@@ -174,13 +200,15 @@ export default function QuanLyNguoiDungPage() {
             />
           </div>
 
-          <Button
-            onClick={() => setOpenAddDialog(true)}
-            className="ml-auto h-9 gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Thêm
-          </Button>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button
+              onClick={() => setOpenAddDialog(true)}
+              className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm"
+            >
+              <Plus className="h-4 w-4" />
+              Thêm
+            </Button>
+          </div>
         </div>
 
         {loading ? (
@@ -202,7 +230,7 @@ export default function QuanLyNguoiDungPage() {
       <AddUserDialog
         open={openAddDialog}
         onOpenChange={setOpenAddDialog}
-        onSuccess={fetchUsers} // ⭐ KHÔNG CẦN REFRESH
+        onSuccess={fetchUsers}
       />
 
       {/* EDIT */}
