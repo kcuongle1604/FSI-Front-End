@@ -33,7 +33,7 @@ const menuStructure = [
   {
     id: 'academic-operations',
     label: 'Nghiệp vụ đào tạo',
-    icon: GraduationCap,
+    icon: BookOpen,
     children: [
       { id: 'graduation-review', label: 'Xét tốt nghiệp', icon: GraduationCap, path: '/nghiep-vu-dao-tao/xet-tot-nghiep' },
     ]
@@ -119,9 +119,9 @@ export default function AppLayout({ children, title, actions, showSearch = false
   }
 
   return (
-    <div className="flex bg-white overflow-hidden" style={{ height: '111.11vh' }}>
+    <div className="flex bg-white min-h-screen overflow-hidden">
       {/* Sidebar Menu */}
-      <aside className="w-64 border-r border-gray-200 flex flex-col" style={{ backgroundColor: '#D5DDED', height: '111.11vh' }}>
+      <aside className="w-64 border-r border-gray-200 flex flex-col min-h-screen" style={{ backgroundColor: '#D5DDED' }}>
         {/* Logo */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -234,7 +234,7 @@ export default function AppLayout({ children, title, actions, showSearch = false
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ height: '111.11vh' }}>
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header - combined with content */}
         {title && (
           <div className="bg-gray-50 px-8 py-3 flex-1 flex flex-col overflow-hidden min-h-0">

@@ -43,6 +43,7 @@ type CourseFormDialogProps = {
   onSave: (data: CourseFormValues) => void
   initialValues?: Partial<CourseFormValues>
   mode?: "create" | "edit"
+  appliedCourses?: string[]
 }
 
 export default function CourseFormDialog({
@@ -51,6 +52,7 @@ export default function CourseFormDialog({
   onSave,
   initialValues,
   mode = "create",
+  appliedCourses = [],
 }: CourseFormDialogProps) {
   const [specialization, setSpecialization] = useState("")
   const [code, setCode] = useState("")
@@ -128,6 +130,7 @@ export default function CourseFormDialog({
   }
 
   const dialogTitle = mode === "edit" ? "Sửa học phần" : "Thêm mới học phần"
+  const appliedCoursesText = appliedCourses.length > 0 ? appliedCourses.join(", ") : ""
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -149,6 +152,17 @@ export default function CourseFormDialog({
             {errors.specialization && specialization === "" && (
               <p className="text-xs text-red-500">{errors.specialization}</p>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-800">
+              Khóa áp dụng
+            </Label>
+            <div
+              className="w-full h-9 px-3 flex items-center rounded-md border border-gray-300 bg-gray-100 text-gray-700 text-sm"
+            >
+              {appliedCoursesText || ""}
+            </div>
           </div>
 
           <div className="space-y-2">

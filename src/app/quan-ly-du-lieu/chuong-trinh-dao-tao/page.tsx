@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
-import { Users, History } from "lucide-react"
+import { BookOpen, History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -51,14 +51,14 @@ export type Program = {
 }
 
 export const INITIAL_PROGRAMS: Program[] = [
-  { id: 1, name: "Quản trị hệ thống thông tin" },
-  { id: 2, name: "Tin học quản lý" },
-  { id: 3, name: "Thống kê" },
+  { id: 1, name: "Quản trị hệ thống thông tin", appliedCourses: ["48K"] },
+  { id: 2, name: "Tin học quản lý", appliedCourses: ["49K"] },
+  { id: 3, name: "Thống kê", appliedCourses: ["50K"] },
 ]
 
 export default function ChuongTrinhDaoTaoPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien")
+  const [activeTab, setActiveTab] = useState("chuong-trinh-dao-tao")
   const [searchQuery, setSearchQuery] = useState("")
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(false)
@@ -137,7 +137,10 @@ export default function ChuongTrinhDaoTaoPage() {
     const query = searchQuery.toLowerCase()
     if (!query) return true
 
-    return p.name.toLowerCase().includes(query)
+    return (
+      p.name.toLowerCase().includes(query) ||
+      p.appliedCourses.some((c) => c.toLowerCase().includes(query))
+    )
   })
 
   const PAGE_SIZE = 30
@@ -157,6 +160,7 @@ export default function ChuongTrinhDaoTaoPage() {
 
   const handleAdd = () => {
     setSelectedStudent(null)
+    setEditingProgram(null)
     setIsFormOpen(true)
   }
 
@@ -198,12 +202,12 @@ export default function ChuongTrinhDaoTaoPage() {
           <div className="border-b border-slate-200">
             <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start">
               <TabsTrigger
-                value="thong-tin-sinh-vien"
-                className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
+                value="chuong-trinh-dao-tao"
+                className="relative min-w-[180px] justify-center flex rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
               >
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Thông tin sinh viên
+                <div className="flex items-center justify-center gap-2 w-full">
+                  <BookOpen className="w-4 h-4" />
+                  Chương trình đào tạo
                 </div>
               </TabsTrigger>
 
@@ -221,7 +225,7 @@ export default function ChuongTrinhDaoTaoPage() {
 
           <div className="flex-1 min-h-0 mt-5 flex flex-col">
             <TabsContent
-              value="thong-tin-sinh-vien"
+              value="chuong-trinh-dao-tao"
               className="m-0 h-full outline-none flex flex-col"
             >
               {/* Search & Actions – giống Quản lý người dùng */}
@@ -258,7 +262,13 @@ export default function ChuongTrinhDaoTaoPage() {
                             STT
                           </TableHead>
                           <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
-                            TÊN CHƯƠNG TRÌNH ĐÀO TẠO
+                            CHUYÊN NGÀNH
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                            KHÓA ÁP DỤNG
+                          </TableHead>
+                          <TableHead className="h-10 px-4 w-[60px] text-right text-sm font-semibold text-gray-700">
+                            THAO TÁC
                           </TableHead>
                         </TableRow>
                       </TableHeader>
@@ -274,6 +284,30 @@ export default function ChuongTrinhDaoTaoPage() {
                           <TableRow key="empty">
                             <TableCell colSpan={2} className="text-center text-gray-500 py-6">
                               Chưa có chương trình đào tạo nào
+                            </TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600">
+                              {program.appliedCourses.join(", ")}
+                            </TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600 text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 hover:bg-gray-100"
+                                  >
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-24">
+                                  <DropdownMenuItem
+                                    className="text-sm"
+                                    onClick={() => handleEditProgram(program)}
+                                  >
+                                    Sửa
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
                         ) : (
@@ -367,6 +401,15 @@ export default function ChuongTrinhDaoTaoPage() {
         onOpenChange={setIsFormOpen}
         onSave={handleSaveProgram}
         existingProgramNames={programs.map((p) => p.name)}
+        initialData={
+          editingProgram
+            ? {
+                id: editingProgram.id,
+                specialization: editingProgram.name,
+                appliedCourses: editingProgram.appliedCourses,
+              }
+            : null
+        }
       />
       <DeleteDialog
         open={isDeleteOpen}

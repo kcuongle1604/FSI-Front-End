@@ -36,7 +36,7 @@ export default function AddCertificateDialog({ open, onOpenChange, onAdd }: AddC
     if (!formData.batches || formData.batches.length === 0) newErrors.batches = "Vui lòng chọn ít nhất một khoá áp dụng";
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
-    if (onAdd) onAdd(formData);
+    if (onAdd) onAdd({ ...formData });
     setFormData({ name: "", batches: [] });
     setErrors({});
     onOpenChange(false);
@@ -54,6 +54,7 @@ export default function AddCertificateDialog({ open, onOpenChange, onAdd }: AddC
         <DialogHeader>
           <DialogTitle className="text-lg font-bold">Thêm chứng chỉ</DialogTitle>
         </DialogHeader>
+
         <div className="space-y-4">
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-800">
@@ -80,23 +81,23 @@ export default function AddCertificateDialog({ open, onOpenChange, onAdd }: AddC
             />
             {errors.batches && <p className="text-xs text-red-500 mt-1">{errors.batches}</p>}
           </div>
-        </div>
-        <div className="flex justify-end gap-3 mt-6">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleCancel}
-            className="h-9"
-          >
-            Hủy
-          </Button>
-          <Button
-            type="button"
-            onClick={handleAdd}
-            className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9"
-          >
-            Lưu
-          </Button>
+          <div className="flex justify-end gap-3 mt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancel}
+              className="h-9"
+            >
+              Hủy
+            </Button>
+            <Button
+              type="button"
+              onClick={handleAdd}
+              className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9"
+            >
+              Lưu
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

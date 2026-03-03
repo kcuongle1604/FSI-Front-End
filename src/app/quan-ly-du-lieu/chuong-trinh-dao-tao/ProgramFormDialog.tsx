@@ -8,7 +8,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -19,6 +18,8 @@ import {
 } from "@/components/ui/select"
 import { MultiSelect } from "@/components/ui/multi-select"
 import { api } from "@/lib/api"
+
+const COURSES = ["48K", "49K", "50K", "51K", "52K"]
 
 export type ProgramFormValues = {
   name: string
@@ -32,6 +33,7 @@ type ProgramFormDialogProps = {
   onOpenChange: (open: boolean) => void
   onSave: (data: ProgramFormValues) => void
   existingProgramNames?: string[]
+  initialData?: ProgramFormValues | null
 }
 
 export default function ProgramFormDialog({
@@ -39,6 +41,7 @@ export default function ProgramFormDialog({
   onOpenChange,
   onSave,
   existingProgramNames = [],
+  initialData,
 }: ProgramFormDialogProps) {
   const [majorId, setMajorId] = useState<number | undefined>()
   const [name, setName] = useState("")
@@ -155,9 +158,11 @@ export default function ProgramFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Thêm mới chương trình đào tạo</DialogTitle>
+          <DialogTitle>
+            {initialData ? "Sửa chương trình đào tạo" : "Thêm mới chương trình đào tạo"}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -215,7 +220,7 @@ export default function ProgramFormDialog({
 
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-800">
-              Tên chương trình đào tạo<span className="text-red-500">*</span>
+              Khóa áp dụng<span className="text-red-500">*</span>
             </Label>
             <Input
               value={name}
@@ -243,6 +248,9 @@ export default function ProgramFormDialog({
               placeholder="Nhập mô tả"
               className="w-full border-gray-300"
             />
+            {errors.appliedCourses && (
+              <p className="text-xs text-red-500">{errors.appliedCourses}</p>
+            )}
           </div>
         </div>
 

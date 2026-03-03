@@ -7,27 +7,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Certificate } from "../page";
-
-
-interface CertificateManagementTableProps {
-  certificates: Certificate[];
-  onEditClick: (certificate: Certificate) => void;
-  onDeleteClick: (certificate: Certificate) => void;
-  onStatusClick?: (certificate: Certificate) => void;
-}
-
-
+import type { ExemptCertificate } from "../page";
+import { CERTIFICATE_TYPES } from "./certificate-types";
 import { useState } from "react";
-
 
 const PAGE_SIZE = 30;
 
-const CertificateManagementTable = ({ certificates, onEditClick, onDeleteClick, onStatusClick }: CertificateManagementTableProps) => {
+
+export default function ExemptCertificateManagementTable({ certificates, onEditClick, onDeleteClick, onStatusClick }: any) {
   const [page, setPage] = useState(1);
   const totalRecords = certificates.length;
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
-  const pagedCertificates = certificates.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pagedCertificates: ExemptCertificate[] = certificates.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const displayCount = pagedCertificates.length;
 
   const goToPage = (p: number) => setPage(Math.max(1, Math.min(totalPages, p)));
@@ -40,32 +31,21 @@ const CertificateManagementTable = ({ certificates, onEditClick, onDeleteClick, 
             <TableHeader>
               <TableRow className="border-b border-gray-200 bg-blue-50" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">STT</TableHead>
-                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">TÊN CHỨNG CHỈ</TableHead>
-                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">KHÓA ÁP DỤNG</TableHead>
-                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">TRẠNG THÁI</TableHead>
+                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">LOẠI CHỨNG CHỈ</TableHead>
+                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">KHÓA MIỄN</TableHead>
+                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">CHUYÊN NGÀNH MIỄN</TableHead>
                 <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-12">
                   <span className="sr-only">Actions</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pagedCertificates.map((certificate, idx) => (
+              {pagedCertificates.map((certificate: any, idx: number) => (
                 <TableRow key={certificate.id}>
                   <TableCell className="px-4 py-2">{(page - 1) * PAGE_SIZE + idx + 1}</TableCell>
-                  <TableCell className="px-4 py-2">{certificate.name}</TableCell>
+                  <TableCell className="px-4 py-2">{certificate.types && certificate.types.length > 0 ? certificate.types.join(', ') : <span className="italic text-gray-400">Chưa có</span>}</TableCell>
                   <TableCell className="px-4 py-2">{certificate.batches && certificate.batches.length > 0 ? certificate.batches.join(', ') : <span className="italic text-gray-400">Chưa có</span>}</TableCell>
-                  <TableCell className="px-4 py-2">
-                    <div
-                      className="flex items-center gap-2 w-fit cursor-pointer select-none"
-                      onClick={onStatusClick ? () => onStatusClick(certificate) : undefined}
-                      title="Thay đổi trạng thái"
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${certificate.status === 'Đang áp dụng' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                      <span className={certificate.status === 'Đang áp dụng' ? 'text-gray-900' : 'text-gray-500'}>
-                        {certificate.status === 'Đang áp dụng' ? 'Đang áp dụng' : 'Ngừng áp dụng'}
-                      </span>
-                    </div>
-                  </TableCell>
+                  <TableCell className="px-4 py-2">{certificate.majors ? certificate.majors.join(', ') : <span className="italic text-gray-400">Chưa có</span>}</TableCell>
                   <TableCell className="px-4 py-2 text-right w-12">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -116,6 +96,4 @@ const CertificateManagementTable = ({ certificates, onEditClick, onDeleteClick, 
       </div>
     </div>
   );
-};
-
-export default CertificateManagementTable;
+}
