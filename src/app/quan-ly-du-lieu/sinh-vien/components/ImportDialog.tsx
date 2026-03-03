@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { importStudents } from "../student.api"
-import type { ImportResponse, ImportError, ColumnMapping } from "../types"
+import type { ImportAnalysisResponse, ImportExecutionResponse, ImportError, ColumnMapping } from "../types"
 
 interface ImportTypeOption {
   value: string
@@ -60,8 +60,8 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
 
   // API integration states
   const [loading, setLoading] = useState(false)
-  const [dryRunResult, setDryRunResult] = useState<ImportResponse | null>(null)
-  const [importResult, setImportResult] = useState<ImportResponse | null>(null)
+  const [dryRunResult, setDryRunResult] = useState<ImportAnalysisResponse | null>(null)
+  const [importResult, setImportResult] = useState<ImportExecutionResponse | null>(null)
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
 
   const isAggregateScoreImport = importType === 'diem-tong-hop'
@@ -97,12 +97,14 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
     value: header,
     label: header
   }))
-  const errorSummary = { valid: 0, notFoundInSystem: 1, duplicateScore: 2, dataError: 3 }
-  const errorDetails = [
-    { row: 3, column: 'Họ và tên', value: 'Nguyễn Văn', error: 'Giá trị không hợp lệ' },
-    { row: 5, column: 'MSSV', value: '', error: 'Thiếu giá trị' },
-    { row: 10, column: 'Ngày sinh', value: 'Mười hai tháng 3', error: 'Sai kiểu dữ liệu' },
-  ]
+  
+  // Get error details from dry run result
+  const errorDetails = dryRunResult?.invalid_rows?.map(error => ({
+    row: error.row_index,
+    column: 'N/A',
+    value: JSON.stringify(error.row_data),
+    error: error.error_message
+  })) || []
 
   const unmappedRequiredFields = mappingFields.filter(
     (field) => field.required && !columnMappings[field.key]
@@ -189,7 +191,7 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
       setDryRunResult(response.data)
 
       // Switch to error overview tab if there are errors
-      if (response.data.errors && response.data.errors.length > 0) {
+      if (response.data.invalid_rows && response.data.invalid_rows.length > 0) {
         setMappingTab('chi-tiet-loi')
       } else {
         setMappingTab('tong-quan-loi')
@@ -234,6 +236,8 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
       })
 
       const response = await importStudents(importFile, false, apiColumnMapping)
+      console.log('✅ Import Response:', response.data)
+      
       setImportResult(response.data)
       setImportStep('result')
 
@@ -244,7 +248,35 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
     } catch (error: any) {
       console.error("❌ Import error:", error)
       console.error("❌ Error response:", error.response?.data)
-      setImportError(error.response?.data?.detail || "Lỗi khi import. Vui lòng thử lại.")
+      
+      // Extract error message from various possible formats
+      let errorMessage = "Lỗi khi import. Vui lòng thử lại."
+      
+      if (error.response?.data) {
+        const errorData = error.response.data
+        if (typeof errorData === 'string') {
+          errorMessage = errorData
+        } else if (errorData.detail) {
+          if (typeof errorData.detail === 'string') {
+            errorMessage = errorData.detail
+          } else if (Array.isArray(errorData.detail)) {
+            errorMessage = errorData.detail.map((e: any) => 
+              typeof e === 'string' ? e : e.msg || JSON.stringify(e)
+            ).join(', ')
+          } else {
+            errorMessage = JSON.stringify(errorData.detail)
+          }
+        } else if (errorData.message) {
+          errorMessage = errorData.message
+        } else if (errorData.error) {
+          errorMessage = errorData.error
+        }
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      setImportError(errorMessage)
+      setImportStep('result')
     } finally {
       setLoading(false)
     }
@@ -521,16 +553,16 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
                     </TableHeader>
                     <TableBody>
                       <TableRow>
-                        <TableCell className="pl-4">Trạng thái</TableCell>
-                        <TableCell className="text-center font-medium">{dryRunResult.status}</TableCell>
+                        <TableCell className="pl-4">Tổng số dòng</TableCell>
+                        <TableCell className="text-center font-medium">{dryRunResult.total_rows}</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="pl-4">Số bản ghi hợp lệ</TableCell>
-                        <TableCell className="text-center text-green-600 font-medium">{dryRunResult.success_count}</TableCell>
+                        <TableCell className="text-center text-green-600 font-medium">{dryRunResult.valid_count}</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="pl-4">Số bản ghi lỗi</TableCell>
-                        <TableCell className="text-center text-red-600 font-medium">{dryRunResult.failure_count}</TableCell>
+                        <TableCell className="text-center text-red-600 font-medium">{dryRunResult.invalid_count}</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="pl-4" colSpan={2}>
@@ -636,13 +668,34 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
               <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto mt-4">
                 <div className="bg-green-50 p-3 rounded-lg">
                   <p className="text-sm text-gray-600">Thành công</p>
-                  <p className="text-2xl font-bold text-green-600">{importResult.success_count}</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {importResult.success_count}
+                  </p>
                 </div>
                 <div className="bg-red-50 p-3 rounded-lg">
                   <p className="text-sm text-gray-600">Thất bại</p>
-                  <p className="text-2xl font-bold text-red-600">{importResult.failure_count}</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {importResult.failure_count}
+                  </p>
                 </div>
               </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Tổng số xử lý: {importResult.total_processed}
+              </p>
+              <p className="text-xs text-gray-400">
+                Trạng thái: {importResult.status}
+              </p>
+            </div>
+          </div>
+        )}
+        {importError && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-center">
+              <AlertCircle className="h-16 w-16 text-red-500" />
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-lg font-semibold text-red-600">Lỗi khi import</p>
+              <p className="text-sm text-gray-600">{importError}</p>
             </div>
           </div>
         )}

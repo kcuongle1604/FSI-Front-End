@@ -51,3 +51,22 @@ export async function getScoreMatrix(params?: {
  * Get list of classes (re-exported from student.api)
  */
 export const getClasses = getClassesFromStudent
+
+/**
+ * Get list of subjects for a training program
+ * @param trainingProgramName - Name of the training program
+ * @returns List of subjects in the program
+ */
+export async function getSubjectsByProgram(trainingProgramName: string) {
+    return api.get("/api/v1/subjects", { 
+        params: { training_program_name: trainingProgramName } 
+    })
+}
+
+/**
+ * Get list of all training programs
+ * @returns List of available training programs
+ */
+export async function getTrainingPrograms() {
+    return api.get("/api/v1/training-programs")
+}

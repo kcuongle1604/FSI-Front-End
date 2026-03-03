@@ -23,14 +23,15 @@ import {
   Users,
   History,
 } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
-import { INITIAL_PROGRAMS, Program } from "../page";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { Program } from "../page";
 import ImportHistoryTab from "../../sinh-vien/components/ImportHistoryTab";
 import ImportDialog from "../../sinh-vien/components/ImportDialog";
 import type { ImportHistory } from "../../sinh-vien/types";
 import CourseFormDialog, { CourseFormValues } from "../CourseFormDialog";
 import DeleteCourseDialog from "../DeleteCourseDialog";
+import { getSubjectsByProgramName, getTrainingPrograms, type Subject } from "../program.api";
 
 type ProgramCourse = {
   id: number;
@@ -99,20 +100,22 @@ const INITIAL_COURSES: ProgramCourse[] = [
 export default function ChuongTrinhDaoTaoDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const programId = Number(params?.id);
+  const programNameFromUrl = searchParams.get('name');
 
-  const program: Program | undefined = useMemo(
-    () => INITIAL_PROGRAMS.find((p) => p.id === programId),
-    [programId]
-  );
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [program, setProgram] = useState<Program | null>(null);
+  const [programLoading, setProgramLoading] = useState(true);
 
-  const title = program?.name ?? "Chương trình đào tạo";
+  const title = program?.name ?? programNameFromUrl ?? "Chương trình đào tạo";
 
   const PAGE_SIZE = 10;
   const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien");
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
-  const [courses, setCourses] = useState<ProgramCourse[]>(INITIAL_COURSES);
+  const [courses, setCourses] = useState<ProgramCourse[]>([]);
+  const [loading, setLoading] = useState(false);
   const [importHistory] = useState<ImportHistory[]>([]);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isCourseDialogOpen, setIsCourseDialogOpen] = useState(false);
@@ -120,6 +123,95 @@ export default function ChuongTrinhDaoTaoDetailPage() {
   const [editingCourse, setEditingCourse] = useState<ProgramCourse | null>(null);
   const [isDeleteCourseDialogOpen, setIsDeleteCourseDialogOpen] = useState(false);
   const [deletingCourse, setDeletingCourse] = useState<ProgramCourse | null>(null);
+
+  // Fetch training programs from API
+  useEffect(() => {
+    // If we have program name from URL, use it directly
+    if (programNameFromUrl) {
+      console.log("✅ Using program name from URL:", programNameFromUrl);
+      setProgram({ id: programId, name: programNameFromUrl });
+      setProgramLoading(false);
+      return;
+    }
+
+    // Otherwise, fetch from API
+    const fetchPrograms = async () => {
+      try {
+        setProgramLoading(true);
+        console.log("📋 Fetching training programs for programId:", programId);
+        const response = await getTrainingPrograms();
+        if (response?.data && Array.isArray(response.data)) {
+          const programsList = response.data.map((p: any) => ({
+            id: p.program_id || p.id,
+            name: p.program_name || p.name,
+          }));
+          console.log("📚 Available programs:", programsList);
+          setPrograms(programsList);
+          
+          // Find matching program
+          const matchedProgram = programsList.find((p: Program) => p.id === programId);
+          if (matchedProgram) {
+            console.log("✅ Matched program:", matchedProgram);
+            setProgram(matchedProgram);
+          } else {
+            console.warn("⚠️ Program not found with ID:", programId);
+            console.warn("Available IDs:", programsList.map((p: Program) => p.id));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load training programs:", err);
+      } finally {
+        setProgramLoading(false);
+      }
+    };
+
+    fetchPrograms();
+  }, [programId, programNameFromUrl]);
+
+  // Fetch subjects when program name is available
+  useEffect(() => {
+    if (!program?.name || program.name === "Chương trình đào tạo") return;
+
+    const fetchSubjects = async () => {
+      try {
+        setLoading(true);
+        console.log("🔍 Fetching subjects for program:", program.name);
+        const response = await getSubjectsByProgramName(program.name);
+        
+        console.log("📦 API Response:", response);
+        
+        if (response?.data && Array.isArray(response.data)) {
+          // Map API response to ProgramCourse structure
+          const mappedCourses: ProgramCourse[] = response.data.map((subject: Subject, index: number) => ({
+            id: index + 1,
+            specialization: program.name,
+            type: subject.is_required ? "bat-buoc" : "tu-chon",
+            code: subject.subject_id,
+            name: subject.course_display_name || subject.name,
+            credits: subject.credits,
+            compulsory: subject.is_required ? subject.credits : 0,
+            optional: subject.is_required ? 0 : subject.credits,
+          }));
+          
+          console.log("✅ Mapped courses:", mappedCourses.length, "items");
+          setCourses(mappedCourses);
+        } else {
+          console.warn("⚠️ Invalid response format:", response);
+          setCourses([]);
+        }
+      } catch (err: any) {
+        console.error("❌ Failed to load subjects for program:", program.name, err);
+        if (err.response?.status === 404) {
+          console.warn("Program not found in backend:", program.name);
+        }
+        setCourses([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSubjects();
+  }, [program]);
 
   const filteredCourses = courses.filter((course) => {
     const query = searchQuery.toLowerCase();
@@ -206,10 +298,10 @@ export default function ChuongTrinhDaoTaoDetailPage() {
               >
                 Chương trình đào tạo
               </button>
-              {title && (
+              {(title || programLoading) && (
                 <>
                   <span className="mx-1">&gt;</span>
-                  {title}
+                  {programLoading ? "Đang tải..." : title}
                 </>
               )}
             </span>
@@ -322,8 +414,14 @@ export default function ChuongTrinhDaoTaoDetailPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {pagedCourses.length === 0 ? (
-                          <tr>
+                        {loading ? (
+                          <tr key="loading">
+                            <td colSpan={7} className="text-center text-gray-500 py-6">
+                              Đang tải...
+                            </td>
+                          </tr>
+                        ) : pagedCourses.length === 0 ? (
+                          <tr key="empty">
                             <td colSpan={7} className="text-center text-gray-500 py-6">
                               Chưa có học phần nào
                             </td>
@@ -446,7 +544,6 @@ export default function ChuongTrinhDaoTaoDetailPage() {
         <ImportDialog
           open={isImportOpen}
           onOpenChange={setIsImportOpen}
-          isCourseImport
         />
 
         <CourseFormDialog
@@ -468,7 +565,6 @@ export default function ChuongTrinhDaoTaoDetailPage() {
           onSave={handleEditCourse}
           mode="edit"
           initialValues={{
-            cohort: editingCourse?.cohort ?? "",
             specialization: editingCourse?.specialization ?? "",
             code: editingCourse?.code ?? "",
             name: editingCourse?.name ?? "",
