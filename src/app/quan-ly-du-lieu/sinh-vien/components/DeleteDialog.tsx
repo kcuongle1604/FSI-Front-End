@@ -12,7 +12,32 @@ interface DeleteDialogProps {
   onSuccess?: () => void
 }
 
-export default function DeleteDialog({ open, onOpenChange, student }: DeleteDialogProps) {
+export default function DeleteDialog({ open, onOpenChange, student, onSuccess }: DeleteDialogProps) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  const handleDelete = async () => {
+    if (!student) return
+
+    try {
+      setLoading(true)
+      setError("")
+      await deleteStudent(student.id)
+      onOpenChange(false)
+
+      if (onSuccess) {
+        onSuccess()
+      } else {
+        window.location.reload()
+      }
+    } catch (err: any) {
+      console.error("Delete failed:", err)
+      setError(err.response?.data?.message || "Không thể xóa sinh viên. Vui lòng thử lại.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[350px]">
@@ -28,14 +53,17 @@ export default function DeleteDialog({ open, onOpenChange, student }: DeleteDial
           </Button>
           <Button
             className="bg-[#167FFC] hover:bg-[#1470E3]"
-            onClick={async () => {
-              if (!student) return
-              await deleteStudent(student.id)
-              onOpenChange(false)
-              window.location.reload()
-            }}
+            onClick={handleDelete}
+            disabled={loading}
           >
-            Có
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Đang xóa...
+              </>
+            ) : (
+              "Có"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

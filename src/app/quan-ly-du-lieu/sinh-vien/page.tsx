@@ -49,7 +49,7 @@ import ImportDialog from "./components/ImportDialog"
 import ImportHistoryTab from "./components/ImportHistoryTab"
 
 // API & Types
-import { getStudents, getClasses } from "./student.api"
+import { getStudents, getClasses, getCohorts } from "./student.api"
 import type { Student, ImportHistory } from "./types"
 import { sampleStudents } from "./data"
 
@@ -59,6 +59,7 @@ export default function SinhVienPage() {
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(false)
   const [classes, setClasses] = useState<any[]>([])
+  const [cohorts, setCohorts] = useState<any[]>([])
 
   const [selectedKhoa, setSelectedKhoa] = useState<string | undefined>()
   const [selectedLop, setSelectedLop] = useState<string | undefined>()
@@ -111,8 +112,8 @@ export default function SinhVienPage() {
         // fallback: hiển thị 5 bản ghi mẫu
         setStudents(sampleStudents.slice(0, 5))
       }
-    } catch (err) {
-      console.error("Load sinh viên thất bại", err)
+    } catch (err: any) {
+      console.error("Load sinh viên thất bại:", err.response?.status || err.message)
       // fallback khi API lỗi: hiển thị 5 bản ghi mẫu
       setStudents(sampleStudents.slice(0, 5))
     } finally {
@@ -131,9 +132,21 @@ export default function SinhVienPage() {
     }
   }
 
+  const fetchCohorts = async () => {
+    try {
+      const res = await getCohorts()
+      if (res?.data) {
+        setCohorts(Array.isArray(res.data) ? res.data : [])
+      }
+    } catch (err) {
+      console.error("Load cohorts failed", err)
+    }
+  }
+
   useEffect(() => {
     fetchStudents()
     fetchClasses()
+    fetchCohorts()
   }, [])
 
   // Refetch students when selectedLop changes
@@ -148,19 +161,14 @@ export default function SinhVienPage() {
     ? classes.map((c: any) => c.class_name || c.name || c)
     : classes
       .filter((c: any) => {
-        const className = c.class_name || c.name || c
-        return String(className).startsWith(selectedKhoa)
+        // Filter classes by cohort_id
+        return c.cohort_id === Number(selectedKhoa)
       })
       .map((c: any) => c.class_name || c.name || c)
 
   const filteredStudents = students.filter((student) => {
     // Chưa chọn lớp => không hiển thị dữ liệu
     if (!selectedLop || selectedLop === "all") {
-      return false
-    }
-
-    // Lọc theo Khóa nếu được chọn
-    if (selectedKhoa && selectedKhoa !== "all" && !String(student.lop).startsWith(selectedKhoa)) {
       return false
     }
 
@@ -278,22 +286,30 @@ export default function SinhVienPage() {
                       className="w-[var(--radix-select-trigger-width)]"
                     >
                       <SelectItem value="all">Tất cả</SelectItem>
-                      <SelectItem value="48K">48K</SelectItem>
-                      <SelectItem value="49K">49K</SelectItem>
-                      <SelectItem value="50K">50K</SelectItem>
+                      {cohorts.map((cohort: any) => {
+                        const label = cohort.name 
+                          ? `${cohort.name} (${cohort.year_start}-${cohort.year_end})`
+                          : `Khóa ${cohort.cohort_id} (${cohort.year_start}-${cohort.year_end})`
+                        return (
+                          <SelectItem key={cohort.cohort_id} value={String(cohort.cohort_id)}>
+                            {label}
+                          </SelectItem>
+                        )
+                      })}
                     </SelectContent>
                   </Select>
                   <Select
                     value={selectedLop}
                     onValueChange={(value) => {
                       setSelectedLop(value)
-                      // Nếu chưa chọn Khóa, tự suy ra từ tiền tố của Lớp (vd: 48K21.2 -> 48K)
+                      // Nếu chưa chọn Khóa, tự suy ra từ cohort_id của lớp
                       if (!selectedKhoa || selectedKhoa === "all") {
-                        const matchedKhoa = ["48K", "49K", "50K"].find((khoa) =>
-                          String(value).startsWith(khoa)
-                        )
-                        if (matchedKhoa) {
-                          setSelectedKhoa(matchedKhoa)
+                        const selectedClass = classes.find((c: any) => {
+                          const className = c.class_name || c.name || c
+                          return className === value
+                        })
+                        if (selectedClass?.cohort_id) {
+                          setSelectedKhoa(String(selectedClass.cohort_id))
                         }
                       }
                     }}

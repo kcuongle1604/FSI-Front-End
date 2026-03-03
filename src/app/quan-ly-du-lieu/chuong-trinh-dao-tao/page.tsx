@@ -41,11 +41,13 @@ import { getStudents } from "../sinh-vien/student.api"
 import type { Student, ImportHistory } from "../sinh-vien/types"
 import { sampleStudents, classesByCourse } from "../sinh-vien/data"
 import ProgramFormDialog, { ProgramFormValues } from "./ProgramFormDialog"
+import { getTrainingPrograms } from "./program.api"
 
 export type Program = {
   id: number
   name: string
-  appliedCourses: string[]
+  specialization?: string
+  applicableCourses?: string[]
 }
 
 export const INITIAL_PROGRAMS: Program[] = [
@@ -69,8 +71,36 @@ export default function ChuongTrinhDaoTaoPage() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
 
   const [importHistory] = useState<ImportHistory[]>([])
-  const [programs, setPrograms] = useState<Program[]>(INITIAL_PROGRAMS)
-  const [editingProgram, setEditingProgram] = useState<Program | null>(null)
+  const [programs, setPrograms] = useState<Program[]>([])
+  const [loadingPrograms, setLoadingPrograms] = useState(false)
+
+  // Fetch training programs from API
+  useEffect(() => {
+    const fetchPrograms = async () => {
+      try {
+        setLoadingPrograms(true)
+        const response = await getTrainingPrograms()
+        if (response?.data && Array.isArray(response.data)) {
+          const programsList = response.data.map((p: any) => ({
+            id: p.program_id || p.id,
+            name: p.program_name || p.name,
+            specialization: p.specialization,
+            applicableCourses: p.applicable_courses || p.applicableCourses || [],
+          }))
+          console.log("📚 Loaded training programs:", programsList)
+          setPrograms(programsList)
+        }
+      } catch (err) {
+        console.error("Failed to load training programs:", err)
+        // Fallback to initial data if API fails
+        setPrograms(INITIAL_PROGRAMS)
+      } finally {
+        setLoadingPrograms(false)
+      }
+    }
+
+    fetchPrograms()
+  }, [])
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -134,28 +164,22 @@ export default function ChuongTrinhDaoTaoPage() {
     setIsFormOpen(true)
   }
 
-  const handleSaveProgram = (data: ProgramFormValues) => {
-    setPrograms((prev) => {
-      if (data.id) {
-        return prev.map((p) =>
-          p.id === data.id
-            ? { ...p, name: data.specialization, appliedCourses: data.appliedCourses }
-            : p,
-        )
+  const handleSaveProgram = async (data: ProgramFormValues) => {
+    // Refresh the programs list after successful save
+    try {
+      const response = await getTrainingPrograms()
+      if (response?.data && Array.isArray(response.data)) {
+        const programsList = response.data.map((p: any) => ({
+          id: p.program_id || p.id,
+          name: p.program_name || p.name,
+          specialization: p.specialization,
+          applicableCourses: p.applicable_courses || p.applicableCourses || [],
+        }))
+        setPrograms(programsList)
       }
-
-      const nextId = prev.length > 0 ? Math.max(...prev.map((p) => p.id)) + 1 : 1
-      return [
-        ...prev,
-        { id: nextId, name: data.specialization, appliedCourses: data.appliedCourses },
-      ]
-    })
-    setEditingProgram(null)
-  }
-
-  const handleEditProgram = (program: Program) => {
-    setEditingProgram(program)
-    setIsFormOpen(true)
+    } catch (err) {
+      console.error("Failed to refresh training programs:", err)
+    }
   }
 
   return (
@@ -250,22 +274,16 @@ export default function ChuongTrinhDaoTaoPage() {
                       </TableHeader>
 
                       <TableBody>
-                        {filteredPrograms.map((program, index) => (
-                          <TableRow
-                            key={program.id}
-                            className="border-b border-gray-200 hover:bg-gray-50"
-                          >
-                            <TableCell className="h-12 px-4 w-[80px] text-sm text-gray-600">
-                              {String(index + 1).padStart(2, "0")}
+                        {loadingPrograms ? (
+                          <TableRow key="loading">
+                            <TableCell colSpan={2} className="text-center text-gray-500 py-6">
+                              Đang tải...
                             </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              <button
-                                type="button"
-                                className="text-blue-700 hover:underline font-medium outline-none"
-                                onClick={() => router.push(`/quan-ly-du-lieu/chuong-trinh-dao-tao/${program.id}`)}
-                              >
-                                {program.name}
-                              </button>
+                          </TableRow>
+                        ) : filteredPrograms.length === 0 ? (
+                          <TableRow key="empty">
+                            <TableCell colSpan={2} className="text-center text-gray-500 py-6">
+                              Chưa có chương trình đào tạo nào
                             </TableCell>
                             <TableCell className="h-12 px-4 text-sm text-gray-600">
                               {program.appliedCourses.join(", ")}
@@ -292,7 +310,30 @@ export default function ChuongTrinhDaoTaoPage() {
                               </DropdownMenu>
                             </TableCell>
                           </TableRow>
-                        ))}
+                        ) : (
+                          filteredPrograms.map((program, index) => (
+                            <TableRow
+                              key={`program-${program.id}-${index}`}
+                              className="border-b border-gray-200 hover:bg-gray-50"
+                            >
+                              <TableCell className="h-12 px-4 w-[80px] text-sm text-gray-600">
+                                {String(index + 1).padStart(2, "0")}
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                                <button
+                                  type="button"
+                                  className="text-blue-700 hover:underline font-medium outline-none"
+                                  onClick={() => {
+                                    console.log("👆 Navigating to program:", program.name, "ID:", program.id)
+                                    router.push(`/quan-ly-du-lieu/chuong-trinh-dao-tao/${program.id}?name=${encodeURIComponent(program.name)}`)
+                                  }}
+                                >
+                                  {program.name}
+                                </button>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
                       </TableBody>
                     </Table>
                   </div>
