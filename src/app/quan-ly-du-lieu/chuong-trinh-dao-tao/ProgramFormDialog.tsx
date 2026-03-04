@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -248,9 +249,6 @@ export default function ProgramFormDialog({
               placeholder="Nhập mô tả"
               className="w-full border-gray-300"
             />
-            {errors.appliedCourses && (
-              <p className="text-xs text-red-500">{errors.appliedCourses}</p>
-            )}
           </div>
         </div>
 

@@ -28,3 +28,19 @@ export async function getSubjectsByProgramName(projectName: string) {
 export async function getTrainingPrograms() {
   return api.get("/api/v1/training-programs")
 }
+
+export interface Cohort {
+  cohort_id: number
+  name: string
+  year_start: number
+  year_end: number
+}
+
+/**
+ * Get list of cohorts for a specific training program
+ * @param trainingProgramId - ID of the training program
+ * @returns List of cohorts associated with the program
+ */
+export async function getProgramCohorts(trainingProgramId: number) {
+  return api.get<Cohort[]>(`/api/v1/training-programs/${trainingProgramId}/cohorts`)
+}

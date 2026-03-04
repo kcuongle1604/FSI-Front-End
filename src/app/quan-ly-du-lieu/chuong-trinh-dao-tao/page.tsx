@@ -41,7 +41,7 @@ import { getStudents } from "../sinh-vien/student.api"
 import type { Student, ImportHistory } from "../sinh-vien/types"
 import { sampleStudents, classesByCourse } from "../sinh-vien/data"
 import ProgramFormDialog, { ProgramFormValues } from "./ProgramFormDialog"
-import { getTrainingPrograms } from "./program.api"
+import { getTrainingPrograms, getProgramCohorts, type Cohort } from "./program.api"
 
 export type Program = {
   id: number
@@ -73,6 +73,8 @@ export default function ChuongTrinhDaoTaoPage() {
   const [importHistory] = useState<ImportHistory[]>([])
   const [programs, setPrograms] = useState<Program[]>([])
   const [loadingPrograms, setLoadingPrograms] = useState(false)
+  const [editingProgram, setEditingProgram] = useState<Program | null>(null)
+  const [programCohorts, setProgramCohorts] = useState<Map<number, string[]>>(new Map())
 
   // Fetch training programs from API
   useEffect(() => {
@@ -80,15 +82,44 @@ export default function ChuongTrinhDaoTaoPage() {
       try {
         setLoadingPrograms(true)
         const response = await getTrainingPrograms()
+        console.log("🔍 Raw API response for training programs:", response)
         if (response?.data && Array.isArray(response.data)) {
-          const programsList = response.data.map((p: any) => ({
-            id: p.program_id || p.id,
-            name: p.program_name || p.name,
-            specialization: p.specialization,
-            applicableCourses: p.applicable_courses || p.applicableCourses || [],
-          }))
+          const programsList = response.data.map((p: any) => {
+            console.log("🔍 Raw program data:", p)
+            console.log("🔍 Checking ID fields - p.program_id:", p.program_id, "p.id:", p.id, "p.training_program_id:", p.training_program_id)
+            const programId = p.training_program_id || p.program_id || p.id
+            console.log("🔍 Selected program ID:", programId)
+            return {
+              id: programId,
+              name: p.program_name || p.name,
+              specialization: p.specialization,
+              applicableCourses: p.applicable_courses || p.applicableCourses || [],
+            }
+          })
           console.log("📚 Loaded training programs:", programsList)
           setPrograms(programsList)
+          
+          // Fetch cohorts for each program
+          const cohortsMap = new Map<number, string[]>()
+          await Promise.all(
+            programsList.map(async (program) => {
+              try {
+                console.log(`🔍 Fetching cohorts for program ID: ${program.id}`)
+                const cohortsResponse = await getProgramCohorts(program.id)
+                console.log(`📊 Cohorts response for program ${program.id}:`, cohortsResponse)
+                if (cohortsResponse?.data && Array.isArray(cohortsResponse.data)) {
+                  const cohortIds = cohortsResponse.data.map((c: Cohort) => String(c.cohort_id))
+                  console.log(`✅ Cohort IDs for program ${program.id}:`, cohortIds)
+                  cohortsMap.set(program.id, cohortIds)
+                }
+              } catch (err) {
+                console.error(`❌ Failed to load cohorts for program ${program.id}:`, err)
+                cohortsMap.set(program.id, [])
+              }
+            })
+          )
+          console.log("🗺️ Final cohorts map:", cohortsMap)
+          setProgramCohorts(cohortsMap)
         }
       } catch (err) {
         console.error("Failed to load training programs:", err)
@@ -164,18 +195,41 @@ export default function ChuongTrinhDaoTaoPage() {
     setIsFormOpen(true)
   }
 
+  const handleEditProgram = (program: Program) => {
+    setEditingProgram(program)
+    setIsFormOpen(true)
+  }
+
   const handleSaveProgram = async (data: ProgramFormValues) => {
     // Refresh the programs list after successful save
     try {
       const response = await getTrainingPrograms()
       if (response?.data && Array.isArray(response.data)) {
         const programsList = response.data.map((p: any) => ({
-          id: p.program_id || p.id,
+          id: p.training_program_id || p.program_id || p.id,
           name: p.program_name || p.name,
           specialization: p.specialization,
           applicableCourses: p.applicable_courses || p.applicableCourses || [],
         }))
         setPrograms(programsList)
+        
+        // Refresh cohorts for all programs
+        const cohortsMap = new Map<number, string[]>()
+        await Promise.all(
+          programsList.map(async (program) => {
+            try {
+              const cohortsResponse = await getProgramCohorts(program.id)
+              if (cohortsResponse?.data && Array.isArray(cohortsResponse.data)) {
+                const cohortIds = cohortsResponse.data.map((c: Cohort) => String(c.cohort_id))
+                cohortsMap.set(program.id, cohortIds)
+              }
+            } catch (err) {
+              console.error(`Failed to load cohorts for program ${program.id}:`, err)
+              cohortsMap.set(program.id, [])
+            }
+          })
+        )
+        setProgramCohorts(cohortsMap)
       }
     } catch (err) {
       console.error("Failed to refresh training programs:", err)
@@ -276,38 +330,14 @@ export default function ChuongTrinhDaoTaoPage() {
                       <TableBody>
                         {loadingPrograms ? (
                           <TableRow key="loading">
-                            <TableCell colSpan={2} className="text-center text-gray-500 py-6">
+                            <TableCell colSpan={4} className="text-center text-gray-500 py-6">
                               Đang tải...
                             </TableCell>
                           </TableRow>
                         ) : filteredPrograms.length === 0 ? (
                           <TableRow key="empty">
-                            <TableCell colSpan={2} className="text-center text-gray-500 py-6">
+                            <TableCell colSpan={4} className="text-center text-gray-500 py-6">
                               Chưa có chương trình đào tạo nào
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {program.appliedCourses.join(", ")}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600 text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 hover:bg-gray-100"
-                                  >
-                                    <MoreVertical className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-24">
-                                  <DropdownMenuItem
-                                    className="text-sm"
-                                    onClick={() => handleEditProgram(program)}
-                                  >
-                                    Sửa
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
                         ) : (
@@ -330,6 +360,34 @@ export default function ChuongTrinhDaoTaoPage() {
                                 >
                                   {program.name}
                                 </button>
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                                {(() => {
+                                  const cohorts = programCohorts.get(program.id)
+                                  console.log(`🎯 Rendering cohorts for program ID ${program.id}:`, cohorts, `Map has key:`, programCohorts.has(program.id))
+                                  return cohorts?.join(", ") || "-"
+                                })()}
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600 text-right">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 hover:bg-gray-100"
+                                    >
+                                      <MoreVertical className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-24">
+                                    <DropdownMenuItem
+                                      className="text-sm"
+                                      onClick={() => handleEditProgram(program)}
+                                    >
+                                      Sửa
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </TableCell>
                             </TableRow>
                           ))
@@ -404,9 +462,10 @@ export default function ChuongTrinhDaoTaoPage() {
         initialData={
           editingProgram
             ? {
-                id: editingProgram.id,
-                specialization: editingProgram.name,
-                appliedCourses: editingProgram.appliedCourses,
+                name: editingProgram.name,
+                major_id: undefined,
+                description: undefined,
+                cohort_ids: [],
               }
             : null
         }
