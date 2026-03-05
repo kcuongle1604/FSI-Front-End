@@ -1,5 +1,12 @@
 import { api } from "@/lib/api"
-import type { StudentListResponse, ImportResponse, ColumnMapping, UpdateStudentRequest } from "./types"
+import type { 
+  StudentListResponse, 
+  ImportResponse, 
+  ImportAnalysisResponse,
+  ImportExecutionResponse,
+  ColumnMapping, 
+  UpdateStudentRequest 
+} from "./types"
 
 export async function getStudents(params?: {
   cohort_id?: number
@@ -30,6 +37,10 @@ export async function getClasses() {
   return api.get("/api/v1/classes")
 }
 
+export async function getCohorts() {
+  return api.get("/api/v1/cohorts")
+}
+
 export async function importStudents(
   file: File,
   dryRun: boolean,
@@ -40,9 +51,18 @@ export async function importStudents(
   formData.append("dry_run", dryRun.toString())
   formData.append("column_mapping", JSON.stringify(columnMapping))
 
-  return api.post<ImportResponse>("/api/v1/students/import", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  })
+  // Return type depends on dry_run value
+  if (dryRun) {
+    return api.post<ImportAnalysisResponse>("/api/v1/students/import", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    })
+  } else {
+    return api.post<ImportExecutionResponse>("/api/v1/students/import", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    })
+  }
 }

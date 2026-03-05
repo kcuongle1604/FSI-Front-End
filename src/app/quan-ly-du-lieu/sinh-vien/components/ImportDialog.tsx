@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { importStudents } from "../student.api"
-import type { ImportResponse, ImportError, ColumnMapping } from "../types"
+import type { ImportAnalysisResponse, ImportExecutionResponse, ImportError, ColumnMapping } from "../types"
 
 interface ImportTypeOption {
   value: string
@@ -29,20 +29,9 @@ interface ImportDialogProps {
   onImportSuccess?: () => void
   importTypeOptions?: ImportTypeOption[]
   classOptions?: { value: string; label: string }[]
-  // Dùng cho các màn import học phần (CTĐT)
-  isCourseImport?: boolean
 }
 
-// isCertificateImport: dùng cho màn Import Chứng chỉ (mssv + các loại chứng chỉ)
-export default function ImportDialog({
-  open,
-  onOpenChange,
-  importTypeOptions,
-  classOptions,
-  isCourseImport = false,
-  // @ts-expect-error kept for backward compatibility in other modules
-  isCertificateImport = false,
-}: ImportDialogProps & { isCertificateImport?: boolean }) {
+export default function ImportDialog({ open, onOpenChange, onImportSuccess, importTypeOptions, classOptions }: ImportDialogProps) {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importError, setImportError] = useState<string>("")
   const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'result'>('upload')
@@ -59,7 +48,7 @@ export default function ImportDialog({
     lop: 'Lớp',
     ngaySinh: 'Ngày sinh',
     ghiChu: 'Ghi chú',
-    viDu: '',
+    // Fields for other import types
     hoLot: '',
     ten: '',
     ele1: '',
@@ -67,52 +56,19 @@ export default function ImportDialog({
     ec1: '',
     ec2: '',
     b1: '',
-    maHocPhan: '',
-    tenHocPhan: '',
-    soTinChi: '',
-    batBuoc: '',
-    tuChon: '',
-    // các cột cho chứng chỉ
-    donTN: '',
-    kiemDiem: '',
-    quanSu: '',
-    theDuc: '',
-    ngoaiNgu: '',
-    tinhHoc: '',
   })
 
   // API integration states
   const [loading, setLoading] = useState(false)
-  const [dryRunResult, setDryRunResult] = useState<ImportResponse | null>(null)
-  const [importResult, setImportResult] = useState<ImportResponse | null>(null)
+  const [dryRunResult, setDryRunResult] = useState<ImportAnalysisResponse | null>(null)
+  const [importResult, setImportResult] = useState<ImportExecutionResponse | null>(null)
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
 
   const isAggregateScoreImport = importType === 'diem-tong-hop'
   const isEnglishScoreImport = importType === 'diem-tieng-anh'
 
   // Cấu hình cột hiển thị & bắt buộc theo loại import
-  const mappingFields = isCourseImport
-    ? ([
-        { key: 'maHocPhan', label: 'Mã học phần', required: true },
-        { key: 'tenHocPhan', label: 'Tên học phần', required: true },
-        { key: 'soTinChi', label: 'Số tín chỉ', required: true },
-        { key: 'batBuoc', label: 'Bắt buộc', required: true },
-        { key: 'tuChon', label: 'Tự chọn', required: true },
-      ] as const)
-    : isCertificateImport
-    ? ([
-        { key: 'lop', label: 'Lớp', required: true },
-        { key: 'hoLot', label: 'Họ lót', required: true },
-        { key: 'ten', label: 'Tên', required: true },
-        { key: 'ngaySinh', label: 'Ngày sinh', required: true },
-        { key: 'donTN', label: 'Đơn xin công nhận TN', required: false },
-        { key: 'kiemDiem', label: 'Bản kiểm điểm cá nhân', required: false },
-        { key: 'quanSu', label: 'CC Quân sự', required: false },
-        { key: 'theDuc', label: 'CC Thể dục', required: false },
-        { key: 'ngoaiNgu', label: 'CC Ngoại ngữ', required: false },
-        { key: 'tinhHoc', label: 'CC Tin học', required: false },
-      ] as const)
-    : isEnglishScoreImport
+  const mappingFields = isEnglishScoreImport
     ? ([
       { key: 'mssv', label: 'MSSV', required: true },
       { key: 'ele1', label: 'ELE1', required: true },
@@ -134,65 +90,21 @@ export default function ImportDialog({
         { key: 'lop', label: 'Lớp', required: true },
         { key: 'ngaySinh', label: 'Ngày sinh', required: true },
         { key: 'ghiChu', label: 'Ghi chú', required: false },
-        { key: 'viDu', label: 'Ví dụ', required: false },
-        ] as const)
+      ] as const)
 
-      const systemColumns = isCourseImport
-    ? [
-        { value: 'Mã học phần', label: 'Mã học phần' },
-        { value: 'Tên học phần', label: 'Tên học phần' },
-        { value: 'Số tín chỉ', label: 'Số tín chỉ' },
-        { value: 'Bắt buộc', label: 'Bắt buộc' },
-        { value: 'Tự chọn', label: 'Tự chọn' },
-      ]
-    : isCertificateImport
-    ? [
-        { value: 'Lớp', label: 'Lớp' },
-        { value: 'Họ lót', label: 'Họ lót' },
-        { value: 'Tên', label: 'Tên' },
-        { value: 'Ngày sinh', label: 'Ngày sinh' },
-        { value: 'Đơn xin công nhận TN', label: 'Đơn xin công nhận TN' },
-        { value: 'Bản kiểm điểm cá nhân', label: 'Bản kiểm điểm cá nhân' },
-        { value: 'CC Quân sự', label: 'CC Quân sự' },
-        { value: 'CC Thể dục', label: 'CC Thể dục' },
-        { value: 'CC Ngoại ngữ', label: 'CC Ngoại ngữ' },
-        { value: 'CC Tin học', label: 'CC Tin học' },
-      ]
-    : isEnglishScoreImport
-    ? [
-      { value: 'MSSV', label: 'MSSV' },
-      { value: 'ELE1', label: 'ELE1' },
-      { value: 'ELE2', label: 'ELE2' },
-      { value: 'EC1', label: 'EC1' },
-      { value: 'EC2', label: 'EC2' },
-      { value: 'B1', label: 'B1' },
-    ]
-    : isAggregateScoreImport
-      ? [
-        { value: 'Lớp', label: 'Lớp' },
-        { value: 'Họ lót', label: 'Họ lót' },
-        { value: 'Tên', label: 'Tên' },
-        { value: 'Ngày sinh', label: 'Ngày sinh' },
-      ]
-      : [
-        { value: 'MSSV', label: 'MSSV' },
-        { value: 'Họ và tên', label: 'Họ và tên' },
-        { value: 'Lớp', label: 'Lớp' },
-        { value: 'Ngày sinh', label: 'Ngày sinh' },
-        { value: 'Ghi chú', label: 'Ghi chú' },
-        { value: 'Ví dụ', label: 'Ví dụ' },
-      ]
-
-  const errorSummary = isCourseImport
-    ? { valid: 10, duplicateWithSystem: 1, duplicateInFile: 2, dataError: 3 }
-    : isCertificateImport
-    ? { valid: 20, notFoundInSystem: 1, duplicateCertificate: 2, dataError: 3 }
-    : { valid: 0, notFoundInSystem: 1, duplicateScore: 2, dataError: 3 }
-  const errorDetails = [
-    { row: 3, column: 'Họ và tên', value: 'Nguyễn Văn', error: 'Giá trị không hợp lệ' },
-    { row: 5, column: 'MSSV', value: '', error: 'Thiếu giá trị' },
-    { row: 10, column: 'Ngày sinh', value: 'Mười hai tháng 3', error: 'Sai kiểu dữ liệu' },
-  ]
+  // Use actual CSV headers instead of hardcoded values
+  const systemColumns = csvHeaders.map(header => ({
+    value: header,
+    label: header
+  }))
+  
+  // Get error details from dry run result
+  const errorDetails = dryRunResult?.invalid_rows?.map(error => ({
+    row: error.row_index,
+    column: 'N/A',
+    value: JSON.stringify(error.row_data),
+    error: error.error_message
+  })) || []
 
   const unmappedRequiredFields = mappingFields.filter(
     (field) => field.required && !columnMappings[field.key]
@@ -209,14 +121,20 @@ export default function ImportDialog({
         const headers = lines[0].split(',').map(h => h.trim().replace(/\r$/, ''))
         setCsvHeaders(headers)
 
-        // Auto-map if column names match
+        // Auto-map if column names match - using correct keys from columnMappings
         const autoMapping: Record<string, string> = {}
-        if (headers.includes('Mã sinh viên')) autoMapping.student_id = 'Mã sinh viên'
-        if (headers.includes('Họ và tên')) autoMapping.full_name = 'Họ và tên'
-        if (headers.includes('Lớp')) autoMapping.class_name = 'Lớp'
-        if (headers.includes('Ngày sinh')) autoMapping.dob = 'Ngày sinh'
 
-        setColumnMappings(autoMapping)
+        // For student import mode
+        if (!isAggregateScoreImport && !isEnglishScoreImport) {
+          if (headers.includes('Mã sinh viên')) autoMapping.mssv = 'Mã sinh viên'
+          if (headers.includes('MSSV')) autoMapping.mssv = 'MSSV'
+          if (headers.includes('Họ và tên')) autoMapping.hoTen = 'Họ và tên'
+          if (headers.includes('Lớp')) autoMapping.lop = 'Lớp'
+          if (headers.includes('Ngày sinh')) autoMapping.ngaySinh = 'Ngày sinh'
+          if (headers.includes('Ghi chú')) autoMapping.ghiChu = 'Ghi chú'
+        }
+
+        setColumnMappings(prev => ({ ...prev, ...autoMapping }))
       }
     } catch (error) {
       console.error('Error parsing CSV headers:', error)
@@ -251,11 +169,21 @@ export default function ImportDialog({
       setLoading(true)
       setImportError("")
 
-      // Build column mapping for API (only include mapped fields)
+      // Transform frontend keys to backend keys
+      const keyMapping: Record<string, string> = {
+        'mssv': 'student_id',
+        'hoTen': 'full_name',
+        'lop': 'class_name',
+        'ngaySinh': 'dob',
+        'ghiChu': 'notes'
+      }
+
+      // Build column mapping for API with transformed keys
       const apiColumnMapping: ColumnMapping = {}
-      Object.entries(columnMappings).forEach(([key, value]) => {
-        if (value) {
-          apiColumnMapping[key] = value
+      Object.entries(columnMappings).forEach(([frontendKey, csvColumn]) => {
+        if (csvColumn) {
+          const backendKey = keyMapping[frontendKey] || frontendKey
+          apiColumnMapping[backendKey] = csvColumn
         }
       })
 
@@ -263,7 +191,7 @@ export default function ImportDialog({
       setDryRunResult(response.data)
 
       // Switch to error overview tab if there are errors
-      if (response.data.errors && response.data.errors.length > 0) {
+      if (response.data.invalid_rows && response.data.invalid_rows.length > 0) {
         setMappingTab('chi-tiet-loi')
       } else {
         setMappingTab('tong-quan-loi')
@@ -282,15 +210,34 @@ export default function ImportDialog({
       setLoading(true)
       setImportError("")
 
-      // Build column mapping for API
+      // Transform frontend keys to backend keys
+      const keyMapping: Record<string, string> = {
+        'mssv': 'student_id',
+        'hoTen': 'full_name',
+        'lop': 'class_name',
+        'ngaySinh': 'dob',
+        'ghiChu': 'notes'
+      }
+
+      // Build column mapping for API with transformed keys
       const apiColumnMapping: ColumnMapping = {}
-      Object.entries(columnMappings).forEach(([key, value]) => {
-        if (value) {
-          apiColumnMapping[key] = value
+      Object.entries(columnMappings).forEach(([frontendKey, csvColumn]) => {
+        if (csvColumn) {
+          // Convert frontend key to backend key
+          const backendKey = keyMapping[frontendKey] || frontendKey
+          apiColumnMapping[backendKey] = csvColumn
         }
       })
 
+      console.log('🚀 Import Request:', {
+        file: importFile.name,
+        dry_run: false,
+        column_mapping: apiColumnMapping
+      })
+
       const response = await importStudents(importFile, false, apiColumnMapping)
+      console.log('✅ Import Response:', response.data)
+      
       setImportResult(response.data)
       setImportStep('result')
 
@@ -299,7 +246,37 @@ export default function ImportDialog({
         onImportSuccess()
       }
     } catch (error: any) {
-      setImportError(error.response?.data?.detail || "Lỗi khi import. Vui lòng thử lại.")
+      console.error("❌ Import error:", error)
+      console.error("❌ Error response:", error.response?.data)
+      
+      // Extract error message from various possible formats
+      let errorMessage = "Lỗi khi import. Vui lòng thử lại."
+      
+      if (error.response?.data) {
+        const errorData = error.response.data
+        if (typeof errorData === 'string') {
+          errorMessage = errorData
+        } else if (errorData.detail) {
+          if (typeof errorData.detail === 'string') {
+            errorMessage = errorData.detail
+          } else if (Array.isArray(errorData.detail)) {
+            errorMessage = errorData.detail.map((e: any) => 
+              typeof e === 'string' ? e : e.msg || JSON.stringify(e)
+            ).join(', ')
+          } else {
+            errorMessage = JSON.stringify(errorData.detail)
+          }
+        } else if (errorData.message) {
+          errorMessage = errorData.message
+        } else if (errorData.error) {
+          errorMessage = errorData.error
+        }
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      setImportError(errorMessage)
+      setImportStep('result')
     } finally {
       setLoading(false)
     }
@@ -508,76 +485,26 @@ export default function ImportDialog({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {isCourseImport ? (
-                      <>
-                        <TableRow>
-                          <TableCell className="pl-4">Hợp lệ</TableCell>
-                          <TableCell className="text-center">{errorSummary.valid}</TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="pl-4">Mã học phần trùng với hệ thống</TableCell>
-                          <TableCell className="text-center">{String(errorSummary.duplicateWithSystem ?? 0).padStart(2, "0")}</TableCell>
-                          <TableCell>Dòng 9</TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="pl-4">Mã học phần trùng nhau trong tệp</TableCell>
-                          <TableCell className="text-center">{String(errorSummary.duplicateInFile ?? 0).padStart(2, "0")}</TableCell>
-                          <TableCell>Dòng 3,12</TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="pl-4">Lỗi dữ liệu khác</TableCell>
-                          <TableCell className="text-center">{String(errorSummary.dataError).padStart(2, "0")}</TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
-                      </>
-                    ) : isCertificateImport ? (
-                      <>
-                        <TableRow>
-                          <TableCell className="pl-4">Hợp lệ</TableCell>
-                          <TableCell className="text-center">{errorSummary.valid}</TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="pl-4">Không tìm thấy Sinh viên trong hệ thống</TableCell>
-                          <TableCell className="text-center">0{errorSummary.notFoundInSystem}</TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="pl-4">Thông tin Chứng chỉ trùng nhau trong tệp</TableCell>
-                          <TableCell className="text-center">0{errorSummary.duplicateCertificate}</TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="pl-4">Lỗi dữ liệu khác</TableCell>
-                          <TableCell className="text-center">0{errorSummary.dataError}</TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
-                      </>
-                    ) : (
-                      <>
-                        <TableRow>
-                          <TableCell className="pl-4">Hợp lệ</TableCell>
-                          <TableCell className="text-center">{errorSummary.valid}</TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="pl-4">Không tìm thấy Sinh viên trong hệ thống</TableCell>
-                          <TableCell className="text-center">0{errorSummary.notFoundInSystem}</TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="pl-4">Thông tin Điểm trùng nhau trong tệp</TableCell>
-                          <TableCell className="text-center">0{errorSummary.duplicateScore}</TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="pl-4">Lỗi dữ liệu khác</TableCell>
-                          <TableCell className="text-center">0{errorSummary.dataError}</TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
-                      </>
-                    )}
+                    <TableRow>
+                      <TableCell className="pl-4">Hợp lệ</TableCell>
+                      <TableCell className="text-center">{errorSummary.valid}</TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-4">Không tìm thấy Sinh viên trong hệ thống</TableCell>
+                      <TableCell className="text-center">0{errorSummary.notFoundInSystem}</TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-4">Thông tin Điểm trùng nhau trong tệp</TableCell>
+                      <TableCell className="text-center">0{errorSummary.duplicateScore}</TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-4">Lỗi dữ liệu khác</TableCell>
+                      <TableCell className="text-center">0{errorSummary.dataError}</TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               </div>
@@ -626,16 +553,16 @@ export default function ImportDialog({
                     </TableHeader>
                     <TableBody>
                       <TableRow>
-                        <TableCell className="pl-4">Trạng thái</TableCell>
-                        <TableCell className="text-center font-medium">{dryRunResult.status}</TableCell>
+                        <TableCell className="pl-4">Tổng số dòng</TableCell>
+                        <TableCell className="text-center font-medium">{dryRunResult.total_rows}</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="pl-4">Số bản ghi hợp lệ</TableCell>
-                        <TableCell className="text-center text-green-600 font-medium">{dryRunResult.success_count}</TableCell>
+                        <TableCell className="text-center text-green-600 font-medium">{dryRunResult.valid_count}</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="pl-4">Số bản ghi lỗi</TableCell>
-                        <TableCell className="text-center text-red-600 font-medium">{dryRunResult.failure_count}</TableCell>
+                        <TableCell className="text-center text-red-600 font-medium">{dryRunResult.invalid_count}</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="pl-4" colSpan={2}>
@@ -705,10 +632,17 @@ export default function ImportDialog({
         <Button variant="outline" onClick={() => setImportStep('upload')}>Trở lại</Button>
         <Button
           className="bg-[#167FFC] hover:bg-[#1470E3]"
-          disabled={hasUnmappedRequired}
-          onClick={() => { handleOpenChange(false) }}
+          disabled={hasUnmappedRequired || loading}
+          onClick={handleActualImport}
         >
-          Import
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Đang import...
+            </>
+          ) : (
+            'Import'
+          )}
         </Button>
       </DialogFooter>
     </>
@@ -734,13 +668,34 @@ export default function ImportDialog({
               <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto mt-4">
                 <div className="bg-green-50 p-3 rounded-lg">
                   <p className="text-sm text-gray-600">Thành công</p>
-                  <p className="text-2xl font-bold text-green-600">{importResult.success_count}</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {importResult.success_count}
+                  </p>
                 </div>
                 <div className="bg-red-50 p-3 rounded-lg">
                   <p className="text-sm text-gray-600">Thất bại</p>
-                  <p className="text-2xl font-bold text-red-600">{importResult.failure_count}</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {importResult.failure_count}
+                  </p>
                 </div>
               </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Tổng số xử lý: {importResult.total_processed}
+              </p>
+              <p className="text-xs text-gray-400">
+                Trạng thái: {importResult.status}
+              </p>
+            </div>
+          </div>
+        )}
+        {importError && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-center">
+              <AlertCircle className="h-16 w-16 text-red-500" />
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-lg font-semibold text-red-600">Lỗi khi import</p>
+              <p className="text-sm text-gray-600">{importError}</p>
             </div>
           </div>
         )}
