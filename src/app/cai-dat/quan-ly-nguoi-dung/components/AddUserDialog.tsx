@@ -24,10 +24,14 @@ const CLASSES = ["48K05", "48K14.1", "48K14.2", "48K21.1", "48K21.2"]
 type AddUserDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onAdd?: (userData: any) => void
+  onSuccess?: () => void
 }
 
-export function AddUserDialog({ open, onOpenChange, onAdd }: AddUserDialogProps) {
+export function AddUserDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: AddUserDialogProps) {
   const [formData, setFormData] = useState({
     role: "",
     assignClasses: [] as string[],
@@ -36,86 +40,94 @@ export function AddUserDialog({ open, onOpenChange, onAdd }: AddUserDialogProps)
     password: "",
     confirmPassword: "",
   })
+
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(false)
 
   const handleInputChange = (field: string, value: string) => {
-    if (field === "role") {
-      // Reset assignClasses when role changes and it's not "Giáo viên chủ nhiệm"
-      if (value !== "Giáo viên chủ nhiệm") {
-        setFormData(prev => ({
-          ...prev,
-          [field]: value,
-          assignClasses: []
-        }))
-      } else {
-        setFormData(prev => ({
-          ...prev,
-          [field]: value
-        }))
-      }
+    if (field === "role" && value !== "Giáo viên chủ nhiệm") {
+      setFormData(prev => ({ ...prev, role: value, assignClasses: [] }))
     } else {
-      setFormData(prev => ({
-        ...prev,
-        [field]: value
-      }))
+      setFormData(prev => ({ ...prev, [field]: value }))
     }
   }
 
-  const handleAdd = () => {
+  const validate = () => {
     const newErrors: Record<string, string> = {}
 
-    // Validate required fields
     if (!formData.role) newErrors.role = "Vui lòng chọn vai trò"
-    // Only validate assignClasses if role is "Giáo viên chủ nhiệm"
-    if (formData.role === "Giáo viên chủ nhiệm" && formData.assignClasses.length === 0) {
+    if (
+      formData.role === "Giáo viên chủ nhiệm" &&
+      formData.assignClasses.length === 0
+    ) {
       newErrors.assignClasses = "Vui lòng chọn ít nhất một lớp"
     }
     if (!formData.email) newErrors.email = "Vui lòng nhập email"
     if (!formData.fullName) newErrors.fullName = "Vui lòng nhập họ và tên"
     if (!formData.password) newErrors.password = "Vui lòng nhập mật khẩu"
-    if (!formData.confirmPassword) newErrors.confirmPassword = "Vui lòng xác nhận mật khẩu"
-
-    // Validate password match
-    if (formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword) {
+    if (!formData.confirmPassword)
+      newErrors.confirmPassword = "Vui lòng xác nhận mật khẩu"
+    if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = "Mật khẩu xác nhận không khớp"
     }
 
     setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
-    // If there are errors, don't proceed
-    if (Object.keys(newErrors).length > 0) {
-      return
+  const handleAdd = async () => {
+    if (!validate()) return
+
+    try {
+      setLoading(true)
+
+      const res = await fetch("http://127.0.0.1:8000/api/v1/users/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+        body: JSON.stringify({
+          username: formData.fullName,
+          email: formData.email,
+          full_name: formData.fullName,
+          password: formData.password,
+          role: formData.role,
+          classes:
+            formData.role === "Giáo viên chủ nhiệm"
+              ? formData.assignClasses
+              : [],
+        }),
+      })
+
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(text || "Tạo người dùng thất bại")
+      }
+
+      // 🔥 QUAN TRỌNG: refresh danh sách ở page cha
+      onSuccess?.()
+      onOpenChange(false)
+
+      setFormData({
+        role: "",
+        assignClasses: [],
+        email: "",
+        fullName: "",
+        password: "",
+        confirmPassword: "",
+      })
+      setErrors({})
+    } catch (err: any) {
+      setErrors({
+        submit: err.message || "Có lỗi xảy ra khi tạo người dùng",
+      })
+    } finally {
+      setLoading(false)
     }
-
-    // Call callback if provided
-    if (onAdd) {
-      onAdd(formData)
-    }
-
-    // Reset form
-    setFormData({
-      role: "",
-      assignClasses: [],
-      email: "",
-      fullName: "",
-      password: "",
-      confirmPassword: "",
-    })
-    setErrors({})
-
-    // Close dialog
-    onOpenChange(false)
   }
 
   const handleCancel = () => {
-    setFormData({
-      role: "",
-      assignClasses: [],
-      email: "",
-      fullName: "",
-      password: "",
-      confirmPassword: "",
-    })
     setErrors({})
     onOpenChange(false)
   }
@@ -127,130 +139,124 @@ export function AddUserDialog({ open, onOpenChange, onAdd }: AddUserDialogProps)
           <DialogTitle>Thêm người dùng</DialogTitle>
         </DialogHeader>
 
+        {errors.submit && (
+          <p className="text-sm text-red-600 bg-red-50 p-2 rounded">
+            {errors.submit}
+          </p>
+        )}
+
         <div className="space-y-4">
-          {/* Role */}
+          {/* Vai trò */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-gray-800">
+            <Label>
               Vai trò<span className="text-red-500">*</span>
             </Label>
-            <Select value={formData.role} onValueChange={(value) => handleInputChange("role", value)}>
-              <SelectTrigger className="w-full border-gray-300">
+
+            <Select
+              value={formData.role}
+              onValueChange={(v) => handleInputChange("role", v)}
+            >
+              <SelectTrigger className={errors.role ? "border-red-500" : ""}>
                 <SelectValue placeholder="Chọn vai trò" />
               </SelectTrigger>
+
               <SelectContent>
                 <SelectItem value="Giáo vụ khoa">Giáo vụ khoa</SelectItem>
-                <SelectItem value="Ban chủ nhiệm khoa">Ban chủ nhiệm khoa</SelectItem>
-                <SelectItem value="Giáo viên chủ nhiệm">Giáo viên chủ nhiệm</SelectItem>
+                <SelectItem value="Ban chủ nhiệm khoa">
+                  Ban chủ nhiệm khoa
+                </SelectItem>
+                <SelectItem value="Giáo viên chủ nhiệm">
+                  Giáo viên chủ nhiệm
+                </SelectItem>
               </SelectContent>
             </Select>
+
+            {/* MESSAGE LỖI – giống Gán lớp */}
+            {errors.role && (
+              <p className="text-xs text-red-500">{errors.role}</p>
+            )}
           </div>
 
-          {/* Assign Class */}
+
+          {/* Gán lớp */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-gray-800">
-              Gán lớp<span className="text-red-500">*</span>
-            </Label>
+            <Label>Gán lớp<span className="text-red-500">*</span></Label>
             <MultiSelect
               options={CLASSES}
               value={formData.assignClasses}
-              onChange={(classes) => setFormData(prev => ({ ...prev, assignClasses: classes }))}
+              onChange={(v) =>
+                setFormData(p => ({ ...p, assignClasses: v }))
+              }
               disabled={formData.role !== "Giáo viên chủ nhiệm"}
               placeholder="Chọn lớp"
             />
-            {errors.assignClasses && <p className="text-xs text-red-500">{errors.assignClasses}</p>}
+            {errors.assignClasses && (
+              <p className="text-xs text-red-500">{errors.assignClasses}</p>
+            )}
           </div>
 
           {/* Email */}
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium text-gray-800">
-              Email<span className="text-red-500">*</span>
-            </Label>
+            <Label>Email<span className="text-red-500">*</span></Label>
             <Input
-              id="email"
-              type="email"
-              placeholder="Nhập email"
               value={formData.email}
-              onChange={(e) => {
+              onChange={(e) =>
                 handleInputChange("email", e.target.value)
-                if (errors.email) setErrors(prev => ({ ...prev, email: "" }))
-              }}
-              className={`w-full border-gray-300 ${errors.email ? "border-red-500" : ""}`}
+              }
             />
-            {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
+            {errors.email && (
+              <p className="text-xs text-red-500">{errors.email}</p>
+            )}
           </div>
 
-          {/* Full Name */}
+          {/* Họ tên */}
           <div className="space-y-2">
-            <Label htmlFor="fullName" className="text-sm font-medium text-gray-800">
-              Họ và tên<span className="text-red-500">*</span>
-            </Label>
+            <Label>Họ và tên<span className="text-red-500">*</span></Label>
             <Input
-              id="fullName"
-              type="text"
-              placeholder="Nhập họ và tên"
               value={formData.fullName}
-              onChange={(e) => {
+              onChange={(e) =>
                 handleInputChange("fullName", e.target.value)
-                if (errors.fullName) setErrors(prev => ({ ...prev, fullName: "" }))
-              }}
-              className={`w-full border-gray-300 ${errors.fullName ? "border-red-500" : ""}`}
+              }
             />
-            {errors.fullName && <p className="text-xs text-red-500">{errors.fullName}</p>}
+            {errors.fullName && (
+              <p className="text-xs text-red-500">{errors.fullName}</p>
+            )}
           </div>
 
-          {/* Password */}
+          {/* Mật khẩu */}
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-sm font-medium text-gray-800">
-              Mật khẩu<span className="text-red-500">*</span>
-            </Label>
+            <Label>Mật khẩu<span className="text-red-500">*</span></Label>
             <Input
-              id="password"
               type="password"
-              placeholder="Nhập mật khẩu"
               value={formData.password}
-              onChange={(e) => {
+              onChange={(e) =>
                 handleInputChange("password", e.target.value)
-                if (errors.password) setErrors(prev => ({ ...prev, password: "" }))
-              }}
-              className={`w-full border-gray-300 ${errors.password ? "border-red-500" : ""}`}
+              }
             />
-            {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
           </div>
 
-          {/* Confirm Password */}
+          {/* Xác nhận mật khẩu */}
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-800">
-              Xác nhận lại mật khẩu<span className="text-red-500">*</span>
-            </Label>
+            <Label>Xác nhận lại mật khẩu<span className="text-red-500">*</span></Label>
             <Input
-              id="confirmPassword"
               type="password"
-              placeholder="Xác nhận mật khẩu"
               value={formData.confirmPassword}
-              onChange={(e) => {
+              onChange={(e) =>
                 handleInputChange("confirmPassword", e.target.value)
-                if (errors.confirmPassword) setErrors(prev => ({ ...prev, confirmPassword: "" }))
-              }}
-              className={`w-full border-gray-300 ${errors.confirmPassword ? "border-red-500" : ""}`}
+              }
             />
-            {errors.confirmPassword && <p className="text-xs text-red-500">{errors.confirmPassword}</p>}
+            {errors.confirmPassword && (
+              <p className="text-xs text-red-500">{errors.confirmPassword}</p>
+            )}
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-3 pt-6 justify-end">
-          <Button
-            variant="outline"
-            onClick={handleCancel}
-            className="px-6 bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
-          >
+        <div className="flex justify-end gap-3 pt-6">
+          <Button variant="outline" onClick={handleCancel} disabled={loading}>
             Hủy
           </Button>
-          <Button
-            onClick={handleAdd}
-            className="px-6 bg-[#167FFC] hover:bg-[#1470E3] text-white"
-          >
-            Lưu
+          <Button onClick={handleAdd} disabled={loading}>
+            {loading ? "Đang lưu..." : "Lưu"}
           </Button>
         </div>
       </DialogContent>

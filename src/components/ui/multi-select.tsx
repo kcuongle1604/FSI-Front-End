@@ -14,10 +14,10 @@ interface MultiSelectProps {
   placeholder?: string
 }
 
-export function MultiSelect({ 
-  options, 
-  value, 
-  onChange, 
+export function MultiSelect({
+  options,
+  value,
+  onChange,
   disabled = false,
   placeholder = "Chọn..."
 }: MultiSelectProps) {
@@ -60,36 +60,43 @@ export function MultiSelect({
         type="button"
         onClick={() => !disabled && setOpen(!open)}
         disabled={disabled}
-        className={`w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-left flex items-center justify-between text-sm transition-colors ${
-          disabled 
-            ? "opacity-50 cursor-not-allowed bg-gray-100" 
+        className={`w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-left flex items-center justify-between text-sm transition-colors ${disabled
+            ? "opacity-50 cursor-not-allowed bg-gray-100"
             : "hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
-        }`}
+          }`}
       >
         <div className="flex items-center gap-2 flex-wrap">
           {value.length === 0 ? (
             <span className="text-gray-500">{placeholder}</span>
           ) : (
             value.map(v => (
-              <span 
+              <span
                 key={v}
                 className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded"
               >
                 {v}
                 {!disabled && (
-                  <button
+                  <span
+                    role="button"
+                    tabIndex={0}
                     onClick={(e) => handleRemove(v, e)}
-                    className="hover:text-blue-900"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        handleRemove(v, e as any)
+                      }
+                    }}
+                    className="cursor-pointer hover:text-blue-900"
                   >
                     <X size={12} />
-                  </button>
+                  </span>
+
                 )}
               </span>
             ))
           )}
         </div>
-        <ChevronDown 
-          size={16} 
+        <ChevronDown
+          size={16}
           className={`text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
@@ -107,20 +114,20 @@ export function MultiSelect({
         >
           <div className="p-2 space-y-1">
             {options.map((option) => (
-              <button
+              <div
                 key={option}
-                type="button"
                 onClick={() => handleToggle(option)}
-                className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-100 rounded text-left text-sm transition-colors"
+                className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-100 rounded text-left text-sm transition-colors cursor-pointer"
               >
                 <Checkbox
                   checked={value.includes(option)}
                   onCheckedChange={() => handleToggle(option)}
                 />
                 <span className="text-gray-700">{option}</span>
-              </button>
+              </div>
             ))}
           </div>
+
         </div>
       )}
     </div>

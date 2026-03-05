@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -21,23 +21,19 @@ import { MultiSelect } from "@/components/ui/multi-select"
 
 const CLASSES = ["48K05", "48K14.1", "48K14.2", "48K21.1", "48K21.2"]
 
-type Account = {
-  id: number
-  name: string
-  email: string
-  role: string
-  status: string
-  isBan: boolean
-}
-
-type EditUserDialogProps = {
+interface EditUserDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  account?: Account
-  onUpdate?: (userData: any) => void
+  account: any
+  onUpdate: (data: any) => void
 }
 
-export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUserDialogProps) {
+export function EditUserDialog({
+  open,
+  onOpenChange,
+  account,
+  onUpdate,
+}: EditUserDialogProps) {
   const [formData, setFormData] = useState({
     role: "",
     assignClasses: [] as string[],
@@ -46,98 +42,89 @@ export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUs
     password: "",
     confirmPassword: "",
   })
-  const [errors, setErrors] = useState<Record<string, string>>({})
 
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(false)
+
+  // ✅ ĐỔ DATA CŨ VÀO FORM
   useEffect(() => {
-    if (account && open) {
-      setFormData({
-        role: account.role,
-        assignClasses: account.role === "Giáo viên chủ nhiệm" ? ["48K05"] : [],
-        email: account.email,
-        fullName: account.name,
-        password: "",
-        confirmPassword: "",
-      })
-      setErrors({})
-    }
-  }, [account, open])
+    if (!account) return
+
+    setFormData({
+      role: account.role?.name || "",
+      assignClasses: account.classes?.map((c: any) => c.code) || [],
+      email: account.email || "",
+      fullName: account.username || "",
+      password: "",
+      confirmPassword: "",
+    })
+  }, [account])
 
   const handleInputChange = (field: string, value: string) => {
-    if (field === "role") {
-      if (value !== "Giáo viên chủ nhiệm") {
-        setFormData(prev => ({
-          ...prev,
-          [field]: value,
-          assignClasses: []
-        }))
-      } else {
-        setFormData(prev => ({
-          ...prev,
-          [field]: value
-        }))
-      }
+    if (field === "role" && value !== "Giáo viên chủ nhiệm") {
+      setFormData(prev => ({ ...prev, role: value, assignClasses: [] }))
     } else {
-      setFormData(prev => ({
-        ...prev,
-        [field]: value
-      }))
+      setFormData(prev => ({ ...prev, [field]: value }))
     }
   }
 
-  const handleUpdate = () => {
+  const validate = () => {
     const newErrors: Record<string, string> = {}
 
     if (!formData.role) newErrors.role = "Vui lòng chọn vai trò"
-    if (formData.role === "Giáo viên chủ nhiệm" && formData.assignClasses.length === 0) {
+
+    if (
+      formData.role === "Giáo viên chủ nhiệm" &&
+      formData.assignClasses.length === 0
+    ) {
       newErrors.assignClasses = "Vui lòng chọn ít nhất một lớp"
     }
+
     if (!formData.email) newErrors.email = "Vui lòng nhập email"
     if (!formData.fullName) newErrors.fullName = "Vui lòng nhập họ và tên"
 
-    // Only validate password if provided
-    if (formData.password) {
-      if (!formData.confirmPassword) {
-        newErrors.confirmPassword = "Vui lòng xác nhận mật khẩu"
-      } else if (formData.password !== formData.confirmPassword) {
+    if (!formData.password) {
+    newErrors.password = "Vui lòng nhập mật khẩu"}
+    
+    if (formData.password || formData.confirmPassword) {
+      if (formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = "Mật khẩu xác nhận không khớp"
       }
     }
 
     setErrors(newErrors)
-
-    if (Object.keys(newErrors).length > 0) {
-      return
-    }
-
-    if (onUpdate) {
-      onUpdate(formData)
-    }
-
-    setFormData({
-      role: "",
-      assignClasses: [],
-      email: "",
-      fullName: "",
-      password: "",
-      confirmPassword: "",
-    })
-    setErrors({})
-
-    onOpenChange(false)
+    return Object.keys(newErrors).length === 0
   }
 
-  const handleCancel = () => {
-    setFormData({
-      role: "",
-      assignClasses: [],
-      email: "",
-      fullName: "",
-      password: "",
-      confirmPassword: "",
-    })
-    setErrors({})
-    onOpenChange(false)
+  const handleUpdate = async () => {
+    if (!validate()) return
+
+    try {
+      setLoading(true)
+
+      await onUpdate({
+        email: formData.email,
+        fullName: formData.fullName,
+        role: formData.role,
+        classes:
+          formData.role === "Giáo viên chủ nhiệm"
+            ? formData.assignClasses
+            : [],
+        password: formData.password || undefined,
+      })
+
+      onOpenChange(false)
+      setErrors({})
+    } catch (err: any) {
+      setErrors({
+        submit: err.message || "Cập nhật người dùng thất bại",
+      })
+    } finally {
+      setLoading(false)
+    }
   }
+
+  if (!account) return null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -146,132 +133,117 @@ export function EditUserDialog({ open, onOpenChange, account, onUpdate }: EditUs
           <DialogTitle>Sửa thông tin người dùng</DialogTitle>
         </DialogHeader>
 
+        {errors.submit && (
+          <p className="text-sm text-red-600 bg-red-50 p-2 rounded">
+            {errors.submit}
+          </p>
+        )}
+
         <div className="space-y-4">
-          {/* Role */}
+          {/* Vai trò */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-gray-800">
-              Vai trò<span className="text-red-500">*</span>
-            </Label>
-            <Select value={formData.role} onValueChange={(value) => handleInputChange("role", value)}>
-              <SelectTrigger className="w-full border-gray-300">
+            <Label>Vai trò<span className="text-red-500">*</span></Label>
+            <Select
+              value={formData.role}
+              onValueChange={(v) => handleInputChange("role", v)}
+            >
+              <SelectTrigger>
                 <SelectValue placeholder="Chọn vai trò" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Giáo vụ khoa">Giáo vụ khoa</SelectItem>
-                <SelectItem value="Ban chủ nhiệm khoa">Ban chủ nhiệm khoa</SelectItem>
-                <SelectItem value="Giáo viên chủ nhiệm">Giáo viên chủ nhiệm</SelectItem>
+                <SelectItem value="Ban chủ nhiệm khoa">
+                  Ban chủ nhiệm khoa
+                </SelectItem>
+                <SelectItem value="Giáo viên chủ nhiệm">
+                  Giáo viên chủ nhiệm
+                </SelectItem>
               </SelectContent>
             </Select>
+            {errors.role && (
+              <p className="text-xs text-red-500">{errors.role}</p>
+            )}
           </div>
 
-          {/* Assign Class */}
+          {/* Gán lớp */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-gray-800">
-              Gán lớp<span className="text-red-500">*</span>
-            </Label>
+            <Label>Gán lớp<span className="text-red-500">*</span></Label>
             <MultiSelect
               options={CLASSES}
               value={formData.assignClasses}
-              onChange={(classes) => setFormData(prev => ({ ...prev, assignClasses: classes }))}
+              onChange={(v) =>
+                setFormData(p => ({ ...p, assignClasses: v }))
+              }
               disabled={formData.role !== "Giáo viên chủ nhiệm"}
               placeholder="Chọn lớp"
             />
-            {errors.assignClasses && <p className="text-xs text-red-500">{errors.assignClasses}</p>}
+            {errors.assignClasses && (
+              <p className="text-xs text-red-500">{errors.assignClasses}</p>
+            )}
           </div>
 
           {/* Email */}
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium text-gray-800">
-              Email<span className="text-red-500">*</span>
-            </Label>
+            <Label>Email<span className="text-red-500">*</span></Label>
             <Input
-              id="email"
-              type="email"
-              placeholder="Nhập email"
               value={formData.email}
-              onChange={(e) => {
+              onChange={(e) =>
                 handleInputChange("email", e.target.value)
-                if (errors.email) setErrors(prev => ({ ...prev, email: "" }))
-              }}
-              className={`w-full border-gray-300 ${errors.email ? "border-red-500" : ""}`}
+              }
             />
-            {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
           </div>
 
-          {/* Full Name */}
+          {/* Họ tên */}
           <div className="space-y-2">
-            <Label htmlFor="fullName" className="text-sm font-medium text-gray-800">
-              Họ và tên<span className="text-red-500">*</span>
-            </Label>
+            <Label>Họ và tên<span className="text-red-500">*</span></Label>
             <Input
-              id="fullName"
-              type="text"
-              placeholder="Nhập họ và tên"
               value={formData.fullName}
-              onChange={(e) => {
+              onChange={(e) =>
                 handleInputChange("fullName", e.target.value)
-                if (errors.fullName) setErrors(prev => ({ ...prev, fullName: "" }))
-              }}
-              className={`w-full border-gray-300 ${errors.fullName ? "border-red-500" : ""}`}
+              }
             />
-            {errors.fullName && <p className="text-xs text-red-500">{errors.fullName}</p>}
           </div>
 
-          {/* Password */}
+          {/* Mật khẩu */}
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-sm font-medium text-gray-800">
+            <Label>
               Mật khẩu<span className="text-red-500">*</span>
             </Label>
             <Input
-              id="password"
               type="password"
-              placeholder="Nhập mật khẩu"
               value={formData.password}
-              onChange={(e) => {
+              onChange={(e) =>
                 handleInputChange("password", e.target.value)
-                if (errors.password) setErrors(prev => ({ ...prev, password: "" }))
-              }}
-              className={`w-full border-gray-300 ${errors.password ? "border-red-500" : ""}`}
+              }
             />
-            {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
+            {errors.password && (
+              <p className="text-xs text-red-500">{errors.password}</p>
+            )}
           </div>
 
-          {/* Confirm Password */}
-          {formData.password && (
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-800">
-                Xác nhận lại mật khẩu<span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="Xác nhận mật khẩu"
-                value={formData.confirmPassword}
-                onChange={(e) => {
-                  handleInputChange("confirmPassword", e.target.value)
-                  if (errors.confirmPassword) setErrors(prev => ({ ...prev, confirmPassword: "" }))
-                }}
-                className={`w-full border-gray-300 ${errors.confirmPassword ? "border-red-500" : ""}`}
-              />
-              {errors.confirmPassword && <p className="text-xs text-red-500">{errors.confirmPassword}</p>}
-            </div>
-          )}
+
+          {/* Xác nhận mật khẩu */}
+          <div className="space-y-2">
+            <Label>Xác nhận lại mật khẩu<span className="text-red-500">*</span></Label>
+            <Input
+              type="password"
+              value={formData.confirmPassword}
+              onChange={(e) =>
+                handleInputChange("confirmPassword", e.target.value)
+              }
+            />
+            {errors.confirmPassword && (
+              <p className="text-xs text-red-500">{errors.confirmPassword}</p>
+            )}
+          </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-3 pt-6 justify-end">
-          <Button
-            variant="outline"
-            onClick={handleCancel}
-            className="px-6 bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
-          >
+        <div className="flex justify-end gap-3 pt-6">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Hủy
           </Button>
-          <Button
-            onClick={handleUpdate}
-            className="px-6 bg-[#167FFC] hover:bg-[#1470E3] text-white"
-          >
-            Cập nhật
+          <Button onClick={handleUpdate} disabled={loading}>
+            {loading ? "Đang lưu..." : "Lưu"}
           </Button>
         </div>
       </DialogContent>
