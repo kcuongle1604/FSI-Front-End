@@ -36,6 +36,7 @@ const menuStructure = [
     icon: BookOpen,
     children: [
       { id: 'graduation-review', label: 'Xét tốt nghiệp', icon: GraduationCap, path: '/nghiep-vu-dao-tao/xet-tot-nghiep' },
+      { id: 'study-advisory', label: 'Tư vấn học tập', icon: Users, path: '/nghiep-vu-dao-tao/tu-van-hoc-tap' },
     ]
   },
   {

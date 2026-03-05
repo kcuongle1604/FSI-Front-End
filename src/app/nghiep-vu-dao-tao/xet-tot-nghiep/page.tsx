@@ -69,9 +69,9 @@ const students: XetTotNghiep[] = [
 
 export default function XetTotNghiepPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedYear, setSelectedYear] = useState("all")
-  const [selectedCourse, setSelectedCourse] = useState("all")
-  const [selectedClass, setSelectedClass] = useState("all")
+  const [selectedYear, setSelectedYear] = useState("") // Mặc định: Chọn kỳ
+  const [selectedCourse, setSelectedCourse] = useState("") // Mặc định: Chọn khóa
+  const [selectedClass, setSelectedClass] = useState("") // Mặc định: Chọn lớp
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [evaluatedCombos, setEvaluatedCombos] = useState<string[]>([])
 
@@ -101,88 +101,82 @@ export default function XetTotNghiepPage() {
     <AppLayout showSearch={false}>
       <div className="h-full flex flex-col px-8 py-5 bg-slate-50/50">
         
-        {/* Header */}
+        {/* Breadcrumb Header */}
         <div className="mb-4">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Xét tốt nghiệp
+            Quản lý dữ liệu
+            <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">&gt; Xét tốt nghiệp</span>
           </h1>
         </div>
 
         {/* Search and Filters Bar */}
         <div className="flex items-center gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="relative w-[250px]">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                type="text"
-                placeholder="Nhập MSSV..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 bg-white"
-              />
-            </div>
-
-            {/* Filters */}
-            <div className="flex items-center gap-2">
-              {/* Kỳ filter */}
-              <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger className="h-9 w-[160px] bg-white">
-                  <SelectValue placeholder="Chọn kỳ" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Chọn kỳ</SelectItem>
-                  <SelectItem value="Kỳ 1 - 2024 - 2025">Kỳ 1/2024-2025</SelectItem>
-                  <SelectItem value="Kỳ 2 - 2024 - 2025">Kỳ 2/2024-2025</SelectItem>
-                  <SelectItem value="Kỳ 2 - 2023 - 2024">Kỳ 2/2023-2024</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Khóa filter */}
-              <Select
-                value={selectedCourse}
-                onValueChange={(value) => {
-                  setSelectedCourse(value)
-                  setSelectedClass("all")
-                }}
-              >
-                <SelectTrigger className="h-9 w-[120px] bg-white">
-                  <SelectValue placeholder="Khóa" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Khóa</SelectItem>
-                  <SelectItem value="48K">48K</SelectItem>
-                  <SelectItem value="49K">49K</SelectItem>
-                  <SelectItem value="50K">50K</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Lớp filter */}
-              <Select
-                value={selectedClass}
-                onValueChange={(value) => {
-                  if (selectedCourse === "all" && value !== "all") {
-                    const found = students.find((s) => s.class === value)
-                    if (found) {
-                      setSelectedCourse(found.course)
-                    }
-                  }
-                  setSelectedClass(value)
-                }}
-              >
-                <SelectTrigger className="h-9 w-[120px] bg-white">
-                  <SelectValue placeholder="Lớp" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Lớp</SelectItem>
-                  {classOptions.map((lop) => (
-                    <SelectItem key={lop} value={lop}>{lop}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="relative w-[250px]">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Nhập MSSV..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-9 bg-white"
+            />
           </div>
-
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            {/* Kỳ filter */}
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="h-9 w-[120px] bg-white">
+                <SelectValue placeholder="Chọn kỳ" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả</SelectItem>
+                <SelectItem value="Kỳ 1 - 2024 - 2025">Kỳ 1/2024-2025</SelectItem>
+                <SelectItem value="Kỳ 2 - 2024 - 2025">Kỳ 2/2024-2025</SelectItem>
+                <SelectItem value="Kỳ 2 - 2023 - 2024">Kỳ 2/2023-2024</SelectItem>
+              </SelectContent>
+            </Select>
+            {/* Khóa filter */}
+            <Select
+              value={selectedCourse}
+              onValueChange={(value) => {
+                setSelectedCourse(value)
+                setSelectedClass("all")
+              }}
+            >
+              <SelectTrigger className="h-9 w-[120px] bg-white">
+                <SelectValue placeholder="Chọn khóa" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả</SelectItem>
+                <SelectItem value="48K">48K</SelectItem>
+                <SelectItem value="49K">49K</SelectItem>
+                <SelectItem value="50K">50K</SelectItem>
+              </SelectContent>
+            </Select>
+            {/* Lớp filter */}
+            <Select
+              value={selectedClass}
+              onValueChange={(value) => {
+                if (selectedCourse === "all" && value !== "all") {
+                  const found = students.find((s) => s.class === value)
+                  if (found) {
+                    setSelectedCourse(found.course)
+                  }
+                }
+                setSelectedClass(value)
+              }}
+            >
+              <SelectTrigger className="h-9 w-[140px] bg-white">
+                <SelectValue placeholder="Chọn lớp" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả</SelectItem>
+                {classOptions.map((lop) => (
+                  <SelectItem key={lop} value={lop}>{lop}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
             <Button
               className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm"
               disabled={!hasRequiredFilters || visibleStudents.length === 0 || isCurrentComboEvaluated}
@@ -191,7 +185,10 @@ export default function XetTotNghiepPage() {
               <GraduationCap className="h-4 w-4" />
               Xét tốt nghiệp
             </Button>
-            <Button className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm">
+            <Button
+              className="bg-white text-slate-700 border border-slate-200 hover:bg-[#06b6d4] hover:text-black h-9 gap-2 text-sm transition-colors shadow-none"
+              style={{ boxShadow: 'none' }}
+            >
               <Download className="h-4 w-4" />
               Mẫu
             </Button>
