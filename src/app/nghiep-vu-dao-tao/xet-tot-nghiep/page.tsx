@@ -124,7 +124,7 @@ export default function XetTotNghiepPage() {
           <div className="flex items-center gap-2">
             {/* Kỳ filter */}
             <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="h-9 w-[120px] bg-white">
+              <SelectTrigger className="h-9 w-[160px] bg-white">
                 <SelectValue placeholder="Chọn kỳ" />
               </SelectTrigger>
               <SelectContent>

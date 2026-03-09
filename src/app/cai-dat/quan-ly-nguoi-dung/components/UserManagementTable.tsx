@@ -23,6 +23,7 @@ interface UserManagementTableProps {
   onEditClick: (account: Account) => void
   onDeleteClick: (account: Account) => void
   onStatusClick: (account: Account) => void
+  onGraduateClick: (account: Account) => void
 }
 
 export default function UserManagementTable({
@@ -30,7 +31,8 @@ export default function UserManagementTable({
   userStatuses,
   onEditClick,
   onDeleteClick,
-  onStatusClick
+  onStatusClick,
+  onGraduateClick
 }: UserManagementTableProps) {
   const totalRecords = accounts.length
   const displayCount = Math.min(30, totalRecords)
@@ -89,12 +91,15 @@ export default function UserManagementTable({
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuContent align="end" className="w-48">
                         <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => onEditClick(account)}>
                           <Edit className="w-4 h-4 mr-2" />Sửa
                         </DropdownMenuItem>
                         <DropdownMenuItem className="cursor-pointer text-sm text-red-600" onClick={() => onDeleteClick(account)}>
                           <Trash2 className="w-4 h-4 mr-2" />Xóa
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="cursor-pointer text-sm text-blue-600" onClick={() => onGraduateClick(account)}>
+                          <ChevronRight className="w-4 h-4 mr-2" />Xét tốt nghiệp
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

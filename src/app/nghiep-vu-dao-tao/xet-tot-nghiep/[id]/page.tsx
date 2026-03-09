@@ -18,6 +18,7 @@ import {
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
+  DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 import AppLayout from "@/components/AppLayout"
@@ -110,6 +111,8 @@ export default function XetTotNghiepDetailPage({ params }: any) {
   const router = useRouter()
   const student = students["221121521260"] // In real app, fetch by params.id
   const [activeTab, setActiveTab] = useState("chuong-trinh")
+  const [filterType, setFilterType] = useState<string | null>(null)
+  const [filterStatus, setFilterStatus] = useState<string | null>(null)
 
   const searchParams = useSearchParams()
 
@@ -121,7 +124,7 @@ export default function XetTotNghiepDetailPage({ params }: any) {
 
   return (
     <AppLayout showSearch={false}>
-      <div className="flex-1 flex flex-col min-h-0 px-8 py-6 bg-[var(--background)]">
+          <div className="px-8 py-6 bg-[var(--background)] min-h-screen flex flex-col">
 
         {/* Header breadcrumb */}
         <div className="mb-4">
@@ -139,47 +142,47 @@ export default function XetTotNghiepDetailPage({ params }: any) {
           </h1>
         </div>
 
-        <div className="flex-1 flex flex-col gap-4">
+            <div className="flex-1 flex flex-col gap-4">
 
-          {/* Student Info Card */}
-          <div className="bg-white rounded-xl border border-[var(--border)] p-6 shadow-sm">
+          {/* Student Info Card - sticky */}
+          <div className="bg-gradient-to-r from-white via-blue-50 to-white rounded-2xl border border-blue-200 p-8 shadow-xl sticky top-0 z-20 transition-all hover:shadow-blue-300 hover:scale-[1.01]">
             <div className="grid grid-cols-2 gap-8">
               <div className="space-y-3">
                 <div className="flex gap-4">
-                  <span className="font-medium text-gray-700 min-w-fit">Họ và Tên:</span>
-                  <span className="text-gray-900">{student.name}</span>
+                  <span className="font-semibold text-blue-700 min-w-fit">Họ và Tên:</span>
+                  <span className="text-lg font-bold text-gray-900">{student.name}</span>
                 </div>
                 <div className="flex gap-4">
-                  <span className="font-medium text-gray-700 min-w-fit">MSSV:</span>
-                  <span className="text-gray-900">{student.mssv}</span>
+                  <span className="font-semibold text-blue-700 min-w-fit">MSSV:</span>
+                  <span className="text-base font-semibold text-gray-900">{student.mssv}</span>
                 </div>
                 <div className="flex gap-4">
-                  <span className="font-medium text-gray-700 min-w-fit">Lớp:</span>
-                  <span className="text-gray-900">{student.class}</span>
+                  <span className="font-semibold text-blue-700 min-w-fit">Lớp:</span>
+                  <span className="text-base font-semibold text-gray-900">{student.class}</span>
                 </div>
                 <div className="flex gap-4">
-                  <span className="font-medium text-gray-700 min-w-fit">Chuyên ngành:</span>
-                  <span className="text-gray-900">{student.major}</span>
+                  <span className="font-semibold text-blue-700 min-w-fit">Chuyên ngành:</span>
+                  <span className="text-base font-semibold text-gray-900">{student.major}</span>
                 </div>
               </div>
               <div className="space-y-3">
                 <div className="flex gap-4">
-                  <span className="font-medium text-gray-700 min-w-fit">GPA:</span>
-                  <span className="text-gray-900">{student.gpa}</span>
+                  <span className="font-semibold text-blue-700 min-w-fit">GPA:</span>
+                  <span className="text-lg font-bold text-green-600">{student.gpa}</span>
                 </div>
                 <div className="flex gap-4">
-                  <span className="font-medium text-gray-700 min-w-fit">Tổng số tín chỉ đã học:</span>
-                  <span className="text-gray-900">{student.totalCredits}</span>
+                  <span className="font-semibold text-blue-700 min-w-fit">Tổng số tín chỉ đã học:</span>
+                  <span className="text-base font-semibold text-gray-900">{student.totalCredits}</span>
                 </div>
                 <div className="flex gap-4">
                   <div className="space-y-2">
                     <div className="flex gap-4">
-                      <span className="font-medium text-gray-700">Tín chỉ bắt buộc:</span>
-                      <span className="text-gray-900">{student.tcbb}</span>
+                      <span className="font-semibold text-blue-700">Tín chỉ bắt buộc:</span>
+                      <span className="text-base font-semibold text-gray-900">{student.tcbb}</span>
                     </div>
                     <div className="flex gap-4">
-                      <span className="font-medium text-gray-700">Tín chỉ tự chọn:</span>
-                      <span className="text-gray-900">{student.tctc}</span>
+                      <span className="font-semibold text-blue-700">Tín chỉ tự chọn:</span>
+                      <span className="text-base font-semibold text-gray-900">{student.tctc}</span>
                     </div>
                   </div>
                 </div>
@@ -188,7 +191,7 @@ export default function XetTotNghiepDetailPage({ params }: any) {
           </div>
 
           {/* Tabs Card */}
-          <div className="flex-1 flex flex-col bg-white rounded-xl border border-[var(--border)] overflow-hidden min-h-0 shadow-sm">
+              <div className="flex-1 flex flex-col bg-white rounded-xl border border-[var(--border)] overflow-hidden min-h-0 shadow-sm mt-4">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
               <div className="px-6 pt-4 border-b border-[var(--border)]">
                 <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start">
@@ -202,33 +205,69 @@ export default function XetTotNghiepDetailPage({ params }: any) {
               </div>
 
               <TabsContent value="chuong-trinh" className="flex-1 flex flex-col px-6 py-4">
-                <div className="border border-[var(--border)] rounded-lg overflow-hidden flex flex-col flex-1">
-                  <div className="overflow-auto flex-1">
-                    <Table className="min-w-max w-full">
-                      <TableHeader>
-                        <TableRow style={{ position: 'sticky', top: 0, zIndex: 10 }} className="border-b border-gray-200 bg-blue-50">
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">STT</TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">MÃ HỌC PHẦN</TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">TÊN HỌC PHẦN</TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">SỐ TC</TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">PHÂN LOẠI</TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">TRẠNG THÁI</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {courseData.map((course, index) => (
-                          <TableRow key={course.id} className="border-b border-transparent odd:bg-white even:bg-slate-50 hover:bg-slate-100">
-                            <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{String(index + 1).padStart(2, '0')}</TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">{course.code}</TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">{course.name}</TableCell>
-                            <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{course.credits}</TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600"><span className={course.type === "Tự chọn" ? "text-blue-600" : "text-gray-700"}>{course.type}</span></TableCell>
-                            <TableCell className="h-12 px-4 text-sm"><span className={course.status.includes("Đạt") ? "text-green-600 font-medium" : course.status === "Chưa học" ? "text-gray-600" : "text-red-600 font-medium"}>{course.status}</span></TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                     <div className="border border-[var(--border)] rounded-lg overflow-hidden flex flex-col flex-1">
+                       <div className="overflow-auto flex-1 max-h-[400px]">
+                         <Table className="min-w-max w-full">
+                           <TableHeader>
+                             <TableRow style={{ position: 'sticky', top: 0, zIndex: 10 }} className="border-b border-gray-200 bg-blue-50">
+                               <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">STT</TableHead>
+                               <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">MÃ HỌC PHẦN</TableHead>
+                               <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">TÊN HỌC PHẦN</TableHead>
+                               <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">SỐ TC</TableHead>
+                               <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                                 <DropdownMenu>
+                                   <DropdownMenuTrigger asChild>
+                                     <span className="cursor-pointer select-none flex items-center gap-1">
+                                       PHÂN LOẠI
+                                       <ChevronDown className="w-4 h-4 text-gray-500" />
+                                     </span>
+                                   </DropdownMenuTrigger>
+                                   <DropdownMenuContent align="start" className="w-32">
+                                     <DropdownMenuItem onClick={() => setFilterType(null)} className="cursor-pointer text-sm">Tất cả</DropdownMenuItem>
+                                     <DropdownMenuItem onClick={() => setFilterType("Bắt buộc")} className="cursor-pointer text-sm">Bắt buộc</DropdownMenuItem>
+                                     <DropdownMenuItem onClick={() => setFilterType("Tự chọn")} className="cursor-pointer text-sm">Tự chọn</DropdownMenuItem>
+                                   </DropdownMenuContent>
+                                 </DropdownMenu>
+                               </TableHead>
+                               <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                                 <DropdownMenu>
+                                   <DropdownMenuTrigger asChild>
+                                     <span className="cursor-pointer select-none flex items-center gap-1">
+                                       TRẠNG THÁI
+                                       <ChevronDown className="w-4 h-4 text-gray-500" />
+                                     </span>
+                                   </DropdownMenuTrigger>
+                                   <DropdownMenuContent align="start" className="w-40">
+                                     <DropdownMenuItem onClick={() => setFilterStatus(null)} className="cursor-pointer text-sm">Tất cả</DropdownMenuItem>
+                                     <DropdownMenuItem onClick={() => setFilterStatus("Đã học (Đạt)")} className="cursor-pointer text-sm">Đã học (Đạt)</DropdownMenuItem>
+                                     <DropdownMenuItem onClick={() => setFilterStatus("Đã học (Chưa đạt)")} className="cursor-pointer text-sm">Đã học (Chưa đạt)</DropdownMenuItem>
+                                     <DropdownMenuItem onClick={() => setFilterStatus("Chưa học")} className="cursor-pointer text-sm">Chưa học</DropdownMenuItem>
+                                   </DropdownMenuContent>
+                                 </DropdownMenu>
+                               </TableHead>
+                             </TableRow>
+                           </TableHeader>
+                           <TableBody>
+                             {(filterType || filterStatus
+                               ? courseData.filter(c => {
+                                   let typeMatch = filterType ? c.type === filterType : true;
+                                   let statusMatch = filterStatus ? c.status === filterStatus : true;
+                                   return typeMatch && statusMatch;
+                                 })
+                               : courseData
+                             ).map((course, index) => (
+                               <TableRow key={course.id} className="border-b border-transparent odd:bg-white even:bg-slate-50 hover:bg-slate-100">
+                                 <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{String(index + 1).padStart(2, '0')}</TableCell>
+                                 <TableCell className="h-12 px-4 text-sm text-gray-600">{course.code}</TableCell>
+                                 <TableCell className="h-12 px-4 text-sm text-gray-600">{course.name}</TableCell>
+                                 <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{course.credits}</TableCell>
+                                 <TableCell className="h-12 px-4 text-sm text-gray-600"><span className={course.type === "Tự chọn" ? "text-blue-600" : "text-gray-700"}>{course.type}</span></TableCell>
+                                 <TableCell className="h-12 px-4 text-sm"><span className={course.status.includes("Đạt") ? "text-green-600 font-medium" : course.status === "Chưa học" ? "text-gray-600" : "text-red-600 font-medium"}>{course.status}</span></TableCell>
+                               </TableRow>
+                             ))}
+                           </TableBody>
+                         </Table>
+                       </div>
 
                   <div className="mt-4 pt-4 border-t border-gray-200 sticky bottom-0 z-10 bg-white">
                     <div className="flex items-center justify-between px-6 py-3">
@@ -248,22 +287,28 @@ export default function XetTotNghiepDetailPage({ params }: any) {
               <TabsContent value="chung-chi" className="flex-1 flex flex-col px-6 py-4">
                 <div className="border border-[var(--border)] rounded-lg overflow-hidden flex flex-col flex-1">
                   <div className="overflow-auto flex-1">
-                    <Table className="min-w-max w-full">
+                    <Table className="w-full table-fixed">
+                      <colgroup>
+                        <col style={{ width: '60px' }} />
+                        <col style={{ width: '100px' }} />
+                        <col style={{ width: '100px' }} />
+                        <col style={{ width: '120px' }} />
+                      </colgroup>
                       <TableHeader>
                         <TableRow style={{ position: 'sticky', top: 0, zIndex: 10 }} className="border-b border-gray-200 bg-blue-50">
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">STT</TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">LOẠI CHỨNG CHỈ</TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">TRẠNG THÁI</TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">GHI CHÚ</TableHead>
+                          <TableHead className="h-10 px-2 text-center text-sm font-semibold text-gray-700">STT</TableHead>
+                          <TableHead className="h-10 px-2 text-left text-sm font-semibold text-gray-700">LOẠI CHỨNG CHỈ</TableHead>
+                          <TableHead className="h-10 px-2 text-center text-sm font-semibold text-gray-700">TRẠNG THÁI</TableHead>
+                          <TableHead className="h-10 px-2 text-left text-sm font-semibold text-gray-700">GHI CHÚ</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {certificateData.map((cert, index) => (
                           <TableRow key={cert.id} className="border-b border-transparent odd:bg-white even:bg-slate-50 hover:bg-slate-100">
-                            <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{String(index + 1).padStart(2, '0')}</TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">{cert.name}</TableCell>
-                            <TableCell className="h-12 px-4 text-center"><Checkbox checked={cert.status} disabled /></TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">{cert.note}</TableCell>
+                            <TableCell className="h-12 px-2 text-center text-sm text-gray-600">{String(index + 1).padStart(2, '0')}</TableCell>
+                            <TableCell className="h-12 px-2 text-sm text-gray-600">{cert.name}</TableCell>
+                            <TableCell className="h-12 px-2 text-center"><Checkbox checked={cert.status} disabled /></TableCell>
+                            <TableCell className="h-12 px-2 text-sm text-gray-600">{cert.note}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>

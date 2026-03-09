@@ -59,7 +59,7 @@ export default function TuVanHocTapTab({ students }: TuVanHocTapTabProps) {
       })
     : [];
 
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 30;
   const [page, setPage] = useState(1);
   const totalRecords = Array.isArray(filteredStudents) ? filteredStudents.length : 0;
   const totalPages = totalRecords > 0 ? Math.max(1, Math.ceil(totalRecords / PAGE_SIZE)) : 1;
@@ -69,43 +69,54 @@ export default function TuVanHocTapTab({ students }: TuVanHocTapTabProps) {
 
   return (
     <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
-      {/* Vùng dữ liệu cuộn riêng, header và phân trang sticky */}
-      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-        <div className="overflow-y-auto" style={{ maxHeight: 480 }}>
-          <Table className="w-full" style={{ borderCollapse: 'collapse' }}>
-            <TableHeader>
-              <TableRow className="border-b border-gray-200 bg-blue-50" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">STT</TableHead>
-                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">MSSV</TableHead>
-                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">HỌ & TÊN</TableHead>
-                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">LỚP</TableHead>
-                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">TCBB</TableHead>
-                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">TCTC</TableHead>
-                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">TCBB THIẾU</TableHead>
-                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">TCTC THIẾU</TableHead>
-                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">GPA</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pagedStudents.map((student, idx) => (
-                <TableRow key={student.id} className="border-b border-gray-200 hover:bg-slate-50 cursor-pointer">
-                  <TableCell className="text-center">{(page - 1) * PAGE_SIZE + idx + 1}</TableCell>
-                  <TableCell>{student.mssv}</TableCell>
-                  <TableCell>{student.name}</TableCell>
-                  <TableCell className="text-center">{student.class}</TableCell>
-                  <TableCell className="text-center">112/120</TableCell>
-                  <TableCell className="text-center">30/34</TableCell>
-                  <TableCell className="text-center">8</TableCell>
-                  <TableCell className="text-center">4</TableCell>
-                  <TableCell className="text-center">{student.gpa}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+      {/* Header bảng */}
+      <div className="w-full">
+        <Table className="w-full" style={{ borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+          <TableHeader>
+            <TableRow className="border-b border-gray-200 bg-blue-50">
+              <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50 w-[60px]">STT</TableHead>
+              <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 w-[140px]">MSSV</TableHead>
+              <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 w-[180px]">HỌ & TÊN</TableHead>
+              <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50 w-[120px]">LỚP</TableHead>
+              <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50 w-[110px]">TCBB</TableHead>
+              <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50 w-[110px]">TCTC</TableHead>
+              <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50 w-[120px]">TCBB THIẾU</TableHead>
+              <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50 w-[120px]">TCTC THIẾU</TableHead>
+              <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-[80px]">GPA</TableHead>
+            </TableRow>
+          </TableHeader>
+        </Table>
       </div>
-      {/* Pagination sticky dưới cùng */}
-      <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50" style={{ position: 'sticky', bottom: 0, zIndex: 10 }}>
+      {/* Bảng scroll */}
+      <div className="overflow-y-auto flex-1 min-h-0" style={{ maxHeight: 600 }}>
+        <Table className="w-full" style={{ borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+          <TableBody>
+            {pagedStudents.map((student, idx) => (
+              <TableRow key={student.id} className="border-b border-gray-200 hover:bg-slate-50 cursor-pointer">
+                <TableCell className="text-center w-[60px]">{(page - 1) * PAGE_SIZE + idx + 1}</TableCell>
+                <TableCell className="text-left w-[140px]">
+                  <button
+                    className="text-blue-600 hover:text-blue-800 hover:underline font-normal text-sm cursor-pointer"
+                    style={{ textDecoration: 'none' }}
+                    onClick={() => router.push(`/nghiep-vu-dao-tao/tu-van-hoc-tap/${student.mssv}`)}
+                  >
+                    {student.mssv}
+                  </button>
+                </TableCell>
+                <TableCell className="text-left w-[180px]">{student.name}</TableCell>
+                <TableCell className="text-center w-[120px]">{student.class}</TableCell>
+                <TableCell className="text-center w-[110px]">48.21.2</TableCell>
+                <TableCell className="text-center w-[110px]">48.21.2</TableCell>
+                <TableCell className="text-center w-[120px]">112/120</TableCell>
+                <TableCell className="text-center w-[120px]">30/34</TableCell>
+                <TableCell className="text-right w-[80px]">{student.gpa}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      {/* Pagination luôn cố định dưới */}
+      <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50">
         <div className="text-sm text-gray-600">
           Hiển thị {pagedStudents.length}/{totalRecords} dòng
         </div>

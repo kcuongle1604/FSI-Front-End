@@ -29,21 +29,21 @@ const YEAR_LABELS: Record<string, string> = {
 }
 
 const students: TuVanHocTap[] = [
-  { id: 1, mssv: "221121521260", name: "Nguyễn Văn A", class: "48.21.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 112, tctc: 30, totalCredits: 0, gpa: 3.36, ccdr: "", program: "", status: "" },
-  { id: 2, mssv: "221121521261", name: "Trần Thị B", class: "48.21.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 112, tctc: 30, totalCredits: 0, gpa: 3.25, ccdr: "", program: "", status: "" },
-  { id: 3, mssv: "221121521262", name: "Lê Văn C", class: "48.21.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 110, tctc: 28, totalCredits: 0, gpa: 3.10, ccdr: "", program: "", status: "" },
-  { id: 4, mssv: "221121521263", name: "Phạm Thị D", class: "48.21.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 115, tctc: 32, totalCredits: 0, gpa: 3.50, ccdr: "", program: "", status: "" },
-  { id: 5, mssv: "221121521264", name: "Ngô Văn E", class: "48.21.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 112, tctc: 30, totalCredits: 0, gpa: 3.00, ccdr: "", program: "", status: "" },
-  { id: 6, mssv: "221121521265", name: "Đỗ Thị F", class: "48.21.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 113, tctc: 29, totalCredits: 0, gpa: 3.20, ccdr: "", program: "", status: "" },
-  { id: 7, mssv: "221121521266", name: "Vũ Văn G", class: "48.21.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 114, tctc: 31, totalCredits: 0, gpa: 3.18, ccdr: "", program: "", status: "" },
-  { id: 8, mssv: "221121521267", name: "Bùi Thị H", class: "48.21.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 112, tctc: 30, totalCredits: 0, gpa: 3.36, ccdr: "", program: "", status: "" },
-  { id: 9, mssv: "221121521268", name: "Nguyễn Văn I", class: "48.21.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 112, tctc: 30, totalCredits: 0, gpa: 3.36, ccdr: "", program: "", status: "" },
-  { id: 10, mssv: "221121521269", name: "Trần Thị K", class: "48.21.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 112, tctc: 30, totalCredits: 0, gpa: 3.36, ccdr: "", program: "", status: "" },
-  { id: 11, mssv: "221121521270", name: "Phạm Văn L", class: "48.21.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 112, tctc: 30, totalCredits: 0, gpa: 3.36, ccdr: "", program: "", status: "" },
-  { id: 12, mssv: "221121521271", name: "Nguyễn Thị M", class: "48.21.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 112, tctc: 30, totalCredits: 0, gpa: 3.36, ccdr: "", program: "", status: "" },
-  { id: 13, mssv: "221121521272", name: "Trần Văn N", class: "48.21.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 112, tctc: 30, totalCredits: 0, gpa: 3.36, ccdr: "", program: "", status: "" },
-  { id: 14, mssv: "221121521273", name: "Lê Thị O", class: "48.21.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 112, tctc: 30, totalCredits: 0, gpa: 3.36, ccdr: "", program: "", status: "" },
-  { id: 15, mssv: "221121521274", name: "Bùi Văn P", class: "48.21.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 112, tctc: 30, totalCredits: 0, gpa: 3.36, ccdr: "", program: "", status: "" },
+  ...Array.from({ length: 40 }, (_, i) => ({
+    id: i + 1,
+    mssv: "221121521260",
+    name: "Nguyễn Văn A",
+    class: "48.21.2",
+    year: "Kỳ 2 - 2024 - 2025",
+    course: "48K",
+    tcbb: 112,
+    tctc: 30,
+    totalCredits: 120,
+    gpa: "3.36",
+    ccdr: "",
+    program: "Hoàn thành",
+    status: "Đạt"
+  }))
 ]
 
 export default function TuVanHocTapPage() {
@@ -137,10 +137,7 @@ export default function TuVanHocTapPage() {
             </Select>
           </div>
           <div className="flex items-center gap-2 ml-auto">
-            <Button className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm">
-              <Users className="h-4 w-4" />
-              Tư vấn học tập
-            </Button>
+            {/* Đã xóa button Tư vấn học tập */}
             <Button
               className="bg-white text-slate-700 border border-slate-200 hover:bg-[#06b6d4] hover:text-black h-9 gap-2 text-sm transition-colors shadow-none"
               style={{ boxShadow: 'none' }}
@@ -151,7 +148,7 @@ export default function TuVanHocTapPage() {
           </div>
         </div>
         {/* Table */}
-        <TuVanHocTapTab students={visibleStudents} />
+        <TuVanHocTapTab students={selectedCourse && selectedCourse !== "all" && selectedClass && selectedClass !== "all" ? visibleStudents : []} />
       </div>
     </AppLayout>
   )
