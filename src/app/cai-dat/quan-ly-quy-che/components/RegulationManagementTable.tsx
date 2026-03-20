@@ -89,6 +89,9 @@ const RegulationManagementTable = ({ regulations, onEditClick, onDeleteClick, on
                         <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => onEditClick(regulation)}>
                           <Edit className="w-4 h-4 mr-2" /> Sửa
                         </DropdownMenuItem>
+                        <DropdownMenuItem className="cursor-pointer text-sm text-red-600" onClick={() => onDeleteClick(regulation)}>
+                          <Trash2 className="w-4 h-4 mr-2" /> Xóa
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

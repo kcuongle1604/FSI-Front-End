@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { api } from "@/lib/api";
+import axios from "axios";
 import { Certificate } from "../page";
 
 type EditCertificateDialogProps = {
@@ -17,7 +19,8 @@ type EditCertificateDialogProps = {
 const BATCHES = ["48K", "49K", "50K", "51K", "52K"];
 export default function EditCertificateDialog({ open, onOpenChange, certificate, onUpdate }: EditCertificateDialogProps) {
   const [formData, setFormData] = useState<{ name: string; batches: string[] }>({ name: "", batches: [] });
-  const [errors, setErrors] = useState<{ name?: string; batches?: string }>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; batches?: string; submit?: string }>({});
 
   useEffect(() => {
     if (certificate && open) {
@@ -44,18 +47,57 @@ export default function EditCertificateDialog({ open, onOpenChange, certificate,
     if (errors.batches) setErrors(prev => ({ ...prev, batches: undefined }));
   };
 
-  const handleUpdate = () => {
-    const newErrors: { name?: string; batches?: string } = {};
+  const handleUpdate = async () => {
+    const newErrors: { name?: string; batches?: string; submit?: string } = {};
     if (!formData.name.trim()) newErrors.name = "Vui lòng nhập tên chứng chỉ";
     if (!formData.batches || formData.batches.length === 0) newErrors.batches = "Vui lòng chọn ít nhất một khoá áp dụng";
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
-    if (onUpdate) onUpdate({ ...formData });
-    setErrors({});
-    onOpenChange(false);
+
+    if (!certificate?.id) {
+      setErrors((prev) => ({ ...prev, submit: "Không tìm thấy chứng chỉ cần cập nhật" }));
+      return;
+    }
+
+    const payload = {
+      name: formData.name.trim(),
+      cohort_ids: formData.batches
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id)),
+    };
+
+    if (payload.cohort_ids.length === 0) {
+      setErrors((prev) => ({ ...prev, submit: "Khóa áp dụng không hợp lệ" }));
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const res = await api.put(`/api/v1/certificates/${certificate.id}/apply`, payload);
+      if (onUpdate) onUpdate(res.data);
+      setErrors({});
+      onOpenChange(false);
+    } catch (err) {
+      console.error("Update certificate apply failed", err);
+      const backendMessage = axios.isAxiosError(err)
+        ? (typeof err.response?.data === "string"
+          ? err.response.data
+          : (err.response?.data?.message || err.response?.data?.detail || err.message))
+        : "";
+
+      setErrors((prev) => ({
+        ...prev,
+        submit: backendMessage
+          ? `Không thể cập nhật chứng chỉ: ${backendMessage}`
+          : "Không thể cập nhật chứng chỉ. Vui lòng thử lại.",
+      }));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleCancel = () => {
+    if (submitting) return;
     setErrors({});
     onOpenChange(false);
   };
@@ -93,12 +135,14 @@ export default function EditCertificateDialog({ open, onOpenChange, certificate,
             />
             {errors.batches && <p className="text-xs text-red-500 mt-1">{errors.batches}</p>}
           </div>
+          {errors.submit && <p className="text-xs text-red-500 mt-1">{errors.submit}</p>}
           <div className="flex justify-end gap-3 mt-6">
             <Button
               type="button"
               variant="outline"
               onClick={handleCancel}
               className="h-9"
+              disabled={submitting}
             >
               Hủy
             </Button>
@@ -106,8 +150,9 @@ export default function EditCertificateDialog({ open, onOpenChange, certificate,
               type="button"
               onClick={handleUpdate}
               className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9"
+              disabled={submitting}
             >
-              Lưu
+              {submitting ? "Đang lưu..." : "Lưu"}
             </Button>
           </div>
         </div>

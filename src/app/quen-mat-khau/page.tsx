@@ -13,7 +13,6 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
 
   const handleSendEmail = () => {
-    console.log("Send reset email to:", email)
     router.push("/quen-mat-khau/xac-nhan-ma")
   }
 

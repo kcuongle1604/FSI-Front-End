@@ -128,7 +128,6 @@ export default function ChuongTrinhDaoTaoDetailPage() {
   useEffect(() => {
     // If we have program name from URL, use it directly
     if (programNameFromUrl) {
-      console.log("✅ Using program name from URL:", programNameFromUrl);
       setProgram({ id: programId, name: programNameFromUrl });
       setProgramLoading(false);
       return;
@@ -138,20 +137,17 @@ export default function ChuongTrinhDaoTaoDetailPage() {
     const fetchPrograms = async () => {
       try {
         setProgramLoading(true);
-        console.log("📋 Fetching training programs for programId:", programId);
         const response = await getTrainingPrograms();
         if (response?.data && Array.isArray(response.data)) {
           const programsList = response.data.map((p: any) => ({
             id: p.program_id || p.id,
             name: p.program_name || p.name,
           }));
-          console.log("📚 Available programs:", programsList);
           setPrograms(programsList);
           
           // Find matching program
           const matchedProgram = programsList.find((p: Program) => p.id === programId);
           if (matchedProgram) {
-            console.log("✅ Matched program:", matchedProgram);
             setProgram(matchedProgram);
           } else {
             console.warn("⚠️ Program not found with ID:", programId);
@@ -175,14 +171,27 @@ export default function ChuongTrinhDaoTaoDetailPage() {
     const fetchSubjects = async () => {
       try {
         setLoading(true);
-        console.log("🔍 Fetching subjects for program:", program.name);
-        const response = await getSubjectsByProgramName(program.name);
-        
-        console.log("📦 API Response:", response);
-        
-        if (response?.data && Array.isArray(response.data)) {
+        const allSubjects: Subject[] = [];
+        const size = 100;
+        let page = 1;
+
+        while (true) {
+          const response = await getSubjectsByProgramName(program.name, page, size);
+          const payload = response?.data;
+          const pageSubjects = Array.isArray(payload)
+            ? payload
+            : payload?.data || payload?.items || payload?.results || [];
+
+          if (!Array.isArray(pageSubjects)) break;
+          allSubjects.push(...pageSubjects);
+
+          if (pageSubjects.length < size) break;
+          page += 1;
+        }
+
+        if (allSubjects.length > 0) {
           // Map API response to ProgramCourse structure
-          const mappedCourses: ProgramCourse[] = response.data.map((subject: Subject, index: number) => ({
+          const mappedCourses: ProgramCourse[] = allSubjects.map((subject: Subject, index: number) => ({
             id: index + 1,
             specialization: program.name,
             type: subject.is_required ? "bat-buoc" : "tu-chon",
@@ -193,10 +202,9 @@ export default function ChuongTrinhDaoTaoDetailPage() {
             optional: subject.is_required ? 0 : subject.credits,
           }));
           
-          console.log("✅ Mapped courses:", mappedCourses.length, "items");
           setCourses(mappedCourses);
         } else {
-          console.warn("⚠️ Invalid response format:", response);
+          console.warn("⚠️ No subjects returned for program:", program.name);
           setCourses([]);
         }
       } catch (err: any) {
@@ -554,7 +562,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
           initialValues={{
             specialization: title,
           }}
-          appliedCourses={program?.appliedCourses}
+          appliedCourses={program?.applicableCourses}
         />
 
         <CourseFormDialog
@@ -572,7 +580,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
             credits: editingCourse?.credits ?? 0,
             type: editingCourse?.type ?? "bat-buoc",
           }}
-          appliedCourses={program?.appliedCourses}
+          appliedCourses={program?.applicableCourses}
         />
 
         <DeleteCourseDialog

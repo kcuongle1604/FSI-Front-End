@@ -66,3 +66,14 @@ export async function importStudents(
     })
   }
 }
+
+export async function importStudentCertificatesHtml(file: File) {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  return api.post("/api/v1/student-certificates/import-html", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  })
+}

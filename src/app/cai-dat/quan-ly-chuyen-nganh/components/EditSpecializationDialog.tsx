@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -31,7 +31,7 @@ type EditSpecializationDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   specialization?: Specialization
-  onUpdate?: (data: FormData) => void
+  onUpdate?: (data: FormData) => Promise<boolean> | boolean
 }
 
 export function EditSpecializationDialog({ open, onOpenChange, specialization, onUpdate }: EditSpecializationDialogProps) {
@@ -71,7 +71,7 @@ export function EditSpecializationDialog({ open, onOpenChange, specialization, o
     }))
   }
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     const newErrors: Record<string, string> = {}
 
     if (!formData.code) newErrors.code = "Vui lòng nhập mã chuyên ngành"
@@ -84,9 +84,12 @@ export function EditSpecializationDialog({ open, onOpenChange, specialization, o
       return
     }
 
+    let updated = true
     if (onUpdate) {
-      onUpdate(formData)
+      updated = await onUpdate(formData)
     }
+
+    if (!updated) return
 
     setFormData({
       code: "",

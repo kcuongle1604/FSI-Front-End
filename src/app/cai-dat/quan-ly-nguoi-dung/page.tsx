@@ -110,17 +110,14 @@ export default function QuanLyNguoiDungPage() {
   }
 
   const handleAddUser = (userData: UserData) => {
-    console.log("Add new user:", userData)
     // Add logic to handle new user creation here
   }
 
   const handleUpdateUser = (userData: UserData) => {
-    console.log("Update user:", userData)
     // Add logic to handle user update here
   }
 
   const handleConfirmDelete = () => {
-    console.log("Delete user:", selectedAccount)
     // Add logic to handle user deletion here
   }
 
@@ -135,7 +132,6 @@ export default function QuanLyNguoiDungPage() {
         ...prev,
         [selectedAccount.id]: newStatus
       }))
-      console.log("Update status for user:", selectedAccount.name, "to:", newStatus)
     }
   }
 

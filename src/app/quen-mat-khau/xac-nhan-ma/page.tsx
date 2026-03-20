@@ -56,7 +56,6 @@ export default function VerifyOTPPage() {
   }
 
   const handleSendOtp = () => {
-    console.log("OTP Code:", otp.join(""))
     router.push("/quen-mat-khau/dat-mat-khau-moi")
   }
 

@@ -449,7 +449,6 @@ export default function DiemPage() {
         open={isImportOpen}
         onOpenChange={setIsImportOpen}
         onImportSuccess={(result: ScoreImportResponse) => {
-          console.log('Score import successful:', result)
           // Refresh scores if a class is selected
           if (selectedClass && selectedClass !== "all") {
             getScoreMatrix({ class_name: selectedClass }).then((res) => {

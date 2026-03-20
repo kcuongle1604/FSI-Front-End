@@ -15,7 +15,7 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select"
-import { importStudents } from "../student.api"
+import { importStudents, importStudentCertificatesHtml } from "../student.api"
 import type { ImportAnalysisResponse, ImportExecutionResponse, ImportError, ColumnMapping } from "../types"
 
 interface ImportTypeOption {
@@ -29,9 +29,10 @@ interface ImportDialogProps {
   onImportSuccess?: () => void
   importTypeOptions?: ImportTypeOption[]
   classOptions?: { value: string; label: string }[]
+  isCertificateImport?: boolean
 }
 
-export default function ImportDialog({ open, onOpenChange, onImportSuccess, importTypeOptions, classOptions }: ImportDialogProps) {
+export default function ImportDialog({ open, onOpenChange, onImportSuccess, importTypeOptions, classOptions, isCertificateImport = false }: ImportDialogProps) {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importError, setImportError] = useState<string>("")
   const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'result'>('upload')
@@ -106,6 +107,13 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
     error: error.error_message
   })) || []
 
+  const errorSummary = {
+    valid: dryRunResult?.valid_count ?? 0,
+    notFoundInSystem: dryRunResult?.invalid_count ?? 0,
+    duplicateScore: 0,
+    dataError: dryRunResult?.invalid_count ?? 0,
+  }
+
   const unmappedRequiredFields = mappingFields.filter(
     (field) => field.required && !columnMappings[field.key]
   )
@@ -149,7 +157,13 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
     }
 
     const lowerName = file.name.toLowerCase()
-    if (!lowerName.endsWith('.csv')) {
+    if (isCertificateImport) {
+      if (!lowerName.endsWith('.html') && !lowerName.endsWith('.htm')) {
+        setImportError("Định dạng file không hợp lệ, chỉ chấp nhận .html")
+        setImportFile(null)
+        return
+      }
+    } else if (!lowerName.endsWith('.csv')) {
       setImportError("Định dạng file không hợp lệ, chỉ chấp nhận .csv")
       setImportFile(null)
       return
@@ -158,8 +172,10 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
     setImportError("")
     setImportFile(file)
 
-    // Parse CSV headers
-    await parseCSVHeaders(file)
+    // Parse CSV headers only for CSV import flow.
+    if (!isCertificateImport) {
+      await parseCSVHeaders(file)
+    }
   }
 
   const handleDryRun = async () => {
@@ -187,7 +203,7 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
         }
       })
 
-      const response = await importStudents(importFile, true, apiColumnMapping)
+      const response = await importStudents(importFile, true, apiColumnMapping) as { data: ImportAnalysisResponse }
       setDryRunResult(response.data)
 
       // Switch to error overview tab if there are errors
@@ -210,6 +226,17 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
       setLoading(true)
       setImportError("")
 
+      if (isCertificateImport) {
+        await importStudentCertificatesHtml(importFile)
+
+        if (onImportSuccess) {
+          onImportSuccess()
+        }
+
+        handleOpenChange(false)
+        return
+      }
+
       // Transform frontend keys to backend keys
       const keyMapping: Record<string, string> = {
         'mssv': 'student_id',
@@ -229,14 +256,7 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
         }
       })
 
-      console.log('🚀 Import Request:', {
-        file: importFile.name,
-        dry_run: false,
-        column_mapping: apiColumnMapping
-      })
-
-      const response = await importStudents(importFile, false, apiColumnMapping)
-      console.log('✅ Import Response:', response.data)
+      const response = await importStudents(importFile, false, apiColumnMapping) as { data: ImportExecutionResponse }
       
       setImportResult(response.data)
       setImportStep('result')
@@ -276,7 +296,9 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
       }
       
       setImportError(errorMessage)
-      setImportStep('result')
+      if (!isCertificateImport) {
+        setImportStep('result')
+      }
     } finally {
       setLoading(false)
     }
@@ -306,7 +328,9 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
     <>
       <DialogHeader>
         <DialogTitle>Tải tệp lên</DialogTitle>
-        <DialogDescription>Chọn file CSV chứa dữ liệu sinh viên</DialogDescription>
+        <DialogDescription>
+          {isCertificateImport ? "Chọn file HTML chứa dữ liệu chứng chỉ" : "Chọn file CSV chứa dữ liệu sinh viên"}
+        </DialogDescription>
       </DialogHeader>
       <div className="pt-0 pb-4">
         {(importTypeOptions && importTypeOptions.length > 0) || (classOptions && classOptions.length > 0) ? (
@@ -369,17 +393,21 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
           {importFile ? (
             <>
               <p className="text-gray-800 font-medium mb-1">{importFile.name}</p>
-              <p className="text-xs text-gray-500 mb-3">Định dạng CSV (.csv), {(importFile.size / 1024).toFixed(2)}KB</p>
+              <p className="text-xs text-gray-500 mb-3">
+                {isCertificateImport ? "Định dạng HTML (.html)" : "Định dạng CSV (.csv)"}, {(importFile.size / 1024).toFixed(2)}KB
+              </p>
             </>
           ) : (
             <>
               <p className="text-gray-800 font-medium mb-1">Chọn một tệp hoặc kéo và thả vào đây</p>
-              <p className="text-xs text-gray-500 mb-3">Định dạng CSV (.csv), dung lượng tối đa 50MB</p>
+              <p className="text-xs text-gray-500 mb-3">
+                {isCertificateImport ? "Định dạng HTML (.html)" : "Định dạng CSV (.csv)"}, dung lượng tối đa 50MB
+              </p>
             </>
           )}
           <Button variant="outline" size="sm" onClick={() => {
             const input = document.createElement('input')
-            input.type = 'file'; input.accept = '.csv'
+            input.type = 'file'; input.accept = isCertificateImport ? '.html,.htm,text/html' : '.csv'
             input.onchange = (e) => {
               const file = (e.target as HTMLInputElement).files?.[0]
               if (file) {
@@ -394,10 +422,23 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
         <Button variant="outline" onClick={() => handleOpenChange(false)}>Hủy</Button>
         <Button
           className="bg-[#167FFC] hover:bg-[#1470E3]"
-          disabled={!importFile || !!importError}
-          onClick={() => { setImportStep('mapping'); setMappingTab('anh-xa-cot') }}
+          disabled={!importFile || !!importError || loading}
+          onClick={() => {
+            if (isCertificateImport) {
+              handleActualImport()
+              return
+            }
+
+            setImportStep('mapping')
+            setMappingTab('anh-xa-cot')
+          }}
         >
-          Tiếp
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Đang import...
+            </>
+          ) : isCertificateImport ? "Import" : "Tiếp"}
         </Button>
       </DialogFooter>
     </>

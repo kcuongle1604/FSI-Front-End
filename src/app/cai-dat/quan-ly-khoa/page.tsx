@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Plus, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,7 @@ import BatchManagementTable from "./components/BatchManagementTable"
 import { AddBatchDialog } from "./components/AddBatchDialog"
 import { EditBatchDialog } from "./components/EditBatchDialog"
 import { DeleteBatchDialog } from "./components/DeleteBatchDialog"
+import { api } from "@/lib/api"
 
 type Batch = {
   id: number
@@ -17,25 +18,58 @@ type Batch = {
   endYear: string
 }
 
-const batches = [
-  { id: 1, code: "46K", startYear: "2020", endYear: "2024" },
-  { id: 2, code: "47K", startYear: "2021", endYear: "2025" },
-  { id: 3, code: "48K", startYear: "2022", endYear: "2026" },
-  { id: 4, code: "49K", startYear: "2023", endYear: "2027" },
-  { id: 5, code: "50K", startYear: "2024", endYear: "2028" },
-  { id: 6, code: "51K", startYear: "2025", endYear: "2029" },
-  { id: 7, code: "52K", startYear: "2026", endYear: "2030" },
-  { id: 8, code: "53K", startYear: "2027", endYear: "2031" },
-  { id: 9, code: "54K", startYear: "2028", endYear: "2032" },
-  { id: 10, code: "55K", startYear: "2029", endYear: "2033" },
-]
+type CohortApiItem = {
+  cohort_id?: number
+  name?: string | null
+  cohort_name?: string | null
+  year_start?: number
+  year_end?: number
+}
 
 export default function QuanLyKhoaPage() {
   const [searchQuery, setSearchQuery] = useState("")
+  const [batches, setBatches] = useState<Batch[]>([])
+  const [loadingBatches, setLoadingBatches] = useState(false)
+  const [batchError, setBatchError] = useState("")
   const [openAddDialog, setOpenAddDialog] = useState(false)
   const [openEditDialog, setOpenEditDialog] = useState(false)
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false)
   const [selectedBatch, setSelectedBatch] = useState<Batch | undefined>()
+
+  const fetchCohorts = async () => {
+    try {
+      setLoadingBatches(true)
+      setBatchError("")
+
+      const res = await api.get<CohortApiItem[]>("/api/v1/cohorts")
+      const rows = Array.isArray(res.data) ? res.data : []
+
+      const mapped = rows.map((item, index) => {
+        const cohortId = Number(item.cohort_id)
+        const codeFromName = (item.name || item.cohort_name || "").trim()
+        const code = codeFromName || (Number.isFinite(cohortId) ? `${cohortId}K` : `K${index + 1}`)
+
+        return {
+          id: Number.isFinite(cohortId) ? cohortId : index + 1,
+          code,
+          startYear: item.year_start != null ? String(item.year_start) : "-",
+          endYear: item.year_end != null ? String(item.year_end) : "-",
+        }
+      })
+
+      setBatches(mapped)
+    } catch (error) {
+      console.error("Load cohorts failed", error)
+      setBatchError("Không thể tải danh sách khóa")
+      setBatches([])
+    } finally {
+      setLoadingBatches(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchCohorts()
+  }, [])
 
   const filteredBatches = batches.filter(batch => 
     batch.code.toLowerCase().includes(searchQuery.toLowerCase())
@@ -51,16 +85,84 @@ export default function QuanLyKhoaPage() {
     setOpenDeleteDialog(true)
   }
 
-  const handleAddBatch = (data: { code: string; startYear: string; endYear: string }) => {
-    console.log("Add batch:", data)
+  const handleAddBatch = async (data: { code?: string; startYear: string; endYear?: string }) => {
+    try {
+      setBatchError("")
+
+      const payload: { year_start: number; year_end?: number } = {
+        year_start: Number(data.startYear),
+      }
+
+      if (data.endYear) {
+        payload.year_end = Number(data.endYear)
+      }
+
+      await api.post("/api/v1/cohorts", payload)
+      await fetchCohorts()
+      return true
+    } catch (error: any) {
+      console.error("Create cohort failed", error)
+      const message =
+        typeof error?.response?.data === "string"
+          ? error.response.data
+          : error?.response?.data?.detail || error?.response?.data?.message || "Không thể tạo khóa mới"
+      setBatchError(message)
+      return false
+    }
   }
 
-  const handleUpdateBatch = (data: { code: string; startYear: string; endYear: string }) => {
-    console.log("Update batch:", data)
+  const handleUpdateBatch = async (data: { code?: string; startYear: string; endYear?: string }) => {
+    if (!selectedBatch?.id) {
+      setBatchError("Không xác định được khóa cần cập nhật")
+      return false
+    }
+
+    try {
+      setBatchError("")
+
+      const payload: { year_start: number; year_end?: number } = {
+        year_start: Number(data.startYear),
+      }
+
+      if (data.endYear) {
+        payload.year_end = Number(data.endYear)
+      }
+
+      await api.put(`/api/v1/cohorts/${selectedBatch.id}`, payload)
+      await fetchCohorts()
+      return true
+    } catch (error: any) {
+      console.error("Update cohort failed", error)
+      const message =
+        typeof error?.response?.data === "string"
+          ? error.response.data
+          : error?.response?.data?.detail || error?.response?.data?.message || "Không thể cập nhật khóa"
+      setBatchError(message)
+      return false
+    }
   }
 
-  const handleConfirmDelete = () => {
-    console.log("Delete batch:", selectedBatch)
+  const handleConfirmDelete = async () => {
+    if (!selectedBatch?.id) {
+      setBatchError("Không xác định được khóa cần xóa")
+      return false
+    }
+
+    try {
+      setBatchError("")
+      await api.delete(`/api/v1/cohorts/${selectedBatch.id}`)
+      await fetchCohorts()
+      setSelectedBatch(undefined)
+      return true
+    } catch (error: any) {
+      console.error("Delete cohort failed", error)
+      const message =
+        typeof error?.response?.data === "string"
+          ? error.response.data
+          : error?.response?.data?.detail || error?.response?.data?.message || "Không thể xóa khóa"
+      setBatchError(message)
+      return false
+    }
   }
 
   return (
@@ -101,6 +203,9 @@ export default function QuanLyKhoaPage() {
             </Button>
           </div>
         </div>
+
+        {batchError && <p className="text-sm text-red-600 mb-3">{batchError}</p>}
+        {loadingBatches && <p className="text-sm text-gray-600 mb-3">Đang tải danh sách khóa...</p>}
 
         {/* Table */}
         <BatchManagementTable 

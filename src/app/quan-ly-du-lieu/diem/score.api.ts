@@ -11,16 +11,12 @@ export async function uploadScores(file: File) {
     const formData = new FormData()
     formData.append("file", file)
 
-    console.log('🚀 Uploading scores to:', api.defaults.baseURL + '/api/v1/upload-scores')
-    console.log('📁 File:', file.name, 'Size:', file.size, 'bytes')
-
     try {
         const response = await api.post<ScoreImportResponse>("/api/v1/upload-scores", formData, {
             headers: {
                 "Content-Type": "multipart/form-data",
             },
         })
-        console.log('✅ Upload successful:', response.data)
         return response
     } catch (error: any) {
         console.error('❌ Upload failed:')

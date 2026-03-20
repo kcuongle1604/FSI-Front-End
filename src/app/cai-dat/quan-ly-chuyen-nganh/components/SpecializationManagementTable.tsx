@@ -47,7 +47,6 @@ export default function SpecializationManagementTable({
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">STT</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">MÃ CHUYÊN NGÀNH</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">TÊN CHUYÊN NGÀNH</TableHead>
-                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">KHÓA ÁP DỤNG</TableHead>
                 <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-12">
                   <span className="sr-only">Actions</span>
                 </TableHead>
@@ -59,9 +58,8 @@ export default function SpecializationManagementTable({
                   <TableCell className="h-12 px-4 text-sm text-gray-600">
                     {String(index + 1).padStart(2, '0')}
                   </TableCell>
-                  <TableCell className="h-12 px-4 text-sm text-gray-600">{spec.code}</TableCell>
+                  <TableCell className="h-12 px-4 text-sm text-gray-600">{spec.code || "-"}</TableCell>
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{spec.name}</TableCell>
-                  <TableCell className="h-12 px-4 text-sm text-gray-600">{spec.batches.join(", ")}</TableCell>
                   <TableCell className="h-12 px-4 text-right w-12">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

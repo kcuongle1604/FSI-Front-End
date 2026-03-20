@@ -8,14 +8,6 @@ async function handleScoreUpload(file: File) {
     try {
         const response = await uploadScores(file)
 
-        console.log('Upload Result:')
-        console.log('- Job ID:', response.data.id)
-        console.log('- File Name:', response.data.file_name)
-        console.log('- Status:', response.data.status)
-        console.log('- Total Processed:', response.data.total_processed)
-        console.log('- Success Count:', response.data.success_count)
-        console.log('- Failure Count:', response.data.failure_count)
-
         if (response.data.error_message) {
             console.error('Error:', response.data.error_message)
         }

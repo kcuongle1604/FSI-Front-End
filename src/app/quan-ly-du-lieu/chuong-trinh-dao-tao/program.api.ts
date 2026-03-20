@@ -9,16 +9,31 @@ export interface Subject {
 }
 
 export interface SubjectsResponse {
-  data: Subject[]
+  data?: Subject[]
+  items?: Subject[]
+  results?: Subject[]
+  total?: number
+  page?: number
+  size?: number
 }
 
 /**
- * Get list of subjects for a training program by project name
- * @param projectName - Name of the training program
- * @returns List of subjects in the program
+ * Get list of subjects for a training program by program name (paginated)
+ * @param programName - Name of the training program
+ * @param page - Page number (starts from 1)
+ * @param size - Page size (max 100)
+ * @returns Paginated list of subjects in the program
  */
-export async function getSubjectsByProgramName(projectName: string) {
-  return api.get<Subject[]>(`/api/v1/training-programs/by-name/${encodeURIComponent(projectName)}/subjects`)
+export async function getSubjectsByProgramName(programName: string, page = 1, size = 20) {
+  return api.get<SubjectsResponse | Subject[]>(
+    `/api/v1/training-programs/by-name/${encodeURIComponent(programName)}/subjects`,
+    {
+      params: {
+        page,
+        size,
+      },
+    }
+  )
 }
 
 /**

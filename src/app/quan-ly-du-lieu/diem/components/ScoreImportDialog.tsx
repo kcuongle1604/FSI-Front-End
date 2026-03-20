@@ -47,11 +47,6 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
             setLoading(true)
             setImportError("")
 
-            console.log('🚀 Uploading scores:', {
-                file: importFile.name,
-                size: importFile.size,
-            })
-
             const response = await uploadScores(importFile)
             setImportResult(response.data)
             setImportStep('result')

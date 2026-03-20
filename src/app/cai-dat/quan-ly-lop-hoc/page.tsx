@@ -53,15 +53,12 @@ export default function QuanLyLopHocPage() {
   }
 
   const handleAddClass = (data: { name: string; specialization: string; advisor: string; studentCount: string | number }) => {
-    console.log("Add class:", data)
   }
 
   const handleUpdateClass = (data: { name: string; specialization: string; advisor: string; studentCount: string | number }) => {
-    console.log("Update class:", data)
   }
 
   const handleConfirmDelete = () => {
-    console.log("Delete class:", selectedClass)
   }
 
   return (

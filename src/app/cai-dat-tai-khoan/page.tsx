@@ -28,13 +28,11 @@ export default function CaiDatNguoiDungPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const handleSave = () => {
-    console.log("Saving user settings:", formData)
     // Handle save logic here
   }
 
   const handleCancel = () => {
     // Reset form or go back
-    console.log("Cancel settings")
   }
 
   return (

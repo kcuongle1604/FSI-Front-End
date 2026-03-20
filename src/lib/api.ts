@@ -6,14 +6,6 @@ export const api = axios.create({
   baseURL: API_URL,
 })
 
-// Log API configuration in development
-if (process.env.NODE_ENV === "development") {
-  console.log("🔧 API Configuration:", {
-    baseURL: API_URL,
-    env: process.env.NEXT_PUBLIC_API_URL ? "from .env.local" : "default",
-  })
-}
-
 api.interceptors.request.use(
   (config) => {
     if (typeof window !== "undefined") {

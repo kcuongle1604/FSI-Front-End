@@ -48,12 +48,13 @@ export type Program = {
   name: string
   specialization?: string
   applicableCourses?: string[]
+  appliedCourses?: string[]
 }
 
 export const INITIAL_PROGRAMS: Program[] = [
-  { id: 1, name: "Quản trị hệ thống thông tin", appliedCourses: ["48K"] },
-  { id: 2, name: "Tin học quản lý", appliedCourses: ["49K"] },
-  { id: 3, name: "Thống kê", appliedCourses: ["50K"] },
+  { id: 1, name: "Quản trị hệ thống thông tin", applicableCourses: ["48K"] },
+  { id: 2, name: "Tin học quản lý", applicableCourses: ["49K"] },
+  { id: 3, name: "Thống kê", applicableCourses: ["50K"] },
 ]
 
 export default function ChuongTrinhDaoTaoPage() {
@@ -82,13 +83,9 @@ export default function ChuongTrinhDaoTaoPage() {
       try {
         setLoadingPrograms(true)
         const response = await getTrainingPrograms()
-        console.log("🔍 Raw API response for training programs:", response)
         if (response?.data && Array.isArray(response.data)) {
           const programsList = response.data.map((p: any) => {
-            console.log("🔍 Raw program data:", p)
-            console.log("🔍 Checking ID fields - p.program_id:", p.program_id, "p.id:", p.id, "p.training_program_id:", p.training_program_id)
             const programId = p.training_program_id || p.program_id || p.id
-            console.log("🔍 Selected program ID:", programId)
             return {
               id: programId,
               name: p.program_name || p.name,
@@ -96,7 +93,6 @@ export default function ChuongTrinhDaoTaoPage() {
               applicableCourses: p.applicable_courses || p.applicableCourses || [],
             }
           })
-          console.log("📚 Loaded training programs:", programsList)
           setPrograms(programsList)
           
           // Fetch cohorts for each program
@@ -104,12 +100,9 @@ export default function ChuongTrinhDaoTaoPage() {
           await Promise.all(
             programsList.map(async (program) => {
               try {
-                console.log(`🔍 Fetching cohorts for program ID: ${program.id}`)
                 const cohortsResponse = await getProgramCohorts(program.id)
-                console.log(`📊 Cohorts response for program ${program.id}:`, cohortsResponse)
                 if (cohortsResponse?.data && Array.isArray(cohortsResponse.data)) {
                   const cohortIds = cohortsResponse.data.map((c: Cohort) => String(c.cohort_id))
-                  console.log(`✅ Cohort IDs for program ${program.id}:`, cohortIds)
                   cohortsMap.set(program.id, cohortIds)
                 }
               } catch (err) {
@@ -118,7 +111,6 @@ export default function ChuongTrinhDaoTaoPage() {
               }
             })
           )
-          console.log("🗺️ Final cohorts map:", cohortsMap)
           setProgramCohorts(cohortsMap)
         }
       } catch (err) {
@@ -170,7 +162,7 @@ export default function ChuongTrinhDaoTaoPage() {
 
     return (
       p.name.toLowerCase().includes(query) ||
-      p.appliedCourses.some((c) => c.toLowerCase().includes(query))
+      (p.applicableCourses ?? p.appliedCourses ?? []).some((c: string) => c.toLowerCase().includes(query))
     )
   })
 
@@ -354,7 +346,6 @@ export default function ChuongTrinhDaoTaoPage() {
                                   type="button"
                                   className="text-blue-700 hover:underline font-medium outline-none"
                                   onClick={() => {
-                                    console.log("👆 Navigating to program:", program.name, "ID:", program.id)
                                     router.push(`/quan-ly-du-lieu/chuong-trinh-dao-tao/${program.id}?name=${encodeURIComponent(program.name)}`)
                                   }}
                                 >
@@ -364,7 +355,6 @@ export default function ChuongTrinhDaoTaoPage() {
                               <TableCell className="h-12 px-4 text-sm text-gray-600">
                                 {(() => {
                                   const cohorts = programCohorts.get(program.id)
-                                  console.log(`🎯 Rendering cohorts for program ID ${program.id}:`, cohorts, `Map has key:`, programCohorts.has(program.id))
                                   return cohorts?.join(", ") || "-"
                                 })()}
                               </TableCell>

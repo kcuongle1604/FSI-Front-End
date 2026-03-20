@@ -10,21 +10,16 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { MultiSelect } from "@/components/ui/multi-select"
-
-const BATCHES = ["48K", "49K", "50K", "51K", "52K"]
 
 type AddSpecializationDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onAdd?: (data: any) => void
+  onAdd?: (data: { name: string }) => Promise<boolean> | boolean
 }
 
 export function AddSpecializationDialog({ open, onOpenChange, onAdd }: AddSpecializationDialogProps) {
   const [formData, setFormData] = useState({
-    code: "",
     name: "",
-    batches: [] as string[],
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -36,21 +31,10 @@ export function AddSpecializationDialog({ open, onOpenChange, onAdd }: AddSpecia
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: "" }))
   }
 
-  const handleBatchToggle = (batch: string) => {
-    setFormData(prev => ({
-      ...prev,
-      batches: prev.batches.includes(batch)
-        ? prev.batches.filter(b => b !== batch)
-        : [...prev.batches, batch]
-    }))
-  }
-
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.code) newErrors.code = "Vui lòng nhập mã chuyên ngành"
     if (!formData.name) newErrors.name = "Vui lòng nhập tên chuyên ngành"
-    if (formData.batches.length === 0) newErrors.batches = "Vui lòng chọn ít nhất một khóa"
 
     setErrors(newErrors)
 
@@ -58,14 +42,17 @@ export function AddSpecializationDialog({ open, onOpenChange, onAdd }: AddSpecia
       return
     }
 
+    let created = true
     if (onAdd) {
-      onAdd(formData)
+      created = await onAdd(formData)
+    }
+
+    if (!created) {
+      return
     }
 
     setFormData({
-      code: "",
       name: "",
-      batches: [],
     })
     setErrors({})
 
@@ -74,9 +61,7 @@ export function AddSpecializationDialog({ open, onOpenChange, onAdd }: AddSpecia
 
   const handleCancel = () => {
     setFormData({
-      code: "",
       name: "",
-      batches: [],
     })
     setErrors({})
     onOpenChange(false)
@@ -90,22 +75,6 @@ export function AddSpecializationDialog({ open, onOpenChange, onAdd }: AddSpecia
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Code */}
-          <div className="space-y-2">
-            <Label htmlFor="code" className="text-sm font-medium text-gray-800">
-              Mã chuyên ngành<span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="code"
-              type="text"
-              placeholder="Nhập mã chuyên ngành"
-              value={formData.code}
-              onChange={(e) => handleInputChange("code", e.target.value)}
-              className={`w-full border-gray-300 ${errors.code ? "border-red-500" : ""}`}
-            />
-            {errors.code && <p className="text-xs text-red-500">{errors.code}</p>}
-          </div>
-
           {/* Name */}
           <div className="space-y-2">
             <Label htmlFor="name" className="text-sm font-medium text-gray-800">
@@ -120,23 +89,6 @@ export function AddSpecializationDialog({ open, onOpenChange, onAdd }: AddSpecia
               className={`w-full border-gray-300 ${errors.name ? "border-red-500" : ""}`}
             />
             {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
-          </div>
-
-          {/* Batches */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-gray-800">
-              Khóa áp dụng<span className="text-red-500">*</span>
-            </Label>
-            <div style={{ zIndex: 30 }}>
-              <MultiSelect
-                options={BATCHES}
-                value={formData.batches}
-                onChange={batches => setFormData(prev => ({ ...prev, batches }))}
-                placeholder="Chọn khóa áp dụng"
-                /* Giới hạn chiều cao dropdown, thêm scroll */
-              />
-            </div>
-            {errors.batches && <p className="text-xs text-red-500">{errors.batches}</p>}
           </div>
         </div>
 
