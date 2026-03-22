@@ -50,6 +50,21 @@ import type { Certificate, CertificateFormData } from "./types"
 import type { ImportHistory } from "../sinh-vien/types"
 import { api } from "@/lib/api"
 
+function extractBackendMessage(error: any, fallback: string): string {
+  const detail = error?.response?.data?.detail
+  if (typeof detail === "string" && detail.trim()) return detail
+  if (Array.isArray(detail) && detail.length > 0) {
+    return detail
+      .map((item: any) => (typeof item === "string" ? item : item?.msg || JSON.stringify(item)))
+      .join(", ")
+  }
+
+  const message = error?.response?.data?.message || error?.message
+  if (typeof message === "string" && message.trim()) return message
+
+  return fallback
+}
+
 type ClassApiItem = {
   class_id?: number
   class_name?: string
@@ -301,9 +316,8 @@ export default function ChungChiPage() {
       }
 
       setCertificates(allItems.map(mapSummaryItem))
-    } catch (error) {
-      console.error("Load student certificate summary failed", error)
-      setCertificateError("Không thể tải dữ liệu chứng chỉ")
+    } catch (error: any) {
+      setCertificateError(extractBackendMessage(error, "Không thể tải dữ liệu chứng chỉ"))
       setCertificates([])
     } finally {
       setLoadingCertificates(false)
@@ -319,8 +333,8 @@ export default function ChungChiPage() {
 
       setClasses(Array.isArray(classesRes.data) ? classesRes.data : [])
       setCohorts(Array.isArray(cohortsRes.data) ? cohortsRes.data : [])
-    } catch (error) {
-      console.error("Load classes/cohorts failed", error)
+    } catch (error: any) {
+      setCertificateError(extractBackendMessage(error, "Không thể tải danh sách lớp và khóa."))
       setClasses([])
       setCohorts([])
     }

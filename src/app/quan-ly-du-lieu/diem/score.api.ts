@@ -5,29 +5,19 @@ import type { ScoreImportResponse, ScoreMatrixResponse } from "./types"
 /**
  * Upload scores from CSV file
  * @param file - CSV file containing score data
+ * @param semesterId - Semester ID for imported scores
  * @returns Upload job information
  */
-export async function uploadScores(file: File) {
+export async function uploadScores(file: File, semesterId: number) {
     const formData = new FormData()
     formData.append("file", file)
+    formData.append("semester_id", String(semesterId))
 
-    try {
-        const response = await api.post<ScoreImportResponse>("/api/v1/upload-scores", formData, {
-            headers: {
-                "Content-Type": "multipart/form-data",
-            },
-        })
-        return response
-    } catch (error: any) {
-        console.error('❌ Upload failed:')
-        console.error('- Error message:', error.message)
-        console.error('- Error code:', error.code)
-        console.error('- Response status:', error.response?.status)
-        console.error('- Response data:', error.response?.data)
-        console.error('- Request URL:', error.config?.url)
-        console.error('- Base URL:', error.config?.baseURL)
-        throw error
-    }
+    return api.post<ScoreImportResponse>("/api/v1/upload-scores", formData, {
+        headers: {
+            "Content-Type": "multipart/form-data",
+        },
+    })
 }
 
 /**
@@ -47,6 +37,31 @@ export async function getScoreMatrix(params?: {
  * Get list of classes (re-exported from student.api)
  */
 export const getClasses = getClassesFromStudent
+
+/**
+ * Semester item from API
+ */
+export interface Semester {
+    id?: number
+    semester_id?: number
+    name?: string
+    semester_name?: string
+    code?: string
+    term?: string
+    academic_year?: string
+}
+
+/**
+ * Get list of semesters
+ */
+export async function getSemesters(params?: { skip?: number; limit?: number }) {
+    return api.get<Semester[] | { data?: Semester[]; items?: Semester[] }>("/api/v1/semesters", {
+        params: {
+            skip: params?.skip ?? 0,
+            limit: params?.limit ?? 100,
+        },
+    })
+}
 
 /**
  * Get list of subjects for a training program

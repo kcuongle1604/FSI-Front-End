@@ -40,7 +40,7 @@ export type CourseFormValues = {
 type CourseFormDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (data: CourseFormValues) => void
+  onSave: (data: CourseFormValues) => void | Promise<void>
   initialValues?: Partial<CourseFormValues>
   mode?: "create" | "edit"
   appliedCourses?: string[]
@@ -59,6 +59,7 @@ export default function CourseFormDialog({
   const [name, setName] = useState("")
   const [credits, setCredits] = useState("")
   const [courseType, setCourseType] = useState<string>("")
+  const [saving, setSaving] = useState(false)
 
   const [errors, setErrors] = useState<{
     specialization?: string
@@ -66,6 +67,7 @@ export default function CourseFormDialog({
     name?: string
     credits?: string
     courseType?: string
+    submit?: string
   }>({})
 
   const resetForm = () => {
@@ -95,7 +97,7 @@ export default function CourseFormDialog({
     }
   }, [open, initialValues])
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const newErrors: typeof errors = {}
 
     if (!specialization) newErrors.specialization = "Vui lòng chọn chuyên ngành"
@@ -112,16 +114,28 @@ export default function CourseFormDialog({
     setErrors(newErrors)
     if (Object.keys(newErrors).length > 0) return
 
-    onSave({
-      specialization,
-      code: code.trim(),
-      name: name.trim(),
-      credits: parsedCredits,
-      type: courseType as CourseFormValues["type"],
-    })
+    try {
+      setSaving(true)
+      await Promise.resolve(
+        onSave({
+          specialization,
+          code: code.trim(),
+          name: name.trim(),
+          credits: parsedCredits,
+          type: courseType as CourseFormValues["type"],
+        })
+      )
 
-    resetForm()
-    onOpenChange(false)
+      resetForm()
+      onOpenChange(false)
+    } catch (error: any) {
+      setErrors((prev) => ({
+        ...prev,
+        submit: error?.message || "Không thể lưu học phần. Vui lòng thử lại.",
+      }))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleCancel = () => {
@@ -255,19 +269,25 @@ export default function CourseFormDialog({
           </div>
         </div>
 
+        {errors.submit && (
+          <p className="text-xs text-red-500">{errors.submit}</p>
+        )}
+
         <div className="flex gap-3 pt-6 justify-end">
           <Button
             variant="outline"
             onClick={handleCancel}
+            disabled={saving}
             className="px-6 bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
           >
             Hủy
           </Button>
           <Button
             onClick={handleSave}
+            disabled={saving}
             className="px-6 bg-[#167FFC] hover:bg-[#1470E3] text-white"
           >
-            Lưu
+            {saving ? "Đang lưu..." : "Lưu"}
           </Button>
         </div>
       </DialogContent>

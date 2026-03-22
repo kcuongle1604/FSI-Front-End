@@ -21,10 +21,5 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status) {
-      console.error(`API Error ${error.response.status}:`, error.config?.url)
-    }
-    return Promise.reject(error)
-  }
+  (error) => Promise.reject(error)
 )

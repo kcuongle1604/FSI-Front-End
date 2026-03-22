@@ -46,8 +46,9 @@ export default function StudentFormDialog({ open, onOpenChange, student, onSucce
         if (res?.data) {
           setClasses(Array.isArray(res.data) ? res.data : [])
         }
-      } catch (err) {
-        console.error("Load classes failed", err)
+      } catch (err: any) {
+        const message = err?.response?.data?.detail || err?.response?.data?.message || err?.message
+        setError(typeof message === "string" ? message : "Không tải được danh sách lớp")
       }
     }
 
@@ -113,7 +114,6 @@ export default function StudentFormDialog({ open, onOpenChange, student, onSucce
     // Split by slash
     const parts = dateStr.split("/")
     if (parts.length !== 3) {
-      console.error('Invalid date format (expected dd/mm/yyyy):', dateStr)
       return ""
     }
 
@@ -121,7 +121,6 @@ export default function StudentFormDialog({ open, onOpenChange, student, onSucce
 
     // Validate parts are numbers
     if (isNaN(Number(day)) || isNaN(Number(month)) || isNaN(Number(year))) {
-      console.error('Invalid date format (expected dd/mm/yyyy):', dateStr)
       return ""
     }
 
@@ -131,7 +130,6 @@ export default function StudentFormDialog({ open, onOpenChange, student, onSucce
     const yearNum = Number(year)
 
     if (dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12 || yearNum < 1900) {
-      console.error('Invalid date values:', { day: dayNum, month: monthNum, year: yearNum })
       return ""
     }
 
@@ -191,10 +189,6 @@ export default function StudentFormDialog({ open, onOpenChange, student, onSucce
         onSuccess()
       }
     } catch (err: any) {
-      console.error("Save student error:", err)
-      console.error("Error response data:", err.response?.data)
-      console.error("Error response status:", err.response?.status)
-
       // Format error message
       let errorMsg = "Có lỗi xảy ra khi lưu dữ liệu"
 

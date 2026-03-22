@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import type { AxiosError } from "axios"
 import {
   Select,
   SelectContent,
@@ -19,12 +20,10 @@ import {
 } from "@/components/ui/select"
 import { MultiSelect } from "@/components/ui/multi-select"
 import { api } from "@/lib/api"
-
-const COURSES = ["48K", "49K", "50K", "51K", "52K"]
+import { createTrainingProgram, updateTrainingProgram } from "./program.api"
 
 export type ProgramFormValues = {
-  name: string
-  major_id?: number
+  major_id: number
   description?: string
   cohort_ids: number[]
 }
@@ -33,24 +32,23 @@ type ProgramFormDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (data: ProgramFormValues) => void
-  existingProgramNames?: string[]
   initialData?: ProgramFormValues | null
+  programId?: number
 }
 
 export default function ProgramFormDialog({
   open,
   onOpenChange,
   onSave,
-  existingProgramNames = [],
   initialData,
+  programId,
 }: ProgramFormDialogProps) {
   const [majorId, setMajorId] = useState<number | undefined>()
-  const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [cohortIds, setCohortIds] = useState<number[]>([])
   const [errors, setErrors] = useState<{ 
     majorId?: string
-    name?: string
+    submit?: string
     cohortIds?: string 
   }>({})
   
@@ -108,23 +106,100 @@ export default function ProgramFormDialog({
 
   const resetForm = () => {
     setMajorId(undefined)
-    setName("")
     setDescription("")
     setCohortIds([])
     setErrors({})
   }
 
+  useEffect(() => {
+    if (!open) return
+
+    if (initialData) {
+      setMajorId(initialData.major_id)
+      setDescription(initialData.description || "")
+      setCohortIds(Array.isArray(initialData.cohort_ids) ? initialData.cohort_ids : [])
+      setErrors({})
+      return
+    }
+
+    resetForm()
+  }, [open, initialData])
+
+  const formatDomainErrorMessage = (message: string): string => {
+    if (!message) return message
+
+    let formatted = message
+
+    // Replace major id with major name when backend returns: "chuyên ngành 14"
+    formatted = formatted.replace(/chuyên ngành\s+(\d+)/gi, (_, majorIdRaw: string) => {
+      const majorIdNum = Number(majorIdRaw)
+      const major = majors.find((m) => m.id === majorIdNum)
+      if (!major?.name) return `chuyên ngành ${majorIdRaw}`
+      return `chuyên ngành ${major.name}`
+    })
+
+    // Replace cohort ids with cohort names when backend returns: "khóa 1, 48"
+    formatted = formatted.replace(/khóa\s+([\d\s,]+)/gi, (_, cohortsRaw: string) => {
+      const ids = cohortsRaw
+        .split(",")
+        .map((item) => Number(item.trim()))
+        .filter((item) => Number.isFinite(item))
+
+      if (ids.length === 0) return `khóa ${cohortsRaw}`
+
+      const mappedNames = ids.map((id) => {
+        const cohort = cohorts.find((c) => c.id === id)
+        return cohort?.name || String(id)
+      })
+
+      return `khóa ${mappedNames.join(", ")}`
+    })
+
+    return formatted
+  }
+
+  const getBackendErrorMessage = (error: unknown): string => {
+    const axiosError = error as AxiosError<any>
+    const data = axiosError?.response?.data
+
+    if (Array.isArray(data?.detail)) {
+      const lines = data.detail
+        .map((item: any) => {
+          if (typeof item === "string") return item
+          const field = Array.isArray(item?.loc) ? item.loc[item.loc.length - 1] : "field"
+          const message = item?.msg || "Invalid value"
+          return `${String(field)}: ${String(message)}`
+        })
+        .filter(Boolean)
+      if (lines.length > 0) return lines.join("; ")
+    }
+
+    if (typeof data?.detail === "string" && data.detail.trim()) {
+      return formatDomainErrorMessage(data.detail.trim())
+    }
+    if (typeof data?.message === "string" && data.message.trim()) {
+      return formatDomainErrorMessage(data.message.trim())
+    }
+
+    if (typeof axiosError?.message === "string" && axiosError.message.trim()) {
+      return axiosError.message.trim()
+    }
+
+    return "Không thể lưu chương trình đào tạo. Vui lòng thử lại."
+  }
+
   const handleSave = async () => {
     const newErrors: { 
       majorId?: string
-      name?: string
+      submit?: string
       cohortIds?: string 
     } = {}
     
-    if (!name.trim()) {
-      newErrors.name = "Vui lòng nhập tên chương trình đào tạo"
-    } else if (existingProgramNames.includes(name.trim())) {
-      newErrors.name = "Tên chương trình đào tạo đã tồn tại. Vui lòng chọn tên khác."
+    if (!majorId) {
+      newErrors.majorId = "Vui lòng chọn chuyên ngành"
+    }
+    if (cohortIds.length === 0) {
+      newErrors.cohortIds = "Vui lòng chọn ít nhất 1 khóa áp dụng"
     }
 
     setErrors(newErrors)
@@ -132,21 +207,23 @@ export default function ProgramFormDialog({
 
     try {
       setLoading(true)
-      const payload: any = {
-        name: name.trim(),
+      const payload: ProgramFormValues = {
+        major_id: majorId!,
+        description: description.trim(),
+        cohort_ids: cohortIds,
       }
       
-      if (majorId) payload.major_id = majorId
-      if (description.trim()) payload.description = description.trim()
-      if (cohortIds.length > 0) payload.cohort_ids = cohortIds
-      
-      const response = await api.post("/api/v1/training-programs", payload)
+      if (programId) {
+        await updateTrainingProgram(programId, payload)
+      } else {
+        await createTrainingProgram(payload)
+      }
       
       onSave(payload)
       resetForm()
       onOpenChange(false)
     } catch (err) {
-      setErrors({ name: "Không thể tạo chương trình đào tạo. Vui lòng thử lại." })
+      setErrors({ submit: getBackendErrorMessage(err) })
     } finally {
       setLoading(false)
     }
@@ -169,7 +246,7 @@ export default function ProgramFormDialog({
         <div className="space-y-4">
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-800">
-              Chuyên ngành
+              Chuyên ngành<span className="text-red-500">*</span>
             </Label>
             <Select
               value={majorId ? String(majorId) : ""}
@@ -200,6 +277,7 @@ export default function ProgramFormDialog({
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-800">
               Khóa áp dụng
+              <span className="text-red-500">*</span>
             </Label>
             <MultiSelect
               options={cohorts.map(c => String(c.id))}
@@ -221,36 +299,20 @@ export default function ProgramFormDialog({
 
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-800">
-              Khóa áp dụng<span className="text-red-500">*</span>
-            </Label>
-            <Input
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value)
-                if (errors.name) {
-                  setErrors((prev) => ({ ...prev, name: undefined }))
-                }
-              }}
-              placeholder="Nhập tên chương trình đào tạo"
-              className={`w-full ${errors.name ? "border-red-500" : "border-gray-300"}`}
-            />
-            {errors.name && (
-              <p className="text-xs text-red-500">{errors.name}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-gray-800">
               Mô tả
             </Label>
             <Input
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDescription(e.target.value)}
               placeholder="Nhập mô tả"
               className="w-full border-gray-300"
             />
           </div>
         </div>
+
+        {errors.submit && (
+          <p className="text-xs text-red-500">{errors.submit}</p>
+        )}
 
         <div className="flex gap-3 pt-6 justify-end">
           <Button

@@ -55,21 +55,7 @@ type CertificateListResponse =
   | CertificateApiItem[]
   | { items?: CertificateApiItem[]; data?: CertificateApiItem[]; results?: CertificateApiItem[] };
 
-type CertificateCohortItem = {
-  cohort_id?: number;
-  name?: string;
-  cohort_name?: string;
-  year_start?: number;
-  year_end?: number;
-};
-
-type CertificateCohortsResponse = {
-  certificate_id?: number;
-  certificate_name?: string;
-  cohorts?: CertificateCohortItem[];
-};
-
-type ExemptionApiItem = {
+type CertificateRelationApiItem = {
   certificate_id?: number;
   certificate_name?: string;
   cohort_id?: number;
@@ -78,10 +64,15 @@ type ExemptionApiItem = {
   major_name?: string;
 };
 
-type ExemptionListResponse = {
-  data?: ExemptionApiItem[];
-  total?: number;
-};
+type CertificateRelationResponse =
+  | CertificateRelationApiItem[]
+  | {
+    items?: CertificateRelationApiItem[];
+    data?: CertificateRelationApiItem[];
+    results?: CertificateRelationApiItem[];
+    applications?: CertificateRelationApiItem[];
+    exemptions?: CertificateRelationApiItem[];
+  };
 
 export default function QuanLyChungChiPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -113,6 +104,36 @@ export default function QuanLyChungChiPage() {
     return Number.isFinite(parsed) ? parsed : null;
   };
 
+  const getListFromPayload = <T,>(payload: T[] | { items?: T[]; data?: T[]; results?: T[] } | null | undefined): T[] => {
+    if (Array.isArray(payload)) return payload;
+    if (!payload) return [];
+    if (Array.isArray(payload.items)) return payload.items;
+    if (Array.isArray(payload.data)) return payload.data;
+    if (Array.isArray(payload.results)) return payload.results;
+    return [];
+  };
+
+  const getRelationRows = (payload: CertificateRelationResponse): CertificateRelationApiItem[] => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.applications)) return payload.applications;
+    if (Array.isArray(payload?.exemptions)) return payload.exemptions;
+    if (Array.isArray(payload?.items)) return payload.items;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.results)) return payload.results;
+    return [];
+  };
+
+  const fetchCertificateList = async () => {
+    const res = await api.get<CertificateListResponse>("/api/v1/certificates", {
+      params: {
+        page: 1,
+        size: 100,
+      },
+    });
+
+    return getListFromPayload<CertificateApiItem>(res.data);
+  };
+
   const mapApiCertificate = (item: CertificateApiItem, index: number): Certificate => {
     const batchesFromCohorts = Array.isArray(item.cohorts)
       ? item.cohorts.map((c) => c?.name || String(c?.cohort_id ?? "")).filter(Boolean)
@@ -135,31 +156,11 @@ export default function QuanLyChungChiPage() {
     };
   };
 
-  const mapCohortLabels = (cohorts: CertificateCohortItem[] | undefined): string[] => {
-    if (!Array.isArray(cohorts)) return [];
-
-    const values = cohorts
-      .map((cohort) => (cohort.cohort_id != null ? String(cohort.cohort_id) : (cohort.name || cohort.cohort_name || "")))
-      .filter(Boolean);
-
-    return Array.from(new Set(values));
-  };
-
   const fetchCertificates = async () => {
     try {
       setLoadingCertificates(true);
       setCertificateError("");
-      const res = await api.get<CertificateListResponse>("/api/v1/certificates", {
-        params: {
-          page: 1,
-          size: 100,
-        },
-      });
-
-      const payload = res.data;
-      const list = Array.isArray(payload)
-        ? payload
-        : payload.items || payload.data || payload.results || [];
+      const list = await fetchCertificateList();
 
       const mappedResults = await Promise.allSettled(
         (list || []).map(async (item, index) => {
@@ -169,8 +170,16 @@ export default function QuanLyChungChiPage() {
           if (!certificateId) return mappedItem;
 
           try {
-            const cohortsRes = await api.get<CertificateCohortsResponse>(`/api/v1/certificates/${certificateId}/cohorts`);
-            const detailBatches = mapCohortLabels(cohortsRes.data?.cohorts);
+            const applicationsRes = await api.get<CertificateRelationResponse>(`/api/v1/certificates/${certificateId}/applications`);
+            const detailRows = getRelationRows(applicationsRes.data);
+            const detailBatches = Array.from(
+              new Set(
+                detailRows
+                  .map((row) => row.cohort_name?.trim() || (row.cohort_id != null ? String(row.cohort_id) : ""))
+                  .filter(Boolean)
+              )
+            );
+
             return {
               ...mappedItem,
               batches: detailBatches.length > 0 ? detailBatches : mappedItem.batches,
@@ -200,50 +209,71 @@ export default function QuanLyChungChiPage() {
     try {
       setLoadingExemptions(true);
       setExemptionError("");
+      const list = await fetchCertificateList();
+      const exemptionResults = await Promise.allSettled(
+        (list || []).map(async (item, index) => {
+          const certificateId = Number(item.certificate_id ?? item.id);
+          if (!Number.isFinite(certificateId)) return null;
 
-      const res = await api.get<ExemptionListResponse>("/api/v1/certificates/exemptions", {
-        params: {
-          page: 1,
-          size: 1000,
-        },
-      });
+          const certificateName = String(item.name || "").trim() || `#${certificateId}`;
 
-      const rows = Array.isArray(res.data?.data) ? res.data.data : [];
-      const grouped = new Map<number, ExemptCertificate>();
+          try {
+            const res = await api.get<CertificateRelationResponse>(`/api/v1/certificates/${certificateId}/exemptions`);
+            const rows = getRelationRows(res.data);
 
-      rows.forEach((row, index) => {
-        const certificateId = Number(row.certificate_id);
-        if (!Number.isFinite(certificateId)) return;
+            if (rows.length === 0) return null;
 
-        const current = grouped.get(certificateId) || {
-          id: certificateId || index + 1,
-          types: [],
-          batches: [],
-          majors: [],
-          exemptionPairs: [],
-        };
+            const batches = Array.from(
+              new Set(
+                rows
+                  .map((row) => row.cohort_name?.trim() || (row.cohort_id != null ? String(row.cohort_id) : ""))
+                  .filter(Boolean)
+              )
+            );
 
-        const certificateName = row.certificate_name?.trim();
-        const cohortLabel = (row.cohort_name?.trim() || (row.cohort_id != null ? String(row.cohort_id) : "")).trim();
-        const majorLabel = (row.major_name?.trim() || (row.major_id != null ? String(row.major_id) : "")).trim();
+            const majors = Array.from(
+              new Set(
+                rows
+                  .map((row) => row.major_name?.trim() || (row.major_id != null ? String(row.major_id) : ""))
+                  .filter(Boolean)
+              )
+            );
 
-        if (certificateName && !current.types.includes(certificateName)) current.types.push(certificateName);
-        if (cohortLabel && !current.batches.includes(cohortLabel)) current.batches.push(cohortLabel);
-        if (majorLabel && !current.majors.includes(majorLabel)) current.majors.push(majorLabel);
+            const exemptionPairs = Array.from(
+              new Set(
+                rows
+                  .map((row) => {
+                    const cohortId = Number(row.cohort_id);
+                    const majorId = Number(row.major_id);
+                    if (!Number.isFinite(cohortId) || !Number.isFinite(majorId)) return null;
+                    return `${cohortId}-${majorId}`;
+                  })
+                  .filter((value): value is string => !!value)
+              )
+            ).map((value) => {
+              const [cohortId, majorId] = value.split("-").map(Number);
+              return { cohort_id: cohortId, major_id: majorId };
+            });
 
-        const cohortId = Number(row.cohort_id);
-        const majorId = Number(row.major_id);
-        if (Number.isFinite(cohortId) && Number.isFinite(majorId)) {
-          const exists = current.exemptionPairs?.some((pair) => pair.cohort_id === cohortId && pair.major_id === majorId);
-          if (!exists) {
-            current.exemptionPairs = [...(current.exemptionPairs || []), { cohort_id: cohortId, major_id: majorId }];
+            return {
+              id: certificateId || index + 1,
+              types: [certificateName],
+              batches,
+              majors,
+              exemptionPairs,
+            } as ExemptCertificate;
+          } catch {
+            return null;
           }
-        }
+        })
+      );
 
-        grouped.set(certificateId, current);
-      });
+      const mapped = exemptionResults
+        .filter((result): result is PromiseFulfilledResult<ExemptCertificate | null> => result.status === "fulfilled")
+        .map((result) => result.value)
+        .filter((item): item is ExemptCertificate => item != null);
 
-      setExemptCertificates(Array.from(grouped.values()));
+      setExemptCertificates(mapped);
     } catch (err) {
       console.error("Load certificate exemptions failed", err);
       setExemptionError("Không thể tải danh sách miễn chứng chỉ");

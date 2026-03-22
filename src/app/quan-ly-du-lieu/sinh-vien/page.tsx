@@ -53,11 +53,27 @@ import { getStudents, getClasses, getCohorts } from "./student.api"
 import type { Student, ImportHistory } from "./types"
 import { sampleStudents } from "./data"
 
+function extractBackendMessage(error: any, fallback: string): string {
+  const detail = error?.response?.data?.detail
+  if (typeof detail === "string" && detail.trim()) return detail
+  if (Array.isArray(detail) && detail.length > 0) {
+    return detail
+      .map((item: any) => (typeof item === "string" ? item : item?.msg || JSON.stringify(item)))
+      .join(", ")
+  }
+
+  const message = error?.response?.data?.message || error?.message
+  if (typeof message === "string" && message.trim()) return message
+
+  return fallback
+}
+
 export default function SinhVienPage() {
   const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien")
   const [searchQuery, setSearchQuery] = useState("")
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState("")
   const [classes, setClasses] = useState<any[]>([])
   const [cohorts, setCohorts] = useState<any[]>([])
 
@@ -85,6 +101,7 @@ export default function SinhVienPage() {
   const fetchStudents = async () => {
     try {
       setLoading(true)
+      setLoadError("")
 
       // Build query params
       const params: any = {}
@@ -113,7 +130,7 @@ export default function SinhVienPage() {
         setStudents(sampleStudents.slice(0, 5))
       }
     } catch (err: any) {
-      console.error("Load sinh viên thất bại:", err.response?.status || err.message)
+      setLoadError(extractBackendMessage(err, "Không tải được danh sách sinh viên."))
       // fallback khi API lỗi: hiển thị 5 bản ghi mẫu
       setStudents(sampleStudents.slice(0, 5))
     } finally {
@@ -127,8 +144,8 @@ export default function SinhVienPage() {
       if (res?.data) {
         setClasses(Array.isArray(res.data) ? res.data : [])
       }
-    } catch (err) {
-      console.error("Load classes failed", err)
+    } catch (err: any) {
+      setLoadError(extractBackendMessage(err, "Không tải được danh sách lớp."))
     }
   }
 
@@ -138,8 +155,8 @@ export default function SinhVienPage() {
       if (res?.data) {
         setCohorts(Array.isArray(res.data) ? res.data : [])
       }
-    } catch (err) {
-      console.error("Load cohorts failed", err)
+    } catch (err: any) {
+      setLoadError(extractBackendMessage(err, "Không tải được danh sách khóa."))
     }
   }
 
@@ -360,6 +377,10 @@ export default function SinhVienPage() {
                   </Button>
                 </div>
               </div>
+
+              {loadError && (
+                <p className="mb-3 text-sm text-red-600">{loadError}</p>
+              )}
 
               {/* Card bảng – giống UserManagementTable */}
               <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">

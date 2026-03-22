@@ -16,21 +16,66 @@ type EditCertificateDialogProps = {
   onUpdate?: (data: any) => void;
 };
 
-const BATCHES = ["48K", "49K", "50K", "51K", "52K"];
+type Cohort = {
+  cohort_id: number;
+};
+
 export default function EditCertificateDialog({ open, onOpenChange, certificate, onUpdate }: EditCertificateDialogProps) {
   const [formData, setFormData] = useState<{ name: string; batches: string[] }>({ name: "", batches: [] });
+  const [cohortOptions, setCohortOptions] = useState<string[]>([]);
+  const [loadingCohorts, setLoadingCohorts] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ name?: string; batches?: string; submit?: string }>({});
 
+  const normalizeBatchValue = (value: string): string => {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+
+    const asNumber = Number(raw);
+    if (Number.isFinite(asNumber)) return String(asNumber);
+
+    const digits = raw.match(/\d+/)?.[0];
+    return digits || "";
+  };
+
+  useEffect(() => {
+    if (!open) return;
+
+    const fetchCohorts = async () => {
+      try {
+        setLoadingCohorts(true);
+        const res = await api.get<Cohort[]>("/api/v1/cohorts");
+        const cohorts = Array.isArray(res.data) ? res.data : [];
+        setCohortOptions(
+          cohorts
+            .map((cohort) => Number(cohort.cohort_id))
+            .filter((id) => Number.isFinite(id))
+            .map((id) => String(id))
+        );
+      } catch (err) {
+        console.error("Load cohorts failed", err);
+        setCohortOptions([]);
+      } finally {
+        setLoadingCohorts(false);
+      }
+    };
+
+    fetchCohorts();
+  }, [open]);
+
   useEffect(() => {
     if (certificate && open) {
+      const normalizedBatches = (Array.isArray((certificate as any).batches)
+        ? (certificate as any).batches
+        : (certificate as any).batch
+          ? [(certificate as any).batch]
+          : [])
+        .map((value: string) => normalizeBatchValue(value))
+        .filter(Boolean);
+
       setFormData({
         name: certificate.name || "",
-        batches: Array.isArray((certificate as any).batches)
-          ? (certificate as any).batches
-          : (certificate as any).batch
-            ? [(certificate as any).batch]
-            : [],
+        batches: normalizedBatches,
       });
     }
   }, [certificate, open]);
@@ -128,10 +173,11 @@ export default function EditCertificateDialog({ open, onOpenChange, certificate,
               Khóa áp dụng <span className="text-red-500">*</span>
             </Label>
             <MultiSelect
-              options={BATCHES}
+              options={cohortOptions}
               value={formData.batches}
               onChange={handleBatchesChange}
-              placeholder="Chọn khoá áp dụng"
+              placeholder={loadingCohorts ? "Đang tải danh sách khóa..." : "Chọn khoá áp dụng"}
+              disabled={loadingCohorts || submitting}
             />
             {errors.batches && <p className="text-xs text-red-500 mt-1">{errors.batches}</p>}
           </div>

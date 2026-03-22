@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Loader2 } from "lucide-react"
 import { Student } from "../types"
 import { deleteStudent } from "../student.api"
 
@@ -32,8 +33,22 @@ export default function DeleteDialog({ open, onOpenChange, student, onSuccess }:
         window.location.reload()
       }
     } catch (err: any) {
-      console.error("Delete failed:", err)
-      setError(err.response?.data?.message || "Không thể xóa sinh viên. Vui lòng thử lại.")
+      const detail = err?.response?.data?.detail
+      const message = err?.response?.data?.message
+
+      if (Array.isArray(detail)) {
+        const joined = detail
+          .map((item) => {
+            if (typeof item === "string") return item
+            if (item?.msg) return String(item.msg)
+            return ""
+          })
+          .filter(Boolean)
+          .join("; ")
+        setError(joined || "Không thể xóa sinh viên. Vui lòng thử lại.")
+      } else {
+        setError(detail || message || "Không thể xóa sinh viên. Vui lòng thử lại.")
+      }
     } finally {
       setLoading(false)
     }

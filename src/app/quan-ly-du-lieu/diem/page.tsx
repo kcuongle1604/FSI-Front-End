@@ -51,6 +51,21 @@ import { getScoreMatrix, getClasses } from "./score.api"
 import type { ImportHistory } from "../sinh-vien/types"
 import type { ScoreImportResponse, StudentScore } from "./types"
 
+function extractBackendMessage(error: any, fallback: string): string {
+  const detail = error?.response?.data?.detail
+  if (typeof detail === "string" && detail.trim()) return detail
+  if (Array.isArray(detail) && detail.length > 0) {
+    return detail
+      .map((item: any) => (typeof item === "string" ? item : item?.msg || JSON.stringify(item)))
+      .join(", ")
+  }
+
+  const message = error?.response?.data?.message || error?.message
+  if (typeof message === "string" && message.trim()) return message
+
+  return fallback
+}
+
 function splitHoTen(fullName: string): { hoLot: string; ten: string } {
   const parts = fullName.trim().split(" ")
   if (parts.length <= 1) {
@@ -66,6 +81,7 @@ export default function DiemPage() {
   const [activeTab, setActiveTab] = useState("diem")
   const [searchQuery, setSearchQuery] = useState("")
   const [loading, setLoading] = useState(false)
+  const [pageError, setPageError] = useState("")
 
   // Score matrix data
   const [scoreData, setScoreData] = useState<StudentScore[]>([])
@@ -86,8 +102,8 @@ export default function DiemPage() {
       try {
         const res = await getClasses()
         setClasses(Array.isArray(res?.data) ? res.data : [])
-      } catch (err) {
-        console.error("Failed to load classes", err)
+      } catch (err: any) {
+        setPageError(extractBackendMessage(err, "Không tải được danh sách lớp."))
       }
     }
     fetchClasses()
@@ -104,11 +120,12 @@ export default function DiemPage() {
     const fetchScores = async () => {
       try {
         setLoading(true)
+        setPageError("")
         const res = await getScoreMatrix({ class_name: selectedClass })
         setScoreData(res.data.students)
         setSubjects(res.data.subjects)
-      } catch (err) {
-        console.error("Failed to load scores", err)
+      } catch (err: any) {
+        setPageError(extractBackendMessage(err, "Không tải được bảng điểm."))
         setScoreData([])
         setSubjects([])
       } finally {
@@ -264,6 +281,10 @@ export default function DiemPage() {
                   </Button>
                 </div>
               </div>
+
+              {pageError && (
+                <p className="mb-3 text-sm text-red-600">{pageError}</p>
+              )}
 
               {/* Score Table */}
               <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
@@ -451,10 +472,16 @@ export default function DiemPage() {
         onImportSuccess={(result: ScoreImportResponse) => {
           // Refresh scores if a class is selected
           if (selectedClass && selectedClass !== "all") {
-            getScoreMatrix({ class_name: selectedClass }).then((res) => {
-              setScoreData(res.data.students)
-              setSubjects(res.data.subjects)
-            })
+            getScoreMatrix({ class_name: selectedClass })
+              .then((res) => {
+                setScoreData(res.data.students)
+                setSubjects(res.data.subjects)
+              })
+              .catch((err: any) => {
+                setPageError(extractBackendMessage(err, "Không tải được bảng điểm."))
+                setScoreData([])
+                setSubjects([])
+              })
           }
         }}
       />

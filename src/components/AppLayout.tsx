@@ -48,6 +48,7 @@ const menuStructure = [
       { id: 'import-scores', label: 'Điểm', icon: FileText, path: '/quan-ly-du-lieu/diem' },
       { id: 'import-credits', label: 'Chứng chỉ', icon: Award, path: '/quan-ly-du-lieu/chung-chi' },
       { id: 'import-programs', label: 'Chương trình đào tạo', icon: BookOpen, path: '/quan-ly-du-lieu/chuong-trinh-dao-tao' },
+      { id: 'subject-management', label: 'Quản lý môn học', icon: BookOpen, path: '/quan-ly-du-lieu/quan-ly-mon-hoc' },
     ]
   },
   {

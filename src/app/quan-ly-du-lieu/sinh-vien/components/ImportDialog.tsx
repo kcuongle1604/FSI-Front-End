@@ -32,6 +32,22 @@ interface ImportDialogProps {
   isCertificateImport?: boolean
 }
 
+const INITIAL_COLUMN_MAPPINGS: Record<string, string> = {
+  mssv: 'MSSV',
+  hoTen: '',
+  lop: 'Lớp',
+  ngaySinh: 'Ngày sinh',
+  ghiChu: 'Ghi chú',
+  // Fields for other import types
+  hoLot: '',
+  ten: '',
+  ele1: '',
+  ele2: '',
+  ec1: '',
+  ec2: '',
+  b1: '',
+}
+
 export default function ImportDialog({ open, onOpenChange, onImportSuccess, importTypeOptions, classOptions, isCertificateImport = false }: ImportDialogProps) {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importError, setImportError] = useState<string>("")
@@ -43,21 +59,7 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
   )
   const [targetClass, setTargetClass] = useState<string>("")
 
-  const [columnMappings, setColumnMappings] = useState<Record<string, string>>({
-    mssv: 'MSSV',
-    hoTen: '',
-    lop: 'Lớp',
-    ngaySinh: 'Ngày sinh',
-    ghiChu: 'Ghi chú',
-    // Fields for other import types
-    hoLot: '',
-    ten: '',
-    ele1: '',
-    ele2: '',
-    ec1: '',
-    ec2: '',
-    b1: '',
-  })
+  const [columnMappings, setColumnMappings] = useState<Record<string, string>>(INITIAL_COLUMN_MAPPINGS)
 
   // API integration states
   const [loading, setLoading] = useState(false)
@@ -129,24 +131,109 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
         const headers = lines[0].split(',').map(h => h.trim().replace(/\r$/, ''))
         setCsvHeaders(headers)
 
+        const normalizeHeader = (value: string) =>
+          value
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, "")
+
+        const normalizedHeaderMap = new Map<string, string>()
+        headers.forEach((header) => {
+          const key = normalizeHeader(header)
+          if (key && !normalizedHeaderMap.has(key)) {
+            normalizedHeaderMap.set(key, header)
+          }
+        })
+
+        const findHeader = (candidates: string[]): string | undefined => {
+          for (const candidate of candidates) {
+            const matched = normalizedHeaderMap.get(normalizeHeader(candidate))
+            if (matched) return matched
+          }
+          return undefined
+        }
+
         // Auto-map if column names match - using correct keys from columnMappings
         const autoMapping: Record<string, string> = {}
 
         // For student import mode
         if (!isAggregateScoreImport && !isEnglishScoreImport) {
-          if (headers.includes('Mã sinh viên')) autoMapping.mssv = 'Mã sinh viên'
-          if (headers.includes('MSSV')) autoMapping.mssv = 'MSSV'
-          if (headers.includes('Họ và tên')) autoMapping.hoTen = 'Họ và tên'
-          if (headers.includes('Lớp')) autoMapping.lop = 'Lớp'
-          if (headers.includes('Ngày sinh')) autoMapping.ngaySinh = 'Ngày sinh'
-          if (headers.includes('Ghi chú')) autoMapping.ghiChu = 'Ghi chú'
+          const studentIdHeader = findHeader(['Mã sinh viên', 'MSSV', 'Ma sinh vien', 'Student ID'])
+          const fullNameHeader = findHeader(['Họ và tên', 'Họ tên', 'Ho va ten', 'Ho ten', 'Tên sinh viên', 'Ten sinh vien', 'Full name'])
+          const classHeader = findHeader(['Lớp', 'Lop', 'Class', 'Class name'])
+          const dobHeader = findHeader(['Ngày sinh', 'Ngaysinh', 'DOB', 'Date of birth'])
+          const noteHeader = findHeader(['Ghi chú', 'Ghichu', 'Note', 'Notes'])
+
+          if (studentIdHeader) autoMapping.mssv = studentIdHeader
+          if (fullNameHeader) autoMapping.hoTen = fullNameHeader
+          if (classHeader) autoMapping.lop = classHeader
+          if (dobHeader) autoMapping.ngaySinh = dobHeader
+          if (noteHeader) autoMapping.ghiChu = noteHeader
+        }
+
+        if (isAggregateScoreImport) {
+          const classHeader = findHeader(['Lớp', 'Lop', 'Class', 'Class name'])
+          const middleNameHeader = findHeader(['Họ lót', 'Ho lot', 'Middle name'])
+          const firstNameHeader = findHeader(['Tên', 'Ten', 'First name'])
+          const dobHeader = findHeader(['Ngày sinh', 'Ngaysinh', 'DOB', 'Date of birth'])
+
+          if (classHeader) autoMapping.lop = classHeader
+          if (middleNameHeader) autoMapping.hoLot = middleNameHeader
+          if (firstNameHeader) autoMapping.ten = firstNameHeader
+          if (dobHeader) autoMapping.ngaySinh = dobHeader
+        }
+
+        if (isEnglishScoreImport) {
+          const studentIdHeader = findHeader(['Mã sinh viên', 'MSSV', 'Ma sinh vien', 'Student ID'])
+          const ele1Header = findHeader(['ELE1'])
+          const ele2Header = findHeader(['ELE2'])
+          const ec1Header = findHeader(['EC1'])
+          const ec2Header = findHeader(['EC2'])
+          const b1Header = findHeader(['B1'])
+
+          if (studentIdHeader) autoMapping.mssv = studentIdHeader
+          if (ele1Header) autoMapping.ele1 = ele1Header
+          if (ele2Header) autoMapping.ele2 = ele2Header
+          if (ec1Header) autoMapping.ec1 = ec1Header
+          if (ec2Header) autoMapping.ec2 = ec2Header
+          if (b1Header) autoMapping.b1 = b1Header
         }
 
         setColumnMappings(prev => ({ ...prev, ...autoMapping }))
       }
     } catch (error) {
-      console.error('Error parsing CSV headers:', error)
+      setImportError("Không thể đọc tiêu đề file CSV. Vui lòng kiểm tra định dạng file.")
     }
+  }
+
+  const buildApiColumnMapping = (): ColumnMapping => {
+    const keyMapping: Record<string, string> = {
+      mssv: 'student_id',
+      hoTen: 'full_name',
+      lop: 'class_name',
+      ngaySinh: 'dob',
+      ghiChu: 'notes',
+      // Keep these as-is for specialized import modes unless backend requires different names
+      hoLot: 'hoLot',
+      ten: 'ten',
+      ele1: 'ele1',
+      ele2: 'ele2',
+      ec1: 'ec1',
+      ec2: 'ec2',
+      b1: 'b1',
+    }
+
+    const apiColumnMapping: ColumnMapping = {}
+    mappingFields.forEach((field) => {
+      const csvColumn = columnMappings[field.key]
+      if (!csvColumn) return
+
+      const backendKey = keyMapping[field.key] || field.key
+      apiColumnMapping[backendKey] = csvColumn
+    })
+
+    return apiColumnMapping
   }
 
   const handleFileSelect = async (file: File) => {
@@ -185,23 +272,7 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
       setLoading(true)
       setImportError("")
 
-      // Transform frontend keys to backend keys
-      const keyMapping: Record<string, string> = {
-        'mssv': 'student_id',
-        'hoTen': 'full_name',
-        'lop': 'class_name',
-        'ngaySinh': 'dob',
-        'ghiChu': 'notes'
-      }
-
-      // Build column mapping for API with transformed keys
-      const apiColumnMapping: ColumnMapping = {}
-      Object.entries(columnMappings).forEach(([frontendKey, csvColumn]) => {
-        if (csvColumn) {
-          const backendKey = keyMapping[frontendKey] || frontendKey
-          apiColumnMapping[backendKey] = csvColumn
-        }
-      })
+      const apiColumnMapping = buildApiColumnMapping()
 
       const response = await importStudents(importFile, true, apiColumnMapping) as { data: ImportAnalysisResponse }
       setDryRunResult(response.data)
@@ -237,24 +308,7 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
         return
       }
 
-      // Transform frontend keys to backend keys
-      const keyMapping: Record<string, string> = {
-        'mssv': 'student_id',
-        'hoTen': 'full_name',
-        'lop': 'class_name',
-        'ngaySinh': 'dob',
-        'ghiChu': 'notes'
-      }
-
-      // Build column mapping for API with transformed keys
-      const apiColumnMapping: ColumnMapping = {}
-      Object.entries(columnMappings).forEach(([frontendKey, csvColumn]) => {
-        if (csvColumn) {
-          // Convert frontend key to backend key
-          const backendKey = keyMapping[frontendKey] || frontendKey
-          apiColumnMapping[backendKey] = csvColumn
-        }
-      })
+      const apiColumnMapping = buildApiColumnMapping()
 
       const response = await importStudents(importFile, false, apiColumnMapping) as { data: ImportExecutionResponse }
       
@@ -266,9 +320,6 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
         onImportSuccess()
       }
     } catch (error: any) {
-      console.error("❌ Import error:", error)
-      console.error("❌ Error response:", error.response?.data)
-      
       // Extract error message from various possible formats
       let errorMessage = "Lỗi khi import. Vui lòng thử lại."
       
@@ -314,12 +365,7 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
       setMappingTab('anh-xa-cot');
       setDryRunResult(null);
       setImportResult(null);
-      setColumnMappings({
-        student_id: '',
-        full_name: '',
-        class_name: '',
-        dob: ''
-      });
+      setColumnMappings(INITIAL_COLUMN_MAPPINGS);
       setCsvHeaders([]);
     }
   }

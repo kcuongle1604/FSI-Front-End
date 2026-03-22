@@ -27,11 +27,11 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Program } from "../page";
 import ImportHistoryTab from "../../sinh-vien/components/ImportHistoryTab";
-import ImportDialog from "../../sinh-vien/components/ImportDialog";
+import ProgramSubjectsImportDialog from "../ProgramSubjectsImportDialog";
 import type { ImportHistory } from "../../sinh-vien/types";
 import CourseFormDialog, { CourseFormValues } from "../CourseFormDialog";
 import DeleteCourseDialog from "../DeleteCourseDialog";
-import { getSubjectsByProgramName, getTrainingPrograms, type Subject } from "../program.api";
+import { addSubjectToTrainingProgram, deleteSubjectFromTrainingProgram, getProgramCohorts, getSubjectsByProgramId, getTrainingPrograms, type Subject } from "../program.api";
 
 type ProgramCourse = {
   id: number;
@@ -107,6 +107,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [program, setProgram] = useState<Program | null>(null);
   const [programLoading, setProgramLoading] = useState(true);
+  const [appliedCourseNames, setAppliedCourseNames] = useState<string[]>([]);
 
   const title = program?.name ?? programNameFromUrl ?? "Chương trình đào tạo";
 
@@ -118,6 +119,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
   const [loading, setLoading] = useState(false);
   const [importHistory] = useState<ImportHistory[]>([]);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [subjectsRefreshKey, setSubjectsRefreshKey] = useState(0);
   const [isCourseDialogOpen, setIsCourseDialogOpen] = useState(false);
   const [isEditCourseDialogOpen, setIsEditCourseDialogOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<ProgramCourse | null>(null);
@@ -149,13 +151,9 @@ export default function ChuongTrinhDaoTaoDetailPage() {
           const matchedProgram = programsList.find((p: Program) => p.id === programId);
           if (matchedProgram) {
             setProgram(matchedProgram);
-          } else {
-            console.warn("⚠️ Program not found with ID:", programId);
-            console.warn("Available IDs:", programsList.map((p: Program) => p.id));
           }
         }
       } catch (err) {
-        console.error("Failed to load training programs:", err);
       } finally {
         setProgramLoading(false);
       }
@@ -164,9 +162,31 @@ export default function ChuongTrinhDaoTaoDetailPage() {
     fetchPrograms();
   }, [programId, programNameFromUrl]);
 
-  // Fetch subjects when program name is available
   useEffect(() => {
-    if (!program?.name || program.name === "Chương trình đào tạo") return;
+    if (!Number.isFinite(programId) || programId <= 0) {
+      setAppliedCourseNames([]);
+      return;
+    }
+
+    const fetchAppliedCourses = async () => {
+      try {
+        const response = await getProgramCohorts(programId);
+        const cohorts = Array.isArray(response?.data) ? response.data : [];
+        const names = cohorts
+          .map((cohort: any) => String(cohort?.name || cohort?.cohort_id || "").trim())
+          .filter(Boolean);
+        setAppliedCourseNames(names);
+      } catch {
+        setAppliedCourseNames([]);
+      }
+    };
+
+    fetchAppliedCourses();
+  }, [programId, subjectsRefreshKey]);
+
+  // Fetch subjects when training program ID is available
+  useEffect(() => {
+    if (!Number.isFinite(programId) || programId <= 0) return;
 
     const fetchSubjects = async () => {
       try {
@@ -176,7 +196,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
         let page = 1;
 
         while (true) {
-          const response = await getSubjectsByProgramName(program.name, page, size);
+          const response = await getSubjectsByProgramId(programId, page, size);
           const payload = response?.data;
           const pageSubjects = Array.isArray(payload)
             ? payload
@@ -193,10 +213,10 @@ export default function ChuongTrinhDaoTaoDetailPage() {
           // Map API response to ProgramCourse structure
           const mappedCourses: ProgramCourse[] = allSubjects.map((subject: Subject, index: number) => ({
             id: index + 1,
-            specialization: program.name,
+            specialization: title,
             type: subject.is_required ? "bat-buoc" : "tu-chon",
             code: subject.subject_id,
-            name: subject.course_display_name || subject.name,
+            name: subject.name || subject.course_display_name,
             credits: subject.credits,
             compulsory: subject.is_required ? subject.credits : 0,
             optional: subject.is_required ? 0 : subject.credits,
@@ -204,13 +224,10 @@ export default function ChuongTrinhDaoTaoDetailPage() {
           
           setCourses(mappedCourses);
         } else {
-          console.warn("⚠️ No subjects returned for program:", program.name);
           setCourses([]);
         }
       } catch (err: any) {
-        console.error("❌ Failed to load subjects for program:", program.name, err);
         if (err.response?.status === 404) {
-          console.warn("Program not found in backend:", program.name);
         }
         setCourses([]);
       } finally {
@@ -219,7 +236,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
     };
 
     fetchSubjects();
-  }, [program]);
+  }, [programId, subjectsRefreshKey, title]);
 
   const filteredCourses = courses.filter((course) => {
     const query = searchQuery.toLowerCase();
@@ -239,25 +256,26 @@ export default function ChuongTrinhDaoTaoDetailPage() {
     setPage(Math.max(1, Math.min(totalPages, p)));
   };
 
-  const handleAddCourse = (values: CourseFormValues) => {
-    setCourses((prev) => {
-      const nextId = prev.length > 0 ? Math.max(...prev.map((c) => c.id)) + 1 : 1;
-      const credits = values.credits;
-      const isCompulsory = values.type === "bat-buoc";
+  const handleAddCourse = async (values: CourseFormValues) => {
+    if (!Number.isFinite(programId) || programId <= 0) return;
 
-      const newCourse: ProgramCourse = {
-        id: nextId,
-        specialization: values.specialization,
-        type: values.type,
-        code: values.code,
-        name: values.name,
-        credits,
-        compulsory: isCompulsory ? credits : 0,
-        optional: isCompulsory ? 0 : credits,
-      };
+    try {
+      await addSubjectToTrainingProgram({
+        program_subject_id: 0,
+        training_program_id: programId,
+        subject_id: values.code,
+        credits: values.credits,
+        is_required: values.type === "bat-buoc",
+      });
 
-      return [...prev, newCourse];
-    });
+      setSubjectsRefreshKey((prev) => prev + 1);
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        "Không thể thêm học phần vào chương trình đào tạo."
+      throw new Error(String(message))
+    }
   };
 
   const handleEditCourse = (values: CourseFormValues) => {
@@ -284,11 +302,29 @@ export default function ChuongTrinhDaoTaoDetailPage() {
     );
   };
 
-  const handleDeleteCourse = () => {
+  const handleDeleteCourse = async () => {
     if (!deletingCourse) return;
 
-    setCourses((prev) => prev.filter((course) => course.id !== deletingCourse.id));
-    setDeletingCourse(null);
+    if (!Number.isFinite(programId) || programId <= 0) {
+      throw new Error("Không xác định được chương trình đào tạo.")
+    }
+
+    if (!deletingCourse.code || deletingCourse.code === "-") {
+      throw new Error("Mã học phần không hợp lệ.")
+    }
+
+    try {
+      await deleteSubjectFromTrainingProgram(programId, deletingCourse.code)
+      setCourses((prev) => prev.filter((course) => course.id !== deletingCourse.id));
+      setDeletingCourse(null);
+      setSubjectsRefreshKey((prev) => prev + 1);
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        "Không thể xóa học phần khỏi chương trình đào tạo."
+      throw new Error(String(message))
+    }
   };
 
   return (
@@ -549,9 +585,11 @@ export default function ChuongTrinhDaoTaoDetailPage() {
           </div>
         </Tabs>
 
-        <ImportDialog
+        <ProgramSubjectsImportDialog
           open={isImportOpen}
           onOpenChange={setIsImportOpen}
+          programName={program?.name}
+          onImportSuccess={() => setSubjectsRefreshKey((prev) => prev + 1)}
         />
 
         <CourseFormDialog
@@ -562,7 +600,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
           initialValues={{
             specialization: title,
           }}
-          appliedCourses={program?.applicableCourses}
+          appliedCourses={appliedCourseNames}
         />
 
         <CourseFormDialog
@@ -580,7 +618,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
             credits: editingCourse?.credits ?? 0,
             type: editingCourse?.type ?? "bat-buoc",
           }}
-          appliedCourses={program?.applicableCourses}
+          appliedCourses={appliedCourseNames}
         />
 
         <DeleteCourseDialog

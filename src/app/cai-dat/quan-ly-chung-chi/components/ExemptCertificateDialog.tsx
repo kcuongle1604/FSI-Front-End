@@ -24,15 +24,23 @@ type CertificateCohort = {
   year_end?: number;
 };
 
-type CertificateCohortResponse = {
-  cohorts?: CertificateCohort[];
-};
-
 type MajorByCohort = {
   major_id: number;
   major_name?: string;
   name?: string;
 };
+
+type ExemptionApiItem = {
+  cohort_id?: number;
+  cohort_name?: string;
+  major_id?: number;
+  major_name?: string;
+  name?: string;
+};
+
+type ExemptionResponse =
+  | ExemptionApiItem[]
+  | { items?: ExemptionApiItem[]; data?: ExemptionApiItem[]; results?: ExemptionApiItem[]; exemptions?: ExemptionApiItem[] };
 
 export default function ExemptCertificateDialog({ open, onOpenChange, certificate, onUpdate, isEdit }: any) {
   const [formData, setFormData] = useState<{ certificateId: string; batches: string[] }>({ certificateId: "", batches: [] });
@@ -49,28 +57,41 @@ export default function ExemptCertificateDialog({ open, onOpenChange, certificat
   useEffect(() => {
     if (!open) return;
 
-    const fetchCertificates = async () => {
+    const fetchDialogData = async () => {
       try {
         setLoadingCertificates(true);
-        const res = await api.get<CertificateListResponse>("/api/v1/certificates", {
-          params: { page: 1, size: 100 },
-        });
+        setLoadingCohorts(true);
+        const [certificatesRes, cohortsRes] = await Promise.all([
+          api.get<CertificateListResponse>("/api/v1/certificates", {
+            params: { page: 1, size: 100 },
+          }),
+          api.get<CertificateCohort[]>("/api/v1/cohorts"),
+        ]);
 
-        const payload = res.data;
+        const payload = certificatesRes.data;
         const list = Array.isArray(payload)
           ? payload
           : payload.items || payload.data || payload.results || [];
 
         setCertificateOptions(Array.isArray(list) ? list : []);
+        const cohorts = Array.isArray(cohortsRes.data) ? cohortsRes.data : [];
+        setCohortOptions(
+          cohorts
+            .map((c) => Number(c.cohort_id))
+            .filter((id) => Number.isFinite(id))
+            .map((id) => String(id))
+        );
       } catch (err) {
-        console.error("Load certificates failed", err);
+        console.error("Load dialog data failed", err);
         setCertificateOptions([]);
+        setCohortOptions([]);
       } finally {
         setLoadingCertificates(false);
+        setLoadingCohorts(false);
       }
     };
 
-    fetchCertificates();
+    fetchDialogData();
   }, [open]);
 
   useEffect(() => {
@@ -90,29 +111,56 @@ export default function ExemptCertificateDialog({ open, onOpenChange, certificat
   }, [certificate, open]);
 
   useEffect(() => {
-    if (!open || !formData.certificateId) return;
+    if (!open || !isEdit || !formData.certificateId) return;
 
-    const fetchCertificateCohorts = async () => {
+    const getListFromPayload = (payload: ExemptionResponse): ExemptionApiItem[] => {
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload?.exemptions)) return payload.exemptions;
+      if (Array.isArray(payload?.items)) return payload.items;
+      if (Array.isArray(payload?.data)) return payload.data;
+      if (Array.isArray(payload?.results)) return payload.results;
+      return [];
+    };
+
+    const fetchExemptionsByCertificate = async () => {
       try {
-        setLoadingCohorts(true);
-        const res = await api.get<CertificateCohortResponse>(`/api/v1/certificates/${formData.certificateId}/cohorts`);
-        const cohorts = Array.isArray(res.data?.cohorts) ? res.data.cohorts : [];
-        setCohortOptions(
-          cohorts
-            .map((c) => Number(c.cohort_id))
-            .filter((id) => Number.isFinite(id))
-            .map((id) => String(id))
+        const res = await api.get<ExemptionResponse>(`/api/v1/certificates/${formData.certificateId}/exemptions`);
+        const rows = getListFromPayload(res.data);
+
+        if (!Array.isArray(rows) || rows.length === 0) return;
+
+        const uniqueBatches = Array.from(
+          new Set(
+            rows
+              .map((row) => row.cohort_id)
+              .filter((value): value is number => Number.isFinite(Number(value)))
+              .map((value) => String(value))
+          )
         );
+
+        setFormData((prev) => ({ ...prev, batches: uniqueBatches }));
+
+        const groupedMajors: Record<string, string[]> = {};
+        rows.forEach((row) => {
+          const cohortId = Number(row.cohort_id);
+          if (!Number.isFinite(cohortId)) return;
+
+          const key = String(cohortId);
+          const majorLabel = String(row.major_name || row.name || row.major_id || "").trim();
+          if (!majorLabel) return;
+
+          if (!Array.isArray(groupedMajors[key])) groupedMajors[key] = [];
+          if (!groupedMajors[key].includes(majorLabel)) groupedMajors[key].push(majorLabel);
+        });
+
+        setBatchMajors(groupedMajors);
       } catch (err) {
-        console.error("Load certificate cohorts failed", err);
-        setCohortOptions([]);
-      } finally {
-        setLoadingCohorts(false);
+        console.error("Load certificate exemptions failed", err);
       }
     };
 
-    fetchCertificateCohorts();
-  }, [open, formData.certificateId]);
+    fetchExemptionsByCertificate();
+  }, [open, isEdit, formData.certificateId]);
 
   useEffect(() => {
     if (!open || formData.batches.length === 0) return;
@@ -191,11 +239,19 @@ export default function ExemptCertificateDialog({ open, onOpenChange, certificat
       return selectedMajorNames
         .map((majorName) => {
           const major = majorOptions.find((m) => m.name === majorName);
-          if (!major || !Number.isFinite(major.id)) return null;
+          if (major && Number.isFinite(major.id)) {
+            return {
+              cohort_id: cohortId,
+              major_id: major.id,
+            };
+          }
+
+          const fallbackMajorId = Number(majorName);
+          if (!Number.isFinite(fallbackMajorId)) return null;
 
           return {
             cohort_id: cohortId,
-            major_id: major.id,
+            major_id: fallbackMajorId,
           };
         })
         .filter((item): item is { cohort_id: number; major_id: number } => Boolean(item));

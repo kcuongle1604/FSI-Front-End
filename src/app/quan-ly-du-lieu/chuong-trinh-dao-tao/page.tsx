@@ -21,6 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   Edit,
   Trash2,
@@ -41,11 +42,13 @@ import { getStudents } from "../sinh-vien/student.api"
 import type { Student, ImportHistory } from "../sinh-vien/types"
 import { sampleStudents, classesByCourse } from "../sinh-vien/data"
 import ProgramFormDialog, { ProgramFormValues } from "./ProgramFormDialog"
-import { getTrainingPrograms, getProgramCohorts, type Cohort } from "./program.api"
+import { deleteTrainingProgram, getTrainingPrograms, getProgramCohorts, type Cohort } from "./program.api"
 
 export type Program = {
   id: number
   name: string
+  majorId?: number
+  majorName?: string
   specialization?: string
   applicableCourses?: string[]
   appliedCourses?: string[]
@@ -76,53 +79,56 @@ export default function ChuongTrinhDaoTaoPage() {
   const [loadingPrograms, setLoadingPrograms] = useState(false)
   const [editingProgram, setEditingProgram] = useState<Program | null>(null)
   const [programCohorts, setProgramCohorts] = useState<Map<number, string[]>>(new Map())
+  const [openDeleteProgramDialog, setOpenDeleteProgramDialog] = useState(false)
+  const [deletingProgram, setDeletingProgram] = useState<Program | null>(null)
+  const [deletingProgramLoading, setDeletingProgramLoading] = useState(false)
+  const [deleteProgramError, setDeleteProgramError] = useState("")
+
+  const refreshPrograms = async () => {
+    try {
+      setLoadingPrograms(true)
+      const response = await getTrainingPrograms()
+      if (response?.data && Array.isArray(response.data)) {
+        const programsList = response.data.map((p: any) => {
+          const programId = p.training_program_id || p.program_id || p.id
+          const normalizedName = String(p.program_name ?? p.name ?? p.major_name ?? "").trim()
+          return {
+            id: programId,
+            name: normalizedName,
+            majorId: p.major_id,
+            majorName: p.major_name,
+            specialization: p.specialization,
+            applicableCourses: p.applicable_courses || p.applicableCourses || [],
+          }
+        })
+        setPrograms(programsList)
+
+        const cohortsMap = new Map<number, string[]>()
+        await Promise.all(
+          programsList.map(async (program) => {
+            try {
+              const cohortsResponse = await getProgramCohorts(program.id)
+              if (cohortsResponse?.data && Array.isArray(cohortsResponse.data)) {
+                const cohortIds = cohortsResponse.data.map((c: Cohort) => String(c.cohort_id))
+                cohortsMap.set(program.id, cohortIds)
+              }
+            } catch {
+              cohortsMap.set(program.id, [])
+            }
+          })
+        )
+        setProgramCohorts(cohortsMap)
+      }
+    } catch {
+      setPrograms(INITIAL_PROGRAMS)
+    } finally {
+      setLoadingPrograms(false)
+    }
+  }
 
   // Fetch training programs from API
   useEffect(() => {
-    const fetchPrograms = async () => {
-      try {
-        setLoadingPrograms(true)
-        const response = await getTrainingPrograms()
-        if (response?.data && Array.isArray(response.data)) {
-          const programsList = response.data.map((p: any) => {
-            const programId = p.training_program_id || p.program_id || p.id
-            return {
-              id: programId,
-              name: p.program_name || p.name,
-              specialization: p.specialization,
-              applicableCourses: p.applicable_courses || p.applicableCourses || [],
-            }
-          })
-          setPrograms(programsList)
-          
-          // Fetch cohorts for each program
-          const cohortsMap = new Map<number, string[]>()
-          await Promise.all(
-            programsList.map(async (program) => {
-              try {
-                const cohortsResponse = await getProgramCohorts(program.id)
-                if (cohortsResponse?.data && Array.isArray(cohortsResponse.data)) {
-                  const cohortIds = cohortsResponse.data.map((c: Cohort) => String(c.cohort_id))
-                  cohortsMap.set(program.id, cohortIds)
-                }
-              } catch (err) {
-                console.error(`❌ Failed to load cohorts for program ${program.id}:`, err)
-                cohortsMap.set(program.id, [])
-              }
-            })
-          )
-          setProgramCohorts(cohortsMap)
-        }
-      } catch (err) {
-        console.error("Failed to load training programs:", err)
-        // Fallback to initial data if API fails
-        setPrograms(INITIAL_PROGRAMS)
-      } finally {
-        setLoadingPrograms(false)
-      }
-    }
-
-    fetchPrograms()
+    refreshPrograms()
   }, [])
 
   useEffect(() => {
@@ -145,8 +151,7 @@ export default function ChuongTrinhDaoTaoPage() {
         } else {
           setStudents(sampleStudents.slice(0, 5))
         }
-      } catch (err) {
-        console.error("Load sinh viên thất bại", err)
+      } catch {
         setStudents(sampleStudents.slice(0, 5))
       } finally {
         setLoading(false)
@@ -160,9 +165,12 @@ export default function ChuongTrinhDaoTaoPage() {
     const query = searchQuery.toLowerCase()
     if (!query) return true
 
+    const programName = String(p.name ?? "").toLowerCase()
+    const courses = (p.applicableCourses ?? p.appliedCourses ?? []).map((c) => String(c).toLowerCase())
+
     return (
-      p.name.toLowerCase().includes(query) ||
-      (p.applicableCourses ?? p.appliedCourses ?? []).some((c: string) => c.toLowerCase().includes(query))
+      programName.includes(query) ||
+      courses.some((c) => c.includes(query))
     )
   })
 
@@ -193,38 +201,33 @@ export default function ChuongTrinhDaoTaoPage() {
   }
 
   const handleSaveProgram = async (data: ProgramFormValues) => {
-    // Refresh the programs list after successful save
+    await refreshPrograms()
+  }
+
+  const handleDeleteProgram = async (program: Program) => {
+    setDeletingProgram(program)
+    setDeleteProgramError("")
+    setOpenDeleteProgramDialog(true)
+  }
+
+  const handleConfirmDeleteProgram = async () => {
+    if (!deletingProgram) return
+
     try {
-      const response = await getTrainingPrograms()
-      if (response?.data && Array.isArray(response.data)) {
-        const programsList = response.data.map((p: any) => ({
-          id: p.training_program_id || p.program_id || p.id,
-          name: p.program_name || p.name,
-          specialization: p.specialization,
-          applicableCourses: p.applicable_courses || p.applicableCourses || [],
-        }))
-        setPrograms(programsList)
-        
-        // Refresh cohorts for all programs
-        const cohortsMap = new Map<number, string[]>()
-        await Promise.all(
-          programsList.map(async (program) => {
-            try {
-              const cohortsResponse = await getProgramCohorts(program.id)
-              if (cohortsResponse?.data && Array.isArray(cohortsResponse.data)) {
-                const cohortIds = cohortsResponse.data.map((c: Cohort) => String(c.cohort_id))
-                cohortsMap.set(program.id, cohortIds)
-              }
-            } catch (err) {
-              console.error(`Failed to load cohorts for program ${program.id}:`, err)
-              cohortsMap.set(program.id, [])
-            }
-          })
-        )
-        setProgramCohorts(cohortsMap)
-      }
-    } catch (err) {
-      console.error("Failed to refresh training programs:", err)
+      setDeletingProgramLoading(true)
+      setDeleteProgramError("")
+      await deleteTrainingProgram(deletingProgram.id)
+      await refreshPrograms()
+      setOpenDeleteProgramDialog(false)
+      setDeletingProgram(null)
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        "Không thể xóa chương trình đào tạo. Vui lòng thử lại."
+      setDeleteProgramError(String(message))
+    } finally {
+      setDeletingProgramLoading(false)
     }
   }
 
@@ -349,7 +352,7 @@ export default function ChuongTrinhDaoTaoPage() {
                                     router.push(`/quan-ly-du-lieu/chuong-trinh-dao-tao/${program.id}?name=${encodeURIComponent(program.name)}`)
                                   }}
                                 >
-                                  {program.name}
+                                  {program.majorName || "-"}
                                 </button>
                               </TableCell>
                               <TableCell className="h-12 px-4 text-sm text-gray-600">
@@ -375,6 +378,12 @@ export default function ChuongTrinhDaoTaoPage() {
                                       onClick={() => handleEditProgram(program)}
                                     >
                                       Sửa
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="text-sm text-red-600 focus:text-red-600"
+                                      onClick={() => handleDeleteProgram(program)}
+                                    >
+                                      Xóa
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
@@ -448,14 +457,13 @@ export default function ChuongTrinhDaoTaoPage() {
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         onSave={handleSaveProgram}
-        existingProgramNames={programs.map((p) => p.name)}
+        programId={editingProgram?.id}
         initialData={
           editingProgram
             ? {
-                name: editingProgram.name,
-                major_id: undefined,
+                major_id: editingProgram.majorId ?? 0,
                 description: undefined,
-                cohort_ids: [],
+                cohort_ids: programCohorts.get(editingProgram.id)?.map((value) => Number(value)).filter((value) => Number.isFinite(value)) || [],
               }
             : null
         }
@@ -465,6 +473,45 @@ export default function ChuongTrinhDaoTaoPage() {
         onOpenChange={setIsDeleteOpen}
         student={selectedStudent}
       />
+
+      <Dialog open={openDeleteProgramDialog} onOpenChange={setOpenDeleteProgramDialog}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Xóa chương trình đào tạo?</DialogTitle>
+          </DialogHeader>
+
+          <div className="py-2 space-y-2">
+            <p className="text-sm text-gray-700">
+              Bạn có chắc chắn muốn xóa chương trình đào tạo này?
+            </p>
+            {deleteProgramError && (
+              <p className="text-sm text-red-600">{deleteProgramError}</p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (deletingProgramLoading) return
+                setOpenDeleteProgramDialog(false)
+                setDeletingProgram(null)
+                setDeleteProgramError("")
+              }}
+              disabled={deletingProgramLoading}
+            >
+              Hủy
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={handleConfirmDeleteProgram}
+              disabled={deletingProgramLoading}
+            >
+              {deletingProgramLoading ? "Đang xóa..." : "Xóa"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   )
 }

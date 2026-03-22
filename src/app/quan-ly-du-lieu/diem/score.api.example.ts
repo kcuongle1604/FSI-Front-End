@@ -6,20 +6,21 @@ import { uploadScores } from './score.api'
 
 async function handleScoreUpload(file: File) {
     try {
-        const response = await uploadScores(file)
+        const semesterId = 1 // Replace with selected semester ID from UI
+        const response = await uploadScores(file, semesterId)
 
         if (response.data.error_message) {
-            console.error('Error:', response.data.error_message)
+            throw new Error(response.data.error_message)
         }
 
         return response.data
     } catch (error: any) {
         if (error.response?.status === 422) {
-            console.error('Validation errors:', error.response.data.detail)
-        } else {
-            console.error('Upload failed:', error.message)
+            const detail = error.response.data.detail
+            throw new Error(Array.isArray(detail) ? detail.map((item: any) => item?.msg || String(item)).join(", ") : "Validation errors")
         }
-        throw error
+
+        throw new Error(error.response?.data?.detail || error.message || "Upload failed")
     }
 }
 

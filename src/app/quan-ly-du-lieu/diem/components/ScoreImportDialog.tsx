@@ -1,11 +1,29 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AlertCircle, FileText, Upload, CheckCircle2, Loader2 } from "lucide-react"
-import { uploadScores } from "../score.api"
+import { getSemesters, uploadScores } from "../score.api"
 import type { ScoreImportResponse } from "../types"
+import type { Semester } from "../score.api"
+
+function extractBackendMessage(error: any, fallback: string): string {
+    const detail = error?.response?.data?.detail
+    if (typeof detail === "string" && detail.trim()) return detail
+    if (Array.isArray(detail) && detail.length > 0) {
+        return detail
+            .map((item: any) => (typeof item === "string" ? item : item?.msg || JSON.stringify(item)))
+            .join(", ")
+    }
+
+    const message = error?.response?.data?.message || error?.message
+    if (typeof message === "string" && message.trim()) return message
+
+    return fallback
+}
 
 interface ScoreImportDialogProps {
     open: boolean
@@ -19,6 +37,137 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
     const [loading, setLoading] = useState(false)
     const [importResult, setImportResult] = useState<ScoreImportResponse | null>(null)
     const [importStep, setImportStep] = useState<'upload' | 'result'>('upload')
+    const [semesters, setSemesters] = useState<Semester[]>([])
+    const [selectedSemesterId, setSelectedSemesterId] = useState<string>("")
+    const [loadingSemesters, setLoadingSemesters] = useState(false)
+
+    const getSemesterLabel = (semester: Semester): string => {
+        return (
+            semester.semester_name ||
+            semester.name ||
+            [semester.term, semester.academic_year].filter(Boolean).join(" - ") ||
+            semester.code ||
+            `Kỳ #${semester.id ?? semester.semester_id ?? "N/A"}`
+        )
+    }
+
+    const getSemesterId = (semester: Semester): number | null => {
+        const rawId = semester.id ?? semester.semester_id
+        if (typeof rawId !== "number" || Number.isNaN(rawId)) {
+            return null
+        }
+        return rawId
+    }
+
+    const parseSuccessFromText = (text: string): { total: number; success: number } | null => {
+        const normalized = text.toLowerCase()
+        if (!normalized.includes("thành công")) return null
+
+        const ratioMatch = text.match(/(\d+)\s*\/\s*(\d+)/)
+        if (!ratioMatch) return { total: 0, success: 0 }
+
+        const success = Number(ratioMatch[1])
+        const total = Number(ratioMatch[2])
+        if (!Number.isFinite(success) || !Number.isFinite(total)) return { total: 0, success: 0 }
+
+        return { total, success }
+    }
+
+    const extractCandidateText = (value: any): string => {
+        if (!value) return ""
+        if (typeof value === "string") return value
+        if (Array.isArray(value)) {
+            return value.map((item) => extractCandidateText(item)).join(" ")
+        }
+        if (typeof value === "object") {
+            return Object.values(value).map((item) => extractCandidateText(item)).join(" ")
+        }
+        return String(value)
+    }
+
+    const buildImportResult = (payload: any): ScoreImportResponse => {
+        const payloadText = extractCandidateText(payload)
+        const recoveredFromText = parseSuccessFromText(payloadText)
+
+        const totalProcessed = Number(payload?.total_processed ?? payload?.total ?? 0)
+        const successCount = Number(payload?.success_count ?? payload?.success ?? 0)
+        const failureCount = Number(payload?.failure_count ?? payload?.failed_count ?? Math.max(0, totalProcessed - successCount))
+
+        const finalTotal = recoveredFromText ? recoveredFromText.total : (Number.isFinite(totalProcessed) ? totalProcessed : 0)
+        const finalSuccess = recoveredFromText ? recoveredFromText.success : (Number.isFinite(successCount) ? successCount : 0)
+        const finalFailure = recoveredFromText
+            ? Math.max(0, recoveredFromText.total - recoveredFromText.success)
+            : (Number.isFinite(failureCount) ? failureCount : 0)
+
+        const hasRecoveredSuccess = !!recoveredFromText
+        const resolvedStatus = hasRecoveredSuccess
+            ? (finalFailure > 0 ? "completed_with_errors" : "completed")
+            : String(payload?.status ?? (finalFailure > 0 ? "completed_with_errors" : "completed"))
+
+        return {
+            id: Number(payload?.id ?? 0),
+            file_name: String(payload?.file_name ?? importFile?.name ?? ""),
+            created_by_id: Number(payload?.created_by_id ?? 0),
+            status: resolvedStatus,
+            total_processed: finalTotal,
+            success_count: finalSuccess,
+            failure_count: finalFailure,
+            error_message: hasRecoveredSuccess ? null : (payload?.error_message ?? null),
+            created_at: String(payload?.created_at ?? new Date().toISOString()),
+        }
+    }
+
+    const buildResultFromValidationError = (error: any): ScoreImportResponse | null => {
+        const detailText = extractCandidateText(error?.response?.data)
+        const parsed = parseSuccessFromText(detailText)
+        if (!parsed) return null
+
+        return {
+            id: 0,
+            file_name: importFile?.name ?? "",
+            created_by_id: 0,
+            status: parsed.total > parsed.success ? "completed_with_errors" : "completed",
+            total_processed: parsed.total,
+            success_count: parsed.success,
+            failure_count: Math.max(0, parsed.total - parsed.success),
+            error_message: null,
+            created_at: new Date().toISOString(),
+        }
+    }
+
+    useEffect(() => {
+        const fetchSemesters = async () => {
+            if (!open) return
+
+            try {
+                setLoadingSemesters(true)
+                const res = await getSemesters({ skip: 0, limit: 100 })
+                const payload = res.data as Semester[] | { data?: Semester[]; items?: Semester[] }
+                const list = Array.isArray(payload)
+                    ? payload
+                    : Array.isArray(payload?.data)
+                        ? payload.data
+                        : Array.isArray(payload?.items)
+                            ? payload.items
+                            : []
+
+                const normalizedSemesters = list.filter((semester) => getSemesterId(semester) !== null)
+                setSemesters(normalizedSemesters)
+                if (normalizedSemesters.length === 0) {
+                    setImportError("Danh sách kỳ học không hợp lệ: thiếu semester_id.")
+                } else {
+                    setImportError("")
+                }
+            } catch (error: any) {
+                setSemesters([])
+                setImportError(extractBackendMessage(error, "Không tải được danh sách kỳ học. Vui lòng thử lại."))
+            } finally {
+                setLoadingSemesters(false)
+            }
+        }
+
+        fetchSemesters()
+    }, [open])
 
     const handleFileSelect = async (file: File) => {
         // Validate file size (50MB limit)
@@ -41,23 +190,37 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
     }
 
     const handleUpload = async () => {
-        if (!importFile) return
+        if (!importFile || !selectedSemesterId) return
 
         try {
             setLoading(true)
             setImportError("")
 
-            const response = await uploadScores(importFile)
-            setImportResult(response.data)
+            const semesterId = Number(selectedSemesterId)
+            if (!Number.isFinite(semesterId)) {
+                setImportError("Kỳ học không hợp lệ. Vui lòng chọn lại.")
+                return
+            }
+
+            const response = await uploadScores(importFile, semesterId)
+            const normalizedResult = buildImportResult(response.data)
+            setImportResult(normalizedResult)
             setImportStep('result')
 
             // Call success callback
             if (onImportSuccess) {
-                onImportSuccess(response.data)
+                onImportSuccess(normalizedResult)
             }
         } catch (error: any) {
-            console.error("❌ Upload error:", error)
-            console.error("❌ Error response:", error.response?.data)
+            const recoveredResult = buildResultFromValidationError(error)
+            if (recoveredResult) {
+                setImportResult(recoveredResult)
+                setImportStep('result')
+                if (onImportSuccess) {
+                    onImportSuccess(recoveredResult)
+                }
+                return
+            }
 
             // Handle validation errors
             if (error.response?.status === 422) {
@@ -82,6 +245,7 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
             // Reset all states
             setImportFile(null)
             setImportError("")
+            setSelectedSemesterId("")
             setImportStep('upload')
             setImportResult(null)
         }
@@ -94,6 +258,29 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
                 <DialogDescription>Chọn file CSV chứa dữ liệu điểm</DialogDescription>
             </DialogHeader>
             <div className="pt-0 pb-4">
+                <div className="mb-3 grid gap-2">
+                    <Label>
+                        Kỳ học <span className="text-red-500">*</span>
+                    </Label>
+                    <Select value={selectedSemesterId} onValueChange={setSelectedSemesterId}>
+                        <SelectTrigger className="bg-white">
+                            <SelectValue placeholder={loadingSemesters ? "Đang tải danh sách kỳ..." : "Chọn kỳ học"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {semesters.map((semester) => {
+                                const semesterId = getSemesterId(semester)
+                                if (semesterId === null) return null
+
+                                return (
+                                <SelectItem key={semesterId} value={String(semesterId)}>
+                                    {getSemesterLabel(semester)}
+                                </SelectItem>
+                                )
+                            })}
+                        </SelectContent>
+                    </Select>
+                </div>
+
                 {importError && (
                     <div className="flex items-center gap-2 text-red-600 text-sm mb-3">
                         <AlertCircle className="h-4 w-4" /><span>{importError}</span>
@@ -147,7 +334,7 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
                 <Button variant="outline" onClick={() => handleOpenChange(false)}>Hủy</Button>
                 <Button
                     className="bg-[#167FFC] hover:bg-[#1470E3]"
-                    disabled={!importFile || !!importError || loading}
+                    disabled={!importFile || !selectedSemesterId || !!importError || loading || loadingSemesters || semesters.length === 0}
                     onClick={handleUpload}
                 >
                     {loading ? (
