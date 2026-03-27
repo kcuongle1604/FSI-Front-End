@@ -1,7 +1,7 @@
 // Popup Import (Chứa toàn bộ logic phức tạp của import)
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, FileText, Upload, CheckCircle2, Loader2 } from "lucide-react"
@@ -15,10 +15,25 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select"
-import { importStudents, importStudentCertificatesHtml } from "../student.api"
+import { getSemesters, importStudents, importStudentCertificatesCsvBySemester, importStudentCertificatesHtml } from "../student.api"
 import type { ImportAnalysisResponse, ImportExecutionResponse, ImportError, ColumnMapping } from "../types"
 
 interface ImportTypeOption {
+  value: string
+  label: string
+}
+
+type SemesterApiItem = {
+  id?: number
+  semester_id?: number
+  name?: string
+  semester_name?: string
+  term?: string
+  academic_year?: string
+  code?: string
+}
+
+type SemesterOption = {
   value: string
   label: string
 }
@@ -30,6 +45,9 @@ interface ImportDialogProps {
   importTypeOptions?: ImportTypeOption[]
   classOptions?: { value: string; label: string }[]
   isCertificateImport?: boolean
+  certificateImportFormat?: 'html' | 'csv'
+  uploadTitle?: string
+  uploadDescription?: string
 }
 
 const INITIAL_COLUMN_MAPPINGS: Record<string, string> = {
@@ -48,7 +66,17 @@ const INITIAL_COLUMN_MAPPINGS: Record<string, string> = {
   b1: '',
 }
 
-export default function ImportDialog({ open, onOpenChange, onImportSuccess, importTypeOptions, classOptions, isCertificateImport = false }: ImportDialogProps) {
+export default function ImportDialog({
+  open,
+  onOpenChange,
+  onImportSuccess,
+  importTypeOptions,
+  classOptions,
+  isCertificateImport = false,
+  certificateImportFormat = 'html',
+  uploadTitle,
+  uploadDescription,
+}: ImportDialogProps) {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importError, setImportError] = useState<string>("")
   const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'result'>('upload')
@@ -58,6 +86,9 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
     importTypeOptions && importTypeOptions.length > 0 ? importTypeOptions[0].value : ""
   )
   const [targetClass, setTargetClass] = useState<string>("")
+  const [semesters, setSemesters] = useState<SemesterOption[]>([])
+  const [selectedSemesterId, setSelectedSemesterId] = useState<string>("")
+  const [loadingSemesters, setLoadingSemesters] = useState(false)
 
   const [columnMappings, setColumnMappings] = useState<Record<string, string>>(INITIAL_COLUMN_MAPPINGS)
 
@@ -69,6 +100,12 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
 
   const isAggregateScoreImport = importType === 'diem-tong-hop'
   const isEnglishScoreImport = importType === 'diem-tieng-anh'
+  const isCertificateCsvImport = isCertificateImport && certificateImportFormat === 'csv'
+  const isCertificateHtmlImport = isCertificateImport && certificateImportFormat === 'html'
+  const resolvedUploadTitle = uploadTitle || 'Tải tệp lên'
+  const resolvedUploadDescription = uploadDescription || (isCertificateImport
+    ? (isCertificateCsvImport ? 'Chọn file Excel/CSV chứa dữ liệu chứng chỉ' : 'Chọn file HTML chứa dữ liệu chứng chỉ')
+    : 'Chọn file CSV chứa dữ liệu sinh viên')
 
   // Cấu hình cột hiển thị & bắt buộc theo loại import
   const mappingFields = isEnglishScoreImport
@@ -121,6 +158,59 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
   )
   const hasUnmappedRequired = unmappedRequiredFields.length > 0
   const allMapped = mappingFields.every((field) => !!columnMappings[field.key])
+
+  const getSemesterId = (item: SemesterApiItem): number | null => {
+    const raw = item.id ?? item.semester_id
+    const id = Number(raw)
+    return Number.isFinite(id) ? id : null
+  }
+
+  const getSemesterLabel = (item: SemesterApiItem): string => {
+    return (
+      item.semester_name ||
+      item.name ||
+      [item.term, item.academic_year].filter(Boolean).join(" - ") ||
+      item.code ||
+      `Kỳ #${item.semester_id ?? item.id ?? ""}`
+    )
+  }
+
+  useEffect(() => {
+    if (!open || !isCertificateCsvImport) return
+
+    const fetchSemesters = async () => {
+      try {
+        setLoadingSemesters(true)
+        const res = await getSemesters({ skip: 0, limit: 100 })
+        const payload = res.data as SemesterApiItem[] | { data?: SemesterApiItem[]; items?: SemesterApiItem[] }
+        const list = Array.isArray(payload) ? payload : payload.data || payload.items || []
+        const normalized = (Array.isArray(list) ? list : [])
+          .map((item) => {
+            const id = getSemesterId(item)
+            if (id === null) return null
+            return { value: String(id), label: getSemesterLabel(item) }
+          })
+          .filter((item): item is SemesterOption => item !== null)
+
+        setSemesters(normalized)
+        setSelectedSemesterId((prev) => {
+          if (prev && normalized.some((item) => item.value === prev)) return prev
+          return ""
+        })
+
+        if (normalized.length === 0) {
+          setImportError("Không có kỳ học hợp lệ để chọn.")
+        }
+      } catch {
+        setSemesters([])
+        setImportError("Không tải được danh sách kỳ học. Vui lòng thử lại.")
+      } finally {
+        setLoadingSemesters(false)
+      }
+    }
+
+    fetchSemesters()
+  }, [open, isCertificateCsvImport])
 
   // Parse CSV headers when file is selected
   const parseCSVHeaders = async (file: File) => {
@@ -244,9 +334,20 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
     }
 
     const lowerName = file.name.toLowerCase()
-    if (isCertificateImport) {
+    if (isCertificateHtmlImport) {
       if (!lowerName.endsWith('.html') && !lowerName.endsWith('.htm')) {
         setImportError("Định dạng file không hợp lệ, chỉ chấp nhận .html")
+        setImportFile(null)
+        return
+      }
+    } else if (isCertificateCsvImport) {
+      const isValidTaScoreFile =
+        lowerName.endsWith('.csv') ||
+        lowerName.endsWith('.xlsx') ||
+        lowerName.endsWith('.xls')
+
+      if (!isValidTaScoreFile) {
+        setImportError("Định dạng file không hợp lệ, chỉ chấp nhận .xlsx, .xls hoặc .csv")
         setImportFile(null)
         return
       }
@@ -298,7 +399,16 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
       setImportError("")
 
       if (isCertificateImport) {
-        await importStudentCertificatesHtml(importFile)
+        if (isCertificateCsvImport) {
+          const semesterId = Number(selectedSemesterId)
+          if (!Number.isFinite(semesterId)) {
+            setImportError("Vui lòng chọn kỳ học trước khi import.")
+            return
+          }
+          await importStudentCertificatesCsvBySemester(importFile, semesterId)
+        } else {
+          await importStudentCertificatesHtml(importFile)
+        }
 
         if (onImportSuccess) {
           onImportSuccess()
@@ -367,19 +477,18 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
       setImportResult(null);
       setColumnMappings(INITIAL_COLUMN_MAPPINGS);
       setCsvHeaders([]);
+      setSelectedSemesterId("");
     }
   }
 
   const uploadStepContent = (
     <>
       <DialogHeader>
-        <DialogTitle>Tải tệp lên</DialogTitle>
-        <DialogDescription>
-          {isCertificateImport ? "Chọn file HTML chứa dữ liệu chứng chỉ" : "Chọn file CSV chứa dữ liệu sinh viên"}
-        </DialogDescription>
+        <DialogTitle>{resolvedUploadTitle}</DialogTitle>
+        <DialogDescription>{resolvedUploadDescription}</DialogDescription>
       </DialogHeader>
       <div className="pt-0 pb-4">
-        {(importTypeOptions && importTypeOptions.length > 0) || (classOptions && classOptions.length > 0) ? (
+        {!isCertificateImport && ((importTypeOptions && importTypeOptions.length > 0) || (classOptions && classOptions.length > 0)) ? (
           <div className="flex items-center justify-end gap-2 mt-2 mb-2">
             {importTypeOptions && importTypeOptions.length > 0 && (
               <Select value={importType} onValueChange={setImportType}>
@@ -411,6 +520,25 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
             )}
           </div>
         ) : null}
+        {isCertificateCsvImport && (
+          <div className="mt-2 mb-3">
+            <p className="text-sm font-medium text-gray-700 mb-1">
+              Kỳ học <span className="text-red-500">*</span>
+            </p>
+            <Select value={selectedSemesterId} onValueChange={setSelectedSemesterId}>
+              <SelectTrigger className="h-9 bg-white">
+                <SelectValue placeholder={loadingSemesters ? "Đang tải danh sách kỳ..." : "Chọn kỳ học"} />
+              </SelectTrigger>
+              <SelectContent>
+                {semesters.map((semester) => (
+                  <SelectItem key={semester.value} value={semester.value}>
+                    {semester.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         {importError && (
           <div className="flex items-center gap-2 text-red-600 text-sm mb-3">
             <AlertCircle className="h-4 w-4" /><span>{importError}</span>
@@ -440,20 +568,20 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
             <>
               <p className="text-gray-800 font-medium mb-1">{importFile.name}</p>
               <p className="text-xs text-gray-500 mb-3">
-                {isCertificateImport ? "Định dạng HTML (.html)" : "Định dạng CSV (.csv)"}, {(importFile.size / 1024).toFixed(2)}KB
+                {isCertificateHtmlImport ? "Định dạng HTML (.html)" : "Định dạng Excel/CSV (.xlsx, .xls, .csv)"}, {(importFile.size / 1024).toFixed(2)}KB
               </p>
             </>
           ) : (
             <>
               <p className="text-gray-800 font-medium mb-1">Chọn một tệp hoặc kéo và thả vào đây</p>
               <p className="text-xs text-gray-500 mb-3">
-                {isCertificateImport ? "Định dạng HTML (.html)" : "Định dạng CSV (.csv)"}, dung lượng tối đa 50MB
+                {isCertificateHtmlImport ? "Định dạng HTML (.html)" : "Định dạng Excel/CSV (.xlsx, .xls, .csv)"}, dung lượng tối đa 50MB
               </p>
             </>
           )}
           <Button variant="outline" size="sm" onClick={() => {
             const input = document.createElement('input')
-            input.type = 'file'; input.accept = isCertificateImport ? '.html,.htm,text/html' : '.csv'
+            input.type = 'file'; input.accept = isCertificateHtmlImport ? '.html,.htm,text/html' : '.xlsx,.xls,.csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             input.onchange = (e) => {
               const file = (e.target as HTMLInputElement).files?.[0]
               if (file) {
@@ -468,7 +596,7 @@ export default function ImportDialog({ open, onOpenChange, onImportSuccess, impo
         <Button variant="outline" onClick={() => handleOpenChange(false)}>Hủy</Button>
         <Button
           className="bg-[#167FFC] hover:bg-[#1470E3]"
-          disabled={!importFile || !!importError || loading}
+          disabled={!importFile || !!importError || loading || (isCertificateCsvImport && (!selectedSemesterId || loadingSemesters || semesters.length === 0))}
           onClick={() => {
             if (isCertificateImport) {
               handleActualImport()

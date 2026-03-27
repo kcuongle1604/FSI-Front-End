@@ -30,10 +30,10 @@ type XetTotNghiep = {
   class: string
   year: string
   course: string
-  tcbb: number
-  tctc: number
-  totalCredits: number
-  gpa: number
+  tcbb: string
+  tctc: string
+  totalCredits: string
+  gpa: string
   ccdr: string
   program: string
   status: string
@@ -134,6 +134,19 @@ function extractBackendMessage(error: any, fallback: string): string {
   if (typeof message === "string" && message.trim()) return message
 
   return fallback
+}
+
+function formatProgress(earned: unknown, required: unknown, fractionDigits = 0): string {
+  const earnedNum = Number(earned)
+  const requiredNum = Number(required)
+
+  const formatValue = (value: number) =>
+    fractionDigits > 0 ? value.toFixed(fractionDigits) : String(Math.trunc(value))
+
+  const earnedText = Number.isFinite(earnedNum) ? formatValue(earnedNum) : "-"
+  const requiredText = Number.isFinite(requiredNum) ? formatValue(requiredNum) : "-"
+
+  return `${earnedText}/${requiredText}`
 }
 
 export default function XetTotNghiepPage() {
@@ -326,10 +339,10 @@ export default function XetTotNghiepPage() {
             class: String(student.class_name || classInfo.class_name || "-"),
             year: selectedSemesterLabel,
             course: String(classInfo.cohort_name || classInfo.cohort_id || "-"),
-            tcbb: Number(student.required_credits_earned ?? 0),
-            tctc: Number(student.elective_credits_earned ?? 0),
-            totalCredits: Number(student.total_credits_earned ?? 0),
-            gpa: Number(student.gpa ?? 0),
+            tcbb: formatProgress(student.required_credits_earned, classInfo.required_credits),
+            tctc: formatProgress(student.elective_credits_earned, classInfo.elective_credits),
+            totalCredits: formatProgress(student.total_credits_earned, classInfo.total_credits),
+            gpa: formatProgress(student.gpa, classInfo.gpa, 2),
             ccdr: totalCertificates > 0 ? `${certificates}/${totalCertificates}` : String(certificates),
             program: String(student.program_status || "-"),
             status: String(student.graduation_status || "-"),

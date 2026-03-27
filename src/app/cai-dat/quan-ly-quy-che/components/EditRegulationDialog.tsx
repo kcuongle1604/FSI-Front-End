@@ -27,11 +27,21 @@ type EditRegulationDialogProps = {
   onUpdate?: (data: any) => void;
 };
 
+const DEFAULT_MIN_TOTAL_CREDITS = 120;
+const DEFAULT_MIN_REQUIRED_CREDITS = 90;
+const DEFAULT_MIN_ELECTIVE_CREDITS = 30;
+const DEFAULT_MIN_GPA = 2.0;
+
+const toNumberWithDefault = (raw: string, fallback: number): number | null => {
+  if (!raw.trim()) return fallback;
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 export default function EditRegulationDialog({ open, onOpenChange, regulation, onUpdate }: EditRegulationDialogProps) {
-  const [certificateOptions, setCertificateOptions] = useState<string[]>([]);
   const [cohortOptions, setCohortOptions] = useState<string[]>([]);
   const [majorOptionsByCohort, setMajorOptionsByCohort] = useState<Record<string, { id: number; name: string }[]>>({});
-  const [loadingCertificates, setLoadingCertificates] = useState(false);
   const [loadingCohorts, setLoadingCohorts] = useState(false);
   const [loadingMajorsByCohort, setLoadingMajorsByCohort] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState({
@@ -40,52 +50,12 @@ export default function EditRegulationDialog({ open, onOpenChange, regulation, o
     minRequiredCredits: "",
     minElectiveCredits: "",
     minGpa: "",
-    requiredCertificates: [] as string[],
     notes: "",
     batches: [] as string[],
   });
   const [batchMajors, setBatchMajors] = useState<Record<string, string[]>>({});
   const [errors, setErrors] = useState<{ name?: string; batches?: string; batchMajors?: string; detail?: string }>({});
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const fetchCertificates = async () => {
-      try {
-        setLoadingCertificates(true);
-        const mappedOptions: string[] = [];
-        const size = 100;
-        let page = 1;
-
-        while (true) {
-          const res = await api.get<any>("/api/v1/certificates", { params: { page, size } });
-          const payload = res.data;
-          const list = Array.isArray(payload)
-            ? payload
-            : payload.items || payload.data || payload.results || [];
-
-          const pageOptions = (Array.isArray(list) ? list : [])
-            .map((item: any) => String(item.code || item.name || item.certificate_id || "").trim())
-            .filter(Boolean);
-
-          mappedOptions.push(...pageOptions);
-
-          if (pageOptions.length < size) break;
-          page += 1;
-        }
-
-        setCertificateOptions(Array.from(new Set(mappedOptions)));
-      } catch (error) {
-        console.error("Load certificates failed", error);
-        setCertificateOptions([]);
-      } finally {
-        setLoadingCertificates(false);
-      }
-    };
-
-    fetchCertificates();
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -163,9 +133,6 @@ export default function EditRegulationDialog({ open, onOpenChange, regulation, o
         minRequiredCredits: regulation.min_required_credits != null ? String(regulation.min_required_credits) : "",
         minElectiveCredits: regulation.min_elective_credits != null ? String(regulation.min_elective_credits) : "",
         minGpa: regulation.min_gpa != null ? String(regulation.min_gpa) : "",
-        requiredCertificates: Array.isArray(regulation.required_certificates)
-          ? regulation.required_certificates.map((value) => String(value))
-          : [],
         notes: regulation.notes || "",
         batches,
       });
@@ -195,19 +162,23 @@ export default function EditRegulationDialog({ open, onOpenChange, regulation, o
     if (errors.batchMajors) setErrors((prev) => ({ ...prev, batchMajors: undefined }));
   };
 
-  const handleRequiredCertificatesChange = (requiredCertificates: string[]) => {
-    setFormData((prev) => ({ ...prev, requiredCertificates }));
-  };
-
   const handleBatchMajorsChange = (batch: string, majors: string[]) => {
     setBatchMajors((prev) => ({ ...prev, [batch]: majors }));
     if (errors.batchMajors) setErrors((prev) => ({ ...prev, batchMajors: undefined }));
   };
 
   const handleUpdate = async () => {
-    const newErrors: { name?: string; detail?: string } = {};
+    const minTotalCredits = toNumberWithDefault(formData.minTotalCredits, DEFAULT_MIN_TOTAL_CREDITS);
+    const minRequiredCredits = toNumberWithDefault(formData.minRequiredCredits, DEFAULT_MIN_REQUIRED_CREDITS);
+    const minElectiveCredits = toNumberWithDefault(formData.minElectiveCredits, DEFAULT_MIN_ELECTIVE_CREDITS);
+    const minGpa = toNumberWithDefault(formData.minGpa, DEFAULT_MIN_GPA);
+
+    const newErrors: { name?: string; batches?: string; batchMajors?: string; detail?: string } = {};
     if (!formData.name.trim()) newErrors.name = "Vui lòng nhập tên quy chế";
-    if (!Number.isFinite(Number(formData.minTotalCredits)) || !Number.isFinite(Number(formData.minRequiredCredits)) || !Number.isFinite(Number(formData.minElectiveCredits)) || !Number.isFinite(Number(formData.minGpa))) {
+    if (!formData.batches || formData.batches.length === 0) newErrors.batches = "Vui lòng chọn ít nhất một khoá áp dụng";
+    const hasInvalidBatch = formData.batches.some((batch) => (batchMajors[batch] ?? []).length === 0);
+    if (hasInvalidBatch) newErrors.batchMajors = "Vui lòng chọn chuyên ngành cho từng khóa áp dụng";
+    if (minTotalCredits === null || minRequiredCredits === null || minElectiveCredits === null || minGpa === null) {
       newErrors.detail = "Vui lòng nhập đúng định dạng số cho tín chỉ và GPA";
     }
     setErrors(newErrors);
@@ -218,13 +189,39 @@ export default function EditRegulationDialog({ open, onOpenChange, regulation, o
       return;
     }
 
+    const applications = formData.batches.flatMap((batch) => {
+      const cohortId = Number(batch);
+      if (!Number.isFinite(cohortId)) return [];
+
+      const selectedMajorNames = batchMajors[batch] ?? [];
+      const majorOptions = majorOptionsByCohort[batch] ?? [];
+
+      return selectedMajorNames
+        .map((majorName) => {
+          const major = majorOptions.find((m) => m.name === majorName);
+          if (!major || !Number.isFinite(major.id)) return null;
+
+          return {
+            cohort_id: cohortId,
+            major_id: major.id,
+          };
+        })
+        .filter((item): item is { cohort_id: number; major_id: number } => Boolean(item));
+    });
+
+    if (applications.length === 0) {
+      setErrors((prev) => ({ ...prev, detail: "Không tạo được dữ liệu cặp khóa/chuyên ngành hợp lệ" }));
+      return;
+    }
+
     const payload = {
       name: formData.name.trim(),
-      min_total_credits: Number(formData.minTotalCredits),
-      min_required_credits: Number(formData.minRequiredCredits),
-      min_elective_credits: Number(formData.minElectiveCredits),
-      min_gpa: Number(formData.minGpa),
-      required_certificates: formData.requiredCertificates,
+      min_total_credits: minTotalCredits,
+      min_required_credits: minRequiredCredits,
+      min_elective_credits: minElectiveCredits,
+      min_gpa: minGpa,
+      required_certificates: Array.isArray(regulation.required_certificates) ? regulation.required_certificates : [],
+      applications,
       notes: formData.notes.trim(),
     };
 
@@ -293,16 +290,6 @@ export default function EditRegulationDialog({ open, onOpenChange, regulation, o
               <Label className="text-sm font-medium text-gray-800">GPA tối thiểu</Label>
               <Input name="minGpa" type="number" step="0.01" value={formData.minGpa} onChange={handleInputChange} placeholder="2.0" />
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-gray-800">Chứng chỉ bắt buộc</Label>
-            <MultiSelect
-              options={certificateOptions}
-              value={formData.requiredCertificates}
-              onChange={handleRequiredCertificatesChange}
-              placeholder={loadingCertificates ? "Đang tải chứng chỉ..." : "Chọn chứng chỉ bắt buộc"}
-              disabled={loadingCertificates}
-            />
           </div>
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-800">Ghi chú</Label>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AlertCircle, FileText, Upload, CheckCircle2, Loader2 } from "lucide-react"
-import { getSemesters, uploadScores } from "../score.api"
+import { getClasses, getSemesters, uploadScores } from "../score.api"
 import type { ScoreImportResponse } from "../types"
 import type { Semester } from "../score.api"
 
@@ -40,6 +40,9 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
     const [semesters, setSemesters] = useState<Semester[]>([])
     const [selectedSemesterId, setSelectedSemesterId] = useState<string>("")
     const [loadingSemesters, setLoadingSemesters] = useState(false)
+    const [classes, setClasses] = useState<any[]>([])
+    const [selectedClassId, setSelectedClassId] = useState<string>("")
+    const [loadingClasses, setLoadingClasses] = useState(false)
 
     const getSemesterLabel = (semester: Semester): string => {
         return (
@@ -57,6 +60,31 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
             return null
         }
         return rawId
+    }
+
+    const getClassId = (classItem: any): number | null => {
+        const rawId = classItem?.id ?? classItem?.class_id
+        if (typeof rawId === "number" && Number.isFinite(rawId)) {
+            return rawId
+        }
+
+        if (typeof rawId === "string" && rawId.trim()) {
+            const parsed = Number(rawId)
+            if (Number.isFinite(parsed)) {
+                return parsed
+            }
+        }
+
+        return null
+    }
+
+    const getClassLabel = (classItem: any): string => {
+        return (
+            classItem?.class_name ||
+            classItem?.name ||
+            classItem?.code ||
+            `Lớp #${classItem?.id ?? classItem?.class_id ?? "N/A"}`
+        )
     }
 
     const parseSuccessFromText = (text: string): { total: number; success: number } | null => {
@@ -166,7 +194,33 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
             }
         }
 
+        const fetchClasses = async () => {
+            if (!open) return
+
+            try {
+                setLoadingClasses(true)
+                const res = await getClasses()
+                const payload = res.data as any[] | { data?: any[]; items?: any[] }
+                const list = Array.isArray(payload)
+                    ? payload
+                    : Array.isArray(payload?.data)
+                        ? payload.data
+                        : Array.isArray(payload?.items)
+                            ? payload.items
+                            : []
+
+                const normalizedClasses = list.filter((classItem) => getClassId(classItem) !== null)
+                setClasses(normalizedClasses)
+            } catch (error: any) {
+                setClasses([])
+                setImportError(extractBackendMessage(error, "Không tải được danh sách lớp. Vui lòng thử lại."))
+            } finally {
+                setLoadingClasses(false)
+            }
+        }
+
         fetchSemesters()
+        fetchClasses()
     }, [open])
 
     const handleFileSelect = async (file: File) => {
@@ -190,7 +244,7 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
     }
 
     const handleUpload = async () => {
-        if (!importFile || !selectedSemesterId) return
+        if (!importFile || !selectedSemesterId || !selectedClassId) return
 
         try {
             setLoading(true)
@@ -202,7 +256,13 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
                 return
             }
 
-            const response = await uploadScores(importFile, semesterId)
+            const classId = Number(selectedClassId)
+            if (!Number.isFinite(classId)) {
+                setImportError("Lớp không hợp lệ. Vui lòng chọn lại.")
+                return
+            }
+
+            const response = await uploadScores(importFile, semesterId, classId)
             const normalizedResult = buildImportResult(response.data)
             setImportResult(normalizedResult)
             setImportStep('result')
@@ -246,6 +306,7 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
             setImportFile(null)
             setImportError("")
             setSelectedSemesterId("")
+            setSelectedClassId("")
             setImportStep('upload')
             setImportResult(null)
         }
@@ -275,6 +336,29 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
                                 <SelectItem key={semesterId} value={String(semesterId)}>
                                     {getSemesterLabel(semester)}
                                 </SelectItem>
+                                )
+                            })}
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div className="mb-3 grid gap-2">
+                    <Label>
+                        Lớp <span className="text-red-500">*</span>
+                    </Label>
+                    <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                        <SelectTrigger className="bg-white">
+                            <SelectValue placeholder={loadingClasses ? "Đang tải danh sách lớp..." : "Chọn lớp"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {classes.map((classItem) => {
+                                const classId = getClassId(classItem)
+                                if (classId === null) return null
+
+                                return (
+                                    <SelectItem key={classId} value={String(classId)}>
+                                        {getClassLabel(classItem)}
+                                    </SelectItem>
                                 )
                             })}
                         </SelectContent>
@@ -334,7 +418,7 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
                 <Button variant="outline" onClick={() => handleOpenChange(false)}>Hủy</Button>
                 <Button
                     className="bg-[#167FFC] hover:bg-[#1470E3]"
-                    disabled={!importFile || !selectedSemesterId || !!importError || loading || loadingSemesters || semesters.length === 0}
+                    disabled={!importFile || !selectedSemesterId || !selectedClassId || !!importError || loading || loadingSemesters || loadingClasses || semesters.length === 0 || classes.length === 0}
                     onClick={handleUpload}
                 >
                     {loading ? (

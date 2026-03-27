@@ -6,12 +6,16 @@ import type { ScoreImportResponse, ScoreMatrixResponse } from "./types"
  * Upload scores from CSV file
  * @param file - CSV file containing score data
  * @param semesterId - Semester ID for imported scores
+ * @param classId - Class ID for imported scores
  * @returns Upload job information
  */
-export async function uploadScores(file: File, semesterId: number) {
+export async function uploadScores(file: File, semesterId: number, classId?: number) {
     const formData = new FormData()
     formData.append("file", file)
     formData.append("semester_id", String(semesterId))
+    if (typeof classId === "number" && Number.isFinite(classId)) {
+        formData.append("class_id", String(classId))
+    }
 
     return api.post<ScoreImportResponse>("/api/v1/upload-scores", formData, {
         headers: {

@@ -77,3 +77,30 @@ export async function importStudentCertificatesHtml(file: File) {
     },
   })
 }
+
+export async function importStudentCertificatesCsv(file: File) {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  return api.post("/api/v1/student-certificates/import-csv", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  })
+}
+
+export async function importStudentCertificatesCsvBySemester(file: File, semesterId: number) {
+  const formData = new FormData()
+  formData.append("file", file)
+  formData.append("semester_id", String(semesterId))
+
+  return api.post("/api/v1/upload-ta-scores", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  })
+}
+
+export async function getSemesters(params?: { skip?: number; limit?: number }) {
+  return api.get<any>("/api/v1/semesters", { params })
+}

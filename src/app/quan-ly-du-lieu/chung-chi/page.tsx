@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
-import { Award, History } from "lucide-react"
+import { Award, History, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -26,7 +26,6 @@ import {
   Plus,
   MoreVertical,
   Search,
-  Upload,
   Download,
   ChevronsLeft,
   ChevronLeft,
@@ -46,7 +45,7 @@ import CertificateFormDialog from "./components/CertificateFormDialog"
 import DeleteCertificateDialog from "./components/DeleteCertificateDialog"
 import ImportDialog from "../sinh-vien/components/ImportDialog"
 import ImportHistoryTab from "../sinh-vien/components/ImportHistoryTab"
-import type { Certificate, CertificateFormData } from "./types"
+import type { Certificate, StudentCertificateCreatePayload } from "./types"
 import type { ImportHistory } from "../sinh-vien/types"
 import { api } from "@/lib/api"
 
@@ -134,6 +133,7 @@ export default function ChungChiPage() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
+  const [isEnglishExemptionImportOpen, setIsEnglishExemptionImportOpen] = useState(false)
   const [selectedCertificate, setSelectedCertificate] = useState<Certificate | null>(null)
   const [certificates, setCertificates] = useState<Certificate[]>([])
   const [classes, setClasses] = useState<ClassApiItem[]>([])
@@ -360,17 +360,22 @@ export default function ChungChiPage() {
     setIsFormOpen(true)
   }
 
-  const handleSubmitCertificate = (data: CertificateFormData) => {
-    setCertificates((prev) => {
-      if (selectedCertificate) {
-        return prev.map((item) =>
-          item.id === selectedCertificate.id ? { ...item, ...data } : item
-        )
+  const handleSubmitCertificate = async (payload: StudentCertificateCreatePayload) => {
+    try {
+      setCertificateError("")
+      await api.post("/api/v1/student-certificates/", payload)
+      await fetchCertificateSummary()
+    } catch (error: any) {
+      const status = Number(error?.response?.status)
+      if (status === 404) {
+        throw new Error("Không tìm thấy sinh viên hoặc chứng chỉ.")
+      }
+      if (status === 409) {
+        throw new Error("Sinh viên đã có chứng chỉ này rồi.")
       }
 
-      const newId = prev.length > 0 ? Math.max(...prev.map((c) => c.id)) + 1 : 1
-      return [...prev, { id: newId, ...data }]
-    })
+      throw new Error(extractBackendMessage(error, "Không thể thêm chứng chỉ cho sinh viên."))
+    }
   }
 
   return (
@@ -399,6 +404,16 @@ export default function ChungChiPage() {
                 <div className="flex items-center justify-center gap-2 w-full">
                   <Award className="w-4 h-4" />
                   Chứng chỉ
+                </div>
+              </TabsTrigger>
+
+              <TabsTrigger
+                value="import-mien-hoc-phan-tieng-anh"
+                className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
+              >
+                <div className="flex items-center gap-2">
+                  <Upload className="w-4 h-4" />
+                  Import CC miễn HP tiếng Anh
                 </div>
               </TabsTrigger>
 
@@ -694,6 +709,27 @@ export default function ChungChiPage() {
             </TabsContent>
 
             <TabsContent
+              value="import-mien-hoc-phan-tieng-anh"
+              className="m-0 h-full outline-none"
+            >
+              <div className="bg-white rounded-lg border border-slate-200 p-6 max-w-2xl">
+                <h2 className="text-lg font-semibold text-slate-900 mb-2">
+                  Import chứng chỉ miễn học phần tiếng Anh
+                </h2>
+                <p className="text-sm text-slate-600 mb-4">
+                  Tải lên file CSV chứa dữ liệu chứng chỉ để cập nhật trạng thái miễn học phần tiếng Anh cho sinh viên.
+                </p>
+                <Button
+                  className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm"
+                  onClick={() => setIsEnglishExemptionImportOpen(true)}
+                >
+                  <Upload className="h-4 w-4" />
+                  Chọn file và import
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent
               value="lich-su-import"
               className="m-0 h-full outline-none flex flex-col min-h-0"
             >
@@ -713,6 +749,7 @@ export default function ChungChiPage() {
         }}
         certificate={selectedCertificate ?? undefined}
         onSubmit={handleSubmitCertificate}
+        studentOptions={certificates}
       />
       <DeleteCertificateDialog
         open={isDeleteOpen}
@@ -735,6 +772,15 @@ export default function ChungChiPage() {
         onImportSuccess={fetchCertificateSummary}
         isCertificateImport
         classOptions={uniqueAvailableClasses.map((lop) => ({ value: lop, label: lop }))}
+      />
+      <ImportDialog
+        open={isEnglishExemptionImportOpen}
+        onOpenChange={setIsEnglishExemptionImportOpen}
+        onImportSuccess={fetchCertificateSummary}
+        isCertificateImport
+        certificateImportFormat="csv"
+        uploadTitle="Import chứng chỉ miễn học phần tiếng Anh"
+        uploadDescription="Chọn file CSV chứa dữ liệu chứng chỉ miễn học phần tiếng Anh"
       />
     </AppLayout>
   )

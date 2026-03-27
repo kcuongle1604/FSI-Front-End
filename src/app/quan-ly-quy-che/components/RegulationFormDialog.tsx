@@ -33,7 +33,6 @@ type FormState = {
   min_required_credits: string;
   min_elective_credits: string;
   min_gpa: string;
-  required_certificates: string;
   cohort_ids: string;
   major_ids: string;
   notes: string;
@@ -45,11 +44,15 @@ const EMPTY_FORM: FormState = {
   min_required_credits: "",
   min_elective_credits: "",
   min_gpa: "",
-  required_certificates: "",
   cohort_ids: "",
   major_ids: "",
   notes: "",
 };
+
+const DEFAULT_MIN_TOTAL_CREDITS = 120;
+const DEFAULT_MIN_REQUIRED_CREDITS = 90;
+const DEFAULT_MIN_ELECTIVE_CREDITS = 30;
+const DEFAULT_MIN_GPA = 2.0;
 
 const toCommaString = (values?: Array<string | number>) =>
   Array.isArray(values) ? values.map((value) => String(value)).join(", ") : "";
@@ -65,6 +68,13 @@ const parseNumberList = (raw: string): number[] =>
     .map((item) => Number(item))
     .filter((value) => Number.isFinite(value));
 
+const toNumberWithDefault = (raw: string, fallback: number): number | null => {
+  if (!raw.trim()) return fallback;
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 export default function RegulationFormDialog({ open, onOpenChange, mode, regulation, onSubmit }: RegulationFormDialogProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [error, setError] = useState<string>("");
@@ -79,7 +89,6 @@ export default function RegulationFormDialog({ open, onOpenChange, mode, regulat
         min_required_credits: regulation.min_required_credits != null ? String(regulation.min_required_credits) : "",
         min_elective_credits: regulation.min_elective_credits != null ? String(regulation.min_elective_credits) : "",
         min_gpa: regulation.min_gpa != null ? String(regulation.min_gpa) : "",
-        required_certificates: toCommaString(regulation.required_certificates),
         cohort_ids: toCommaString(regulation.cohort_ids),
         major_ids: toCommaString(regulation.major_ids),
         notes: regulation.notes || "",
@@ -97,13 +106,18 @@ export default function RegulationFormDialog({ open, onOpenChange, mode, regulat
   };
 
   const handleSubmit = () => {
+    const minTotalCredits = toNumberWithDefault(form.min_total_credits, DEFAULT_MIN_TOTAL_CREDITS);
+    const minRequiredCredits = toNumberWithDefault(form.min_required_credits, DEFAULT_MIN_REQUIRED_CREDITS);
+    const minElectiveCredits = toNumberWithDefault(form.min_elective_credits, DEFAULT_MIN_ELECTIVE_CREDITS);
+    const minGpa = toNumberWithDefault(form.min_gpa, DEFAULT_MIN_GPA);
+
     const payload: RegulationFormPayload = {
       name: form.name.trim(),
-      min_total_credits: Number(form.min_total_credits),
-      min_required_credits: Number(form.min_required_credits),
-      min_elective_credits: Number(form.min_elective_credits),
-      min_gpa: Number(form.min_gpa),
-      required_certificates: parseStringList(form.required_certificates),
+      min_total_credits: minTotalCredits ?? Number.NaN,
+      min_required_credits: minRequiredCredits ?? Number.NaN,
+      min_elective_credits: minElectiveCredits ?? Number.NaN,
+      min_gpa: minGpa ?? Number.NaN,
+      required_certificates: [],
       cohort_ids: parseNumberList(form.cohort_ids),
       major_ids: parseNumberList(form.major_ids),
       notes: form.notes.trim(),
@@ -163,15 +177,6 @@ export default function RegulationFormDialog({ open, onOpenChange, mode, regulat
               <Label>GPA tối thiểu</Label>
               <Input type="number" step="0.01" value={form.min_gpa} onChange={(e) => updateField("min_gpa", e.target.value)} placeholder="2.0" />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Chứng chỉ bắt buộc (phân tách bằng dấu phẩy)</Label>
-            <Input
-              value={form.required_certificates}
-              onChange={(e) => updateField("required_certificates", e.target.value)}
-              placeholder="TOEIC_550, TIN_HOC_CƠ_BẢN"
-            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

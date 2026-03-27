@@ -24,10 +24,10 @@ type XetTotNghiep = {
   class: string
   year: string
   course: string
-  tcbb: number
-  tctc: number
-  totalCredits: number
-  gpa: number
+  tcbb: string
+  tctc: string
+  totalCredits: string
+  gpa: string
   ccdr: string
   program: string
   status: string

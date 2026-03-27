@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ChevronDown, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -16,12 +16,12 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 import AppLayout from "@/components/AppLayout"
+import { api } from "@/lib/api"
 
 type StudentDetail = {
   id: number
@@ -56,24 +56,15 @@ type CertificateData = {
   note: string
 }
 
-// Sample data - in real app this would come from API
-const students: Record<string, StudentDetail> = {
-  "221121521260": {
-    id: 1,
-    mssv: "221121521260",
-    name: "Nguyễn Văn A",
-    class: "48K21.2",
-    year: "Kỳ 2 - 2024 - 2025",
-    course: "48K",
-    tcbb: 120,
-    tctc: 14,
-    totalCredits: 134,
-    gpa: 3.6,
-    ccdr: "5/5",
-    program: "Hoàn thành",
-    status: "Đạt",
-    major: "Quản trị hệ thống thông tin"
-  }
+type AcademicSummaryResponse = {
+  student_id: number
+  full_name: string
+  class_name: string
+  major_name: string
+  gpa: number
+  total_credits: number
+  required_credits: number
+  elective_credits: number
 }
 
 const courseData: CourseData[] = [
@@ -107,14 +98,84 @@ const certificateData: CertificateData[] = [
   { id: 5, name: "Chứng chỉ tin học", status: true, note: "" },
 ]
 
-export default function XetTotNghiepDetailPage({ params }: any) {
+export default function XetTotNghiepDetailPage() {
   const router = useRouter()
-  const student = students["221121521260"] // In real app, fetch by params.id
+  const params = useParams<{ id?: string | string[] }>()
+  const studentIdParam = useMemo(() => {
+    if (typeof params?.id === "string") return params.id
+    if (Array.isArray(params?.id) && typeof params.id[0] === "string") return params.id[0]
+    return ""
+  }, [params])
+  const [student, setStudent] = useState<StudentDetail | null>(null)
+  const [loadingStudent, setLoadingStudent] = useState(true)
+  const [studentError, setStudentError] = useState("")
   const [activeTab, setActiveTab] = useState("chuong-trinh")
   const [filterType, setFilterType] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState<string | null>(null)
 
   const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const fetchAcademicSummary = async () => {
+      if (!studentIdParam) {
+        setStudentError("Thiếu student_id trên đường dẫn")
+        setLoadingStudent(false)
+        return
+      }
+
+      try {
+        setLoadingStudent(true)
+        setStudentError("")
+
+        const res = await api.get<AcademicSummaryResponse>(`/api/v1/students/${studentIdParam}/academic-summary`)
+        const data = res.data
+
+        setStudent({
+          id: Number(data.student_id || 0),
+          mssv: String(data.student_id || studentIdParam),
+          name: data.full_name || "",
+          class: data.class_name || "",
+          year: "",
+          course: "",
+          tcbb: Number(data.required_credits || 0),
+          tctc: Number(data.elective_credits || 0),
+          totalCredits: Number(data.total_credits || 0),
+          gpa: Number(data.gpa || 0),
+          ccdr: "",
+          program: "",
+          status: "",
+          major: data.major_name || "",
+        })
+      } catch (error: any) {
+        const detail = error?.response?.data?.detail
+        const message = typeof detail === "string" && detail.trim()
+          ? detail
+          : "Không tải được thông tin học tập của sinh viên"
+        setStudentError(message)
+      } finally {
+        setLoadingStudent(false)
+      }
+    }
+
+    fetchAcademicSummary()
+  }, [studentIdParam])
+
+  const displayStudent: StudentDetail = student || {
+    id: 0,
+    mssv: studentIdParam,
+    name: loadingStudent ? "Đang tải..." : "",
+    class: "",
+    year: "",
+    course: "",
+    tcbb: 0,
+    tctc: 0,
+    totalCredits: 0,
+    gpa: 0,
+    ccdr: "",
+    program: "",
+    status: "",
+    major: "",
+  }
 
   const goToList = () => {
     const qs = searchParams?.toString() ?? ""
@@ -137,9 +198,10 @@ export default function XetTotNghiepDetailPage({ params }: any) {
               Xét tốt nghiệp
             </button>
             <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">
-              &gt; <span className="ml-1">{student.name}</span>
+              &gt; <span className="ml-1">{displayStudent.name}</span>
             </span>
           </h1>
+          {studentError && <p className="text-sm text-red-600 mt-2">{studentError}</p>}
         </div>
 
             <div className="flex-1 flex flex-col gap-4">
@@ -150,39 +212,39 @@ export default function XetTotNghiepDetailPage({ params }: any) {
               <div className="space-y-3">
                 <div className="flex gap-4">
                   <span className="font-semibold text-blue-700 min-w-fit">Họ và Tên:</span>
-                  <span className="text-lg font-bold text-gray-900">{student.name}</span>
+                  <span className="text-lg font-bold text-gray-900">{displayStudent.name}</span>
                 </div>
                 <div className="flex gap-4">
                   <span className="font-semibold text-blue-700 min-w-fit">MSSV:</span>
-                  <span className="text-base font-semibold text-gray-900">{student.mssv}</span>
+                  <span className="text-base font-semibold text-gray-900">{displayStudent.mssv}</span>
                 </div>
                 <div className="flex gap-4">
                   <span className="font-semibold text-blue-700 min-w-fit">Lớp:</span>
-                  <span className="text-base font-semibold text-gray-900">{student.class}</span>
+                  <span className="text-base font-semibold text-gray-900">{displayStudent.class}</span>
                 </div>
                 <div className="flex gap-4">
                   <span className="font-semibold text-blue-700 min-w-fit">Chuyên ngành:</span>
-                  <span className="text-base font-semibold text-gray-900">{student.major}</span>
+                  <span className="text-base font-semibold text-gray-900">{displayStudent.major}</span>
                 </div>
               </div>
               <div className="space-y-3">
                 <div className="flex gap-4">
                   <span className="font-semibold text-blue-700 min-w-fit">GPA:</span>
-                  <span className="text-lg font-bold text-green-600">{student.gpa}</span>
+                  <span className="text-lg font-bold text-green-600">{displayStudent.gpa}</span>
                 </div>
                 <div className="flex gap-4">
                   <span className="font-semibold text-blue-700 min-w-fit">Tổng số tín chỉ đã học:</span>
-                  <span className="text-base font-semibold text-gray-900">{student.totalCredits}</span>
+                  <span className="text-base font-semibold text-gray-900">{displayStudent.totalCredits}</span>
                 </div>
                 <div className="flex gap-4">
                   <div className="space-y-2">
                     <div className="flex gap-4">
                       <span className="font-semibold text-blue-700">Tín chỉ bắt buộc:</span>
-                      <span className="text-base font-semibold text-gray-900">{student.tcbb}</span>
+                      <span className="text-base font-semibold text-gray-900">{displayStudent.tcbb}</span>
                     </div>
                     <div className="flex gap-4">
                       <span className="font-semibold text-blue-700">Tín chỉ tự chọn:</span>
-                      <span className="text-base font-semibold text-gray-900">{student.tctc}</span>
+                      <span className="text-base font-semibold text-gray-900">{displayStudent.tctc}</span>
                     </div>
                   </div>
                 </div>

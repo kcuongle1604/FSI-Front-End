@@ -5,16 +5,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { MultiSelect } from "@/components/ui/multi-select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, X } from "lucide-react"
-import { Certificate, CertificateFormData } from "../types"
+import { api } from "@/lib/api"
+import { Certificate, StudentCertificateCreatePayload } from "../types"
 import { sampleCertificates } from "../data"
 
 interface CertificateFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   certificate?: Certificate | null
-  onSubmit: (data: CertificateFormData) => void
+  onSubmit: (data: StudentCertificateCreatePayload) => Promise<void>
+  studentOptions?: Certificate[]
+}
+
+type CertificateOption = {
+  id: number
+  label: string
 }
 
 export default function CertificateFormDialog({
@@ -22,23 +29,15 @@ export default function CertificateFormDialog({
   onOpenChange,
   certificate,
   onSubmit,
+  studentOptions,
 }: CertificateFormDialogProps) {
   const isEdit = !!certificate
 
-  const [formData, setFormData] = useState<CertificateFormData>({
-    mssv: certificate?.mssv || "",
-    hoLot: certificate?.hoLot || "",
-    ten: certificate?.ten || "",
-    lop: certificate?.lop || "",
-    ngaySinh: certificate?.ngaySinh || "",
-    donTN: certificate?.donTN || false,
-    kiemDiem: certificate?.kiemDiem || false,
-    quanSu: certificate?.quanSu || false,
-    theDuc: certificate?.theDuc || false,
-    ngoaiNgu: certificate?.ngoaiNgu || false,
-    tinhHoc: certificate?.tinhHoc || false,
-    ghiChu: certificate?.ghiChu || "",
-  })
+  const [selectedCertificateId, setSelectedCertificateId] = useState<string>("")
+  const [note, setNote] = useState("")
+  const [certificateOptions, setCertificateOptions] = useState<CertificateOption[]>([])
+  const [loadingCertificateOptions, setLoadingCertificateOptions] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -48,66 +47,114 @@ export default function CertificateFormDialog({
   const [studentSearch, setStudentSearch] = useState("")
   const [showStudentLookup, setShowStudentLookup] = useState(false)
 
-  const studentOptions = sampleCertificates
+  const studentLookupOptions = studentOptions ?? sampleCertificates
 
-  const filteredStudentOptions = studentOptions.filter((s) => {
+  const filteredStudentOptions = studentLookupOptions.filter((s) => {
     const keyword = studentSearch.trim().toLowerCase()
     if (!keyword) return true
     return `${String(s.mssv)} ${s.hoLot} ${s.ten}`.toLowerCase().includes(keyword)
   })
 
   useEffect(() => {
-    if (certificate) {
-      setSelectedStudent(certificate)
-      setFormData({
-        mssv: certificate.mssv || "",
-        hoLot: certificate.hoLot,
-        ten: certificate.ten,
-        lop: certificate.lop,
-        ngaySinh: certificate.ngaySinh,
-        donTN: certificate.donTN || false,
-        kiemDiem: certificate.kiemDiem || false,
-        quanSu: certificate.quanSu || false,
-        theDuc: certificate.theDuc || false,
-        ngoaiNgu: certificate.ngoaiNgu || false,
-        tinhHoc: certificate.tinhHoc || false,
-        ghiChu: certificate.ghiChu || "",
-      })
-    } else {
-      setSelectedStudent(null)
-      setFormData({
-        mssv: "",
-        hoLot: "",
-        ten: "",
-        lop: "",
-        ngaySinh: "",
-        donTN: false,
-        kiemDiem: false,
-        quanSu: false,
-        theDuc: false,
-        ngoaiNgu: false,
-        tinhHoc: false,
-        ghiChu: "",
-      })
+    if (!open) return
+
+    const fetchCertificateOptions = async () => {
+      try {
+        setLoadingCertificateOptions(true)
+        const all: CertificateOption[] = []
+        const size = 100
+        let page = 1
+
+        while (true) {
+          const res = await api.get<any>("/api/v1/certificates", { params: { page, size } })
+          const payload = res.data
+          const list = Array.isArray(payload)
+            ? payload
+            : payload.items || payload.data || payload.results || []
+
+          const mapped: CertificateOption[] = (Array.isArray(list) ? list : [])
+            .map((item: any) => {
+              const id = Number(item.id ?? item.certificate_id)
+              const label = String(item.name ?? item.code ?? item.certificate_name ?? "").trim()
+              if (!Number.isFinite(id) || !label) return null
+              return { id, label }
+            })
+            .filter((item: CertificateOption | null): item is CertificateOption => item !== null)
+
+          all.push(...mapped)
+
+          if (mapped.length < size) break
+          page += 1
+        }
+
+        const uniqueOptions = Array.from(new Map(all.map((item) => [item.id, item])).values())
+        setCertificateOptions(uniqueOptions)
+      } catch {
+        setCertificateOptions([])
+      } finally {
+        setLoadingCertificateOptions(false)
+      }
     }
 
+    fetchCertificateOptions()
+  }, [open])
+
+  useEffect(() => {
+    if (certificate) {
+      setSelectedStudent(certificate)
+      setNote(certificate.ghiChu || "")
+    } else {
+      setSelectedStudent(null)
+      setNote("")
+    }
+
+    setSelectedCertificateId("")
     setStudentSearch("")
     setShowStudentLookup(false)
+    setErrors({})
   }, [certificate, open])
 
   const validate = () => {
     const newErrors: Record<string, string> = {}
-    if (!selectedStudent && !String(formData.mssv).trim()) {
+    if (!selectedStudent?.id) {
       newErrors.mssv = "Sinh viên là bắt buộc"
+    }
+    if (!selectedCertificateId) {
+      newErrors.certificate_id = "Chứng chỉ là bắt buộc"
     }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = () => {
-    if (validate()) {
-      onSubmit(formData)
+  const handleSubmit = async () => {
+    if (!validate() || !selectedStudent?.id) return
+
+    const studentId = Number(selectedStudent.id)
+    const certificateId = Number(selectedCertificateId)
+    if (!Number.isFinite(studentId) || !Number.isFinite(certificateId)) {
+      setErrors((prev) => ({
+        ...prev,
+        mssv: !Number.isFinite(studentId) ? "Sinh viên không hợp lệ" : prev.mssv,
+        certificate_id: !Number.isFinite(certificateId) ? "Chứng chỉ không hợp lệ" : prev.certificate_id,
+      }))
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      await onSubmit({
+        student_id: studentId,
+        certificate_id: certificateId,
+        note: note.trim() || undefined,
+      })
       onOpenChange(false)
+    } catch (error: any) {
+      setErrors((prev) => ({
+        ...prev,
+        detail: error?.message || "Không thể thêm chứng chỉ cho sinh viên.",
+      }))
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -116,7 +163,7 @@ export default function CertificateFormDialog({
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>
-            {certificate ? "Chỉnh sửa thông tin chứng chỉ" : "Thêm mới thông tin chứng chỉ"}
+            {certificate ? "Thêm chứng chỉ cho sinh viên" : "Thêm mới thông tin chứng chỉ"}
           </DialogTitle>
         </DialogHeader>
 
@@ -183,7 +230,6 @@ export default function CertificateFormDialog({
                             setSelectedStudent(null)
                             setStudentSearch("")
                             setShowStudentLookup(false)
-                            setFormData({ ...formData, mssv: "" })
                           }}
                           className="hover:text-blue-900"
                         >
@@ -205,14 +251,6 @@ export default function CertificateFormDialog({
                           setSelectedStudent(s)
                           setShowStudentLookup(false)
                           setStudentSearch("")
-                          setFormData({
-                            ...formData,
-                            mssv: s.mssv,
-                            hoLot: s.hoLot,
-                            ten: s.ten,
-                            lop: s.lop,
-                            ngaySinh: s.ngaySinh,
-                          })
                           setErrors((prev) => {
                             const { mssv, ...rest } = prev
                             return rest
@@ -231,51 +269,52 @@ export default function CertificateFormDialog({
             )}
           </div>
 
-          {/* Các loại chứng chỉ */}
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-700">
-              Các loại chứng chỉ
+              Chứng chỉ <span className="text-red-500">*</span>
             </Label>
-            <MultiSelect
-              options={[
-                "Đơn xin công nhận TN",
-                "Bản kiểm điểm cá nhân",
-                "Cc Quân sự",
-                "Cc Thể dục",
-                "Cc Ngoại ngữ",
-                "Cc Tin học",
-              ]}
-              value={[
-                formData.donTN ? "Đơn xin công nhận TN" : "",
-                formData.kiemDiem ? "Bản kiểm điểm cá nhân" : "",
-                formData.quanSu ? "Cc Quân sự" : "",
-                formData.theDuc ? "Cc Thể dục" : "",
-                formData.ngoaiNgu ? "Cc Ngoại ngữ" : "",
-                formData.tinhHoc ? "Cc Tin học" : "",
-              ].filter(Boolean) as string[]}
-              onChange={(selected) => {
-                setFormData({
-                  ...formData,
-                  donTN: selected.includes("Đơn xin công nhận TN"),
-                  kiemDiem: selected.includes("Bản kiểm điểm cá nhân"),
-                  quanSu: selected.includes("Cc Quân sự"),
-                  theDuc: selected.includes("Cc Thể dục"),
-                  ngoaiNgu: selected.includes("Cc Ngoại ngữ"),
-                  tinhHoc: selected.includes("Cc Tin học"),
+            <Select value={selectedCertificateId} onValueChange={(value) => {
+              setSelectedCertificateId(value)
+              if (errors.certificate_id) {
+                setErrors((prev) => {
+                  const { certificate_id, ...rest } = prev
+                  return rest
                 })
-              }}
-              placeholder="Chọn loại chứng chỉ"
+              }
+            }}>
+              <SelectTrigger className={errors.certificate_id ? "border-red-500" : ""}>
+                <SelectValue placeholder={loadingCertificateOptions ? "Đang tải danh sách chứng chỉ..." : "Chọn chứng chỉ"} />
+              </SelectTrigger>
+              <SelectContent>
+                {certificateOptions.map((item) => (
+                  <SelectItem key={item.id} value={String(item.id)}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.certificate_id && <p className="text-red-500 text-xs mt-1">{errors.certificate_id}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">Ghi chú</Label>
+            <Input
+              placeholder="Ví dụ: TOEIC 650, MOS Word"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
             />
           </div>
+
+          {errors.detail && <p className="text-red-500 text-xs mt-1">{errors.detail}</p>}
 
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
             Hủy
           </Button>
-          <Button className="bg-[#167FFC] hover:bg-[#1470E3]" onClick={handleSubmit}>
-            {certificate ? "Cập nhật" : "Lưu"}
+          <Button className="bg-[#167FFC] hover:bg-[#1470E3]" onClick={handleSubmit} disabled={submitting || loadingCertificateOptions}>
+            {submitting ? "Đang lưu..." : "Lưu"}
           </Button>
         </DialogFooter>
       </DialogContent>
