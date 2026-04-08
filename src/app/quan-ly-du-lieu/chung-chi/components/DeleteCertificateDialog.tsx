@@ -7,7 +7,7 @@ interface DeleteCertificateDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   certificateName: string
-  onConfirm: () => void
+  onConfirm: () => void | Promise<void>
 }
 
 export default function DeleteCertificateDialog({

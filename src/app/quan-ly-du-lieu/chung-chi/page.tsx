@@ -78,6 +78,12 @@ type CohortApiItem = {
   year_end?: number
 }
 
+type CohortCertificateApiItem = {
+  certificate_id?: number
+  name?: string
+  note?: string
+}
+
 type StudentCertificateSummaryItem = {
   id?: number
   student_id?: number | string
@@ -124,6 +130,13 @@ type StudentCertificateSummaryResponse = {
   total?: number
 }
 
+const DEFAULT_CERTIFICATE_HEADERS = [
+  "CC QUÂN SỰ",
+  "CC THỂ DỤC",
+  "CC NGOẠI NGỮ",
+  "CC TIN HỌC",
+]
+
 export default function ChungChiPage() {
   const [activeTab, setActiveTab] = useState("chung-chi")
   const [searchQuery, setSearchQuery] = useState("")
@@ -140,9 +153,12 @@ export default function ChungChiPage() {
   const [cohorts, setCohorts] = useState<CohortApiItem[]>([])
   const [loadingCertificates, setLoadingCertificates] = useState(false)
   const [certificateError, setCertificateError] = useState("")
+  const [certificateColumnHeaders, setCertificateColumnHeaders] = useState<string[]>(DEFAULT_CERTIFICATE_HEADERS)
   const [importHistory] = useState<ImportHistory[]>([])
 
   const classNameOf = (item: ClassApiItem): string => String(item.class_name || item.name || "").trim()
+  const getClassByName = (className?: string) =>
+    classes.find((c) => classNameOf(c) === String(className || "").trim())
 
   const availableClasses =
     !selectedKhoa || selectedKhoa === "all"
@@ -160,7 +176,7 @@ export default function ChungChiPage() {
     }
 
     if (selectedKhoa && selectedKhoa !== "all") {
-      const selectedClass = classes.find((c) => classNameOf(c) === certificate.lop)
+      const selectedClass = getClassByName(certificate.lop)
       if (!selectedClass || String(selectedClass.cohort_id) !== selectedKhoa) {
         return false
       }
@@ -183,6 +199,10 @@ export default function ChungChiPage() {
   const totalRecords = filteredCertificates.length
   const displayCount = Math.min(PAGE_SIZE, totalRecords)
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+  const certificateColumns =
+    Array.isArray(certificateColumnHeaders) && certificateColumnHeaders.length > 0
+      ? certificateColumnHeaders
+      : DEFAULT_CERTIFICATE_HEADERS
 
   const toBoolean = (value: unknown): boolean => {
     if (typeof value === "boolean") return value
@@ -262,6 +282,51 @@ export default function ChungChiPage() {
       hoLot: parts.slice(0, -1).join(" "),
       ten: parts[parts.length - 1] || "",
     }
+  }
+
+  const getCertificateStatusByColumn = (
+    certificate: Certificate,
+    columnName: string,
+    columnIndex: number
+  ): boolean => {
+    const normalized = normalizeText(columnName)
+
+    if (normalized.includes("quansu") || normalized.includes("military")) {
+      return Boolean(certificate.quanSu)
+    }
+    if (
+      normalized.includes("theduc") ||
+      normalized.includes("physical") ||
+      normalized.includes("pe")
+    ) {
+      return Boolean(certificate.theDuc)
+    }
+    if (
+      normalized.includes("ngoaingu") ||
+      normalized.includes("english") ||
+      normalized.includes("language") ||
+      normalized.includes("toeic") ||
+      normalized.includes("ielts")
+    ) {
+      return Boolean(certificate.ngoaiNgu)
+    }
+    if (
+      normalized.includes("tinhoc") ||
+      normalized.includes("tinhhoc") ||
+      normalized.includes("it") ||
+      normalized.includes("computer")
+    ) {
+      return Boolean(certificate.tinhHoc)
+    }
+
+    const fallbackByIndex = [
+      Boolean(certificate.quanSu),
+      Boolean(certificate.theDuc),
+      Boolean(certificate.ngoaiNgu),
+      Boolean(certificate.tinhHoc),
+    ]
+
+    return fallbackByIndex[columnIndex] ?? false
   }
 
   const mapSummaryItem = (item: StudentCertificateSummaryItem, index: number): Certificate => {
@@ -345,6 +410,51 @@ export default function ChungChiPage() {
     fetchClassAndCohortOptions()
   }, [])
 
+  useEffect(() => {
+    const fetchCertificatesByCohort = async () => {
+      if (!selectedKhoa || selectedKhoa === "all") {
+        setCertificateColumnHeaders(DEFAULT_CERTIFICATE_HEADERS)
+        return
+      }
+
+      const cohortId = Number(selectedKhoa)
+      if (!Number.isFinite(cohortId)) {
+        setCertificateColumnHeaders(DEFAULT_CERTIFICATE_HEADERS)
+        return
+      }
+
+      try {
+        const res = await api.get<
+          CohortCertificateApiItem[] | { data?: CohortCertificateApiItem[]; items?: CohortCertificateApiItem[] }
+        >(`/api/v1/cohorts/${cohortId}/certificates`)
+
+        const payload = res.data
+        const list = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload?.items)
+              ? payload.items
+              : []
+
+        const names = list
+          .map((item) => String(item?.name || "").trim())
+          .filter((name) => name.length > 0)
+
+        if (names.length === 0) {
+          setCertificateColumnHeaders(DEFAULT_CERTIFICATE_HEADERS)
+          return
+        }
+
+        setCertificateColumnHeaders(names)
+      } catch {
+        setCertificateColumnHeaders(DEFAULT_CERTIFICATE_HEADERS)
+      }
+    }
+
+    void fetchCertificatesByCohort()
+  }, [selectedKhoa])
+
   const handleEdit = (certificate: Certificate) => {
     setSelectedCertificate(certificate)
     setIsFormOpen(true)
@@ -375,6 +485,26 @@ export default function ChungChiPage() {
       }
 
       throw new Error(extractBackendMessage(error, "Không thể thêm chứng chỉ cho sinh viên."))
+    }
+  }
+
+  const handleDeleteCertificate = async () => {
+    if (!selectedCertificate) return
+
+    const certificateId = Number(selectedCertificate.id)
+    if (!Number.isFinite(certificateId)) {
+      setCertificateError("Không xác định được certificate_id để xóa")
+      return
+    }
+
+    try {
+      setCertificateError("")
+      await api.delete(`/api/v1/certificates/${certificateId}`)
+
+      await fetchCertificateSummary()
+      setSelectedCertificate(null)
+    } catch (error: any) {
+      setCertificateError(extractBackendMessage(error, "Không thể xóa chứng chỉ"))
     }
   }
 
@@ -484,7 +614,16 @@ export default function ChungChiPage() {
                         })}
                     </SelectContent>
                   </Select>
-                  <Select value={selectedLop} onValueChange={setSelectedLop}>
+                  <Select
+                    value={selectedLop}
+                    onValueChange={(value) => {
+                      setSelectedLop(value)
+
+                      const selectedClass = getClassByName(value)
+                      const cohortId = Number(selectedClass?.cohort_id)
+                      setSelectedKhoa(Number.isFinite(cohortId) ? String(cohortId) : undefined)
+                    }}
+                  >
                     <SelectTrigger className="h-9 w-[140px] bg-white">
                       <SelectValue placeholder="Lớp" />
                     </SelectTrigger>
@@ -494,6 +633,7 @@ export default function ChungChiPage() {
                       align="center"
                       className="w-[var(--radix-select-trigger-width)]"
                     >
+                      <SelectItem value="all">Tất cả</SelectItem>
                       {uniqueAvailableClasses.map((lop) => (
                         <SelectItem key={lop} value={lop}>
                           {lop}
@@ -559,18 +699,14 @@ export default function ChungChiPage() {
                           <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
                             NGÀY SINH
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">
-                            CC QUÂN SỰ
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">
-                            CC THỂ DỤC
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">
-                            CC NGOẠI NGỮ
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">
-                            CC TIN HỌC
-                          </TableHead>
+                          {certificateColumns.map((headerName, headerIndex) => (
+                            <TableHead
+                              key={`${headerName}-${headerIndex}`}
+                              className="h-10 px-4 text-center text-sm font-semibold text-gray-700"
+                            >
+                              {headerName}
+                            </TableHead>
+                          ))}
                           <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 w-12" />
                         </TableRow>
                       </TableHeader>
@@ -597,42 +733,20 @@ export default function ChungChiPage() {
                               <TableCell className="h-12 px-4 text-sm text-gray-600">
                                 {certificate.ngaySinh}
                               </TableCell>
-                              <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
-                                <div className="flex justify-center">
-                                  <Checkbox
-                                    checked={certificate.quanSu}
-                                    disabled
-                                    className="pointer-events-none data-[state=unchecked]:bg-transparent"
-                                  />
-                                </div>
-                              </TableCell>
-                              <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
-                                <div className="flex justify-center">
-                                  <Checkbox
-                                    checked={certificate.theDuc}
-                                    disabled
-                                    className="pointer-events-none data-[state=unchecked]:bg-transparent"
-                                  />
-                                </div>
-                              </TableCell>
-                              <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
-                                <div className="flex justify-center">
-                                  <Checkbox
-                                    checked={certificate.ngoaiNgu}
-                                    disabled
-                                    className="pointer-events-none data-[state=unchecked]:bg-transparent"
-                                  />
-                                </div>
-                              </TableCell>
-                              <TableCell className="h-12 px-4 text-sm text-gray-600 text-center">
-                                <div className="flex justify-center">
-                                  <Checkbox
-                                    checked={certificate.tinhHoc}
-                                    disabled
-                                    className="pointer-events-none data-[state=unchecked]:bg-transparent"
-                                  />
-                                </div>
-                              </TableCell>
+                              {certificateColumns.map((headerName, headerIndex) => (
+                                <TableCell
+                                  key={`${certificate.id}-${headerName}-${headerIndex}`}
+                                  className="h-12 px-4 text-sm text-gray-600 text-center"
+                                >
+                                  <div className="flex justify-center">
+                                    <Checkbox
+                                      checked={getCertificateStatusByColumn(certificate, headerName, headerIndex)}
+                                      disabled
+                                      className="pointer-events-none data-[state=unchecked]:bg-transparent"
+                                    />
+                                  </div>
+                                </TableCell>
+                              ))}
                               <TableCell className="h-12 px-4 text-right w-12">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
@@ -760,11 +874,7 @@ export default function ChungChiPage() {
           }
         }}
         certificateName={selectedCertificate ? `${selectedCertificate.hoLot} ${selectedCertificate.ten}` : ""}
-        onConfirm={() => {
-          if (!selectedCertificate) return
-          setCertificates((prev) => prev.filter((item) => item.id !== selectedCertificate.id))
-          setSelectedCertificate(null)
-        }}
+        onConfirm={handleDeleteCertificate}
       />
       <ImportDialog
         open={isImportOpen}

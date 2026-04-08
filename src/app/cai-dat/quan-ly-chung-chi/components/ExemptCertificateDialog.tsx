@@ -196,7 +196,6 @@ export default function ExemptCertificateDialog({ open, onOpenChange, certificat
   const handleTypeChange = (certificateId: string) => {
     setFormData({ certificateId, batches: [] });
     setBatchMajors({});
-    setCohortOptions([]);
     if (errors.certificateId) setErrors(prev => ({ ...prev, certificateId: undefined }));
   };
 
@@ -287,7 +286,9 @@ export default function ExemptCertificateDialog({ open, onOpenChange, certificat
           exemptions,
         });
       } else {
-        await api.post(`/api/v1/certificates/${formData.certificateId}/exemptions`, { pairs });
+        await api.post(`/api/v1/certificates/${formData.certificateId}/exemptions`, {
+          pairs,
+        });
       }
 
       if (onUpdate) onUpdate({ certificate_id: Number(formData.certificateId), pairs });

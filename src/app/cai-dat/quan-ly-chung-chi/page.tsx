@@ -332,46 +332,82 @@ export default function QuanLyChungChiPage() {
     }
 
     const certificateId = selectedCertificate.id;
-    const cohortIds = Array.from(
-      new Set(
-        (selectedCertificate.batches || [])
-          .map(parseCohortId)
-          .filter((id): id is number => id != null)
-      )
-    );
 
-    if (cohortIds.length === 0) {
-      throw new Error("Không tìm thấy khóa áp dụng hợp lệ để xóa");
-    }
+    const getKnownRelationPairs = async (relation: "applications" | "exemptions") => {
+      try {
+        const relationRes = await api.get<CertificateRelationResponse>(`/api/v1/certificates/${certificateId}/${relation}`);
+        const rows = getRelationRows(relationRes.data);
+        return Array.from(
+          new Set(
+            rows
+              .map((row) => {
+                const cohortId = Number(row.cohort_id);
+                const majorId = Number(row.major_id);
+                if (!Number.isFinite(cohortId) || !Number.isFinite(majorId)) return null;
+                return `${cohortId}-${majorId}`;
+              })
+              .filter((value): value is string => Boolean(value))
+          )
+        ).map((value) => {
+          const [cohortId, majorId] = value.split("-").map(Number);
+          return { cohort_id: cohortId, major_id: majorId };
+        });
+      } catch {
+        return [] as Array<{ cohort_id: number; major_id: number }>;
+      }
+    };
 
-    const majorsByCohort = await Promise.all(
-      cohortIds.map(async (cohortId) => {
-        const res = await api.get<Array<{ major_id?: number }>>(`/api/v1/majors/by-cohort/${cohortId}`);
-        const majorIds = (Array.isArray(res.data) ? res.data : [])
-          .map((item) => Number(item.major_id))
-          .filter((majorId) => Number.isFinite(majorId));
+    const deleteRelationPairs = async (
+      relation: "applications" | "exemptions",
+      pairs: Array<{ cohort_id: number; major_id: number }>
+    ) => {
+      if (pairs.length === 0) return;
 
-        return { cohortId, majorIds: Array.from(new Set(majorIds)) };
-      })
-    );
+      await Promise.all(
+        pairs.map((pair) =>
+          api.delete(`/api/v1/certificates/${certificateId}/${relation}`, {
+            data: {
+              certificate_id: certificateId,
+              cohort_id: pair.cohort_id,
+              major_id: pair.major_id,
+            },
+          })
+        )
+      );
+    };
 
-    const deleteRequests = majorsByCohort.flatMap(({ cohortId, majorIds }) =>
-      majorIds.map((majorId) =>
-        api.delete(`/api/v1/certificates/${certificateId}/applications`, {
-          data: {
-            cohort_id: cohortId,
-            major_id: majorId,
-          },
-        })
-      )
-    );
+    const deleteStudentCertificateLinks = async () => {
+      const candidates: Array<() => Promise<unknown>> = [
+        () => api.delete(`/api/v1/student-certificates/by-certificate/${certificateId}`),
+        () => api.delete(`/api/v1/student-certificates/${certificateId}`),
+        () => api.delete(`/api/v1/student-certificates`, { data: { certificate_id: certificateId } }),
+      ];
 
-    if (deleteRequests.length === 0) {
-      throw new Error("Không tìm thấy chuyên ngành theo khóa để xóa áp dụng");
-    }
+      for (const run of candidates) {
+        try {
+          await run();
+          return;
+        } catch (error: any) {
+          const status = Number(error?.response?.status);
+          if ([404, 405].includes(status)) {
+            continue;
+          }
+
+          throw error;
+        }
+      }
+    };
 
     try {
-      await Promise.all(deleteRequests);
+      const [applicationPairs, exemptionPairs] = await Promise.all([
+        getKnownRelationPairs("applications"),
+        getKnownRelationPairs("exemptions"),
+      ]);
+
+      await deleteRelationPairs("applications", applicationPairs);
+      await deleteRelationPairs("exemptions", exemptionPairs);
+      await deleteStudentCertificateLinks();
+      await api.delete(`/api/v1/certificates/${certificateId}`);
     } catch (error) {
       const backendMessage = axios.isAxiosError(error)
         ? (typeof error.response?.data === "string"
@@ -379,12 +415,12 @@ export default function QuanLyChungChiPage() {
           : (error.response?.data?.message || error.response?.data?.detail || error.message))
         : "";
 
-      throw new Error(backendMessage || "Không thể xóa áp dụng chứng chỉ");
+      throw new Error(backendMessage || "Không thể xóa chứng chỉ hoàn toàn");
     }
 
     setOpenDeleteDialog(false);
     setSelectedCertificate(undefined);
-    await fetchCertificates();
+    await Promise.all([fetchCertificates(), fetchExemptions()]);
     return true;
   };
 

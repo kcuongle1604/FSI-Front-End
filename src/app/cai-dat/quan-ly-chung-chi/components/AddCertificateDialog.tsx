@@ -18,11 +18,11 @@ type Cohort = {
   cohort_id: number;
 };
 export default function AddCertificateDialog({ open, onOpenChange, onAdd }: AddCertificateDialogProps) {
-  const [formData, setFormData] = useState({ name: "", batches: [] as string[] });
+  const [formData, setFormData] = useState({ name: "", cohortIds: [] as string[] });
   const [cohortOptions, setCohortOptions] = useState<string[]>([]);
   const [loadingCohorts, setLoadingCohorts] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ name?: string; batches?: string; submit?: string }>({});
+  const [errors, setErrors] = useState<{ name?: string; cohort_ids?: string; submit?: string }>({});
 
   useEffect(() => {
     if (!open) return;
@@ -51,28 +51,41 @@ export default function AddCertificateDialog({ open, onOpenChange, onAdd }: AddC
     }
   };
 
-  const handleBatchesChange = (batches: string[]) => {
-    setFormData(prev => ({ ...prev, batches }));
-    if (errors.batches) setErrors(prev => ({ ...prev, batches: undefined }));
+  const handleCohortChange = (cohortIds: string[]) => {
+    setFormData((prev) => ({ ...prev, cohortIds }));
+    if (errors.cohort_ids) setErrors((prev) => ({ ...prev, cohort_ids: undefined }));
+  };
+
+  const normalizeCohortIds = (values: string[]) => {
+    return Array.from(
+      new Set(
+        values
+          .map((value) => Number(value))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      )
+    );
   };
 
   const handleAdd = async () => {
-    const newErrors: { name?: string; batches?: string; submit?: string } = {};
+    const newErrors: { name?: string; cohort_ids?: string; submit?: string } = {};
+    const normalizedCohortIds = normalizeCohortIds(formData.cohortIds);
+
     if (!formData.name.trim()) newErrors.name = "Vui lòng nhập tên chứng chỉ";
-    if (!formData.batches || formData.batches.length === 0) newErrors.batches = "Vui lòng chọn ít nhất một khoá áp dụng";
+    if (normalizedCohortIds.length === 0) newErrors.cohort_ids = "Vui lòng chọn ít nhất một khoá áp dụng";
+
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
 
     const payload = {
       name: formData.name.trim(),
-      cohort_ids: formData.batches.map((id) => Number(id)).filter((id) => Number.isFinite(id)),
+      cohort_ids: normalizedCohortIds,
     };
 
     try {
       setSubmitting(true);
       const res = await api.post("/api/v1/certificates", payload);
       if (onAdd) onAdd(res.data);
-      setFormData({ name: "", batches: [] });
+      setFormData({ name: "", cohortIds: [] });
       setErrors({});
       onOpenChange(false);
     } catch (err) {
@@ -85,7 +98,7 @@ export default function AddCertificateDialog({ open, onOpenChange, onAdd }: AddC
 
   const handleCancel = () => {
     if (submitting) return;
-    setFormData({ name: "", batches: [] });
+    setFormData({ name: "", cohortIds: [] });
     setErrors({});
     onOpenChange(false);
   };
@@ -117,12 +130,12 @@ export default function AddCertificateDialog({ open, onOpenChange, onAdd }: AddC
             </Label>
             <MultiSelect
               options={cohortOptions}
-              value={formData.batches}
-              onChange={handleBatchesChange}
+              value={formData.cohortIds}
+              onChange={handleCohortChange}
               placeholder={loadingCohorts ? "Đang tải danh sách khóa..." : "Chọn khoá áp dụng"}
               disabled={loadingCohorts || submitting}
             />
-            {errors.batches && <p className="text-xs text-red-500 mt-1">{errors.batches}</p>}
+            {errors.cohort_ids && <p className="text-xs text-red-500 mt-1">{errors.cohort_ids}</p>}
           </div>
           {errors.submit && <p className="text-xs text-red-500 mt-1">{errors.submit}</p>}
           <div className="flex justify-end gap-3 mt-6">

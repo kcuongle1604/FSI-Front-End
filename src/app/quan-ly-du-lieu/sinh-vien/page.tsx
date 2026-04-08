@@ -84,6 +84,7 @@ export default function SinhVienPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
 
   // giữ nguyên để dùng cho tab lịch sử import
   const [importHistory] = useState<ImportHistory[]>([])
@@ -206,8 +207,21 @@ export default function SinhVienPage() {
 
   const PAGE_SIZE = 30
   const totalRecords = filteredStudents.length
-  const displayCount = Math.min(PAGE_SIZE, totalRecords)
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages)
+  const startIndex = (safeCurrentPage - 1) * PAGE_SIZE
+  const pagedStudents = filteredStudents.slice(startIndex, startIndex + PAGE_SIZE)
+  const displayCount = pagedStudents.length
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedKhoa, selectedLop, searchQuery])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
 
   const handleEdit = (student: Student) => {
     setSelectedStudent(student)
@@ -415,13 +429,13 @@ export default function SinhVienPage() {
                       </TableHeader>
 
                       <TableBody>
-                        {filteredStudents.slice(0, 30).map((student, index) => (
+                        {pagedStudents.map((student, index) => (
                           <TableRow
                             key={student.id}
                             className="border-b border-gray-200 hover:bg-gray-50"
                           >
                             <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {String(index + 1).padStart(2, "0")}
+                              {String(startIndex + index + 1).padStart(2, "0")}
                             </TableCell>
                             <TableCell className="h-12 px-4 text-sm text-gray-600">
                               {student.mssv}
@@ -475,7 +489,8 @@ export default function SinhVienPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled
+                      disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage(1)}
                     >
                       <ChevronsLeft className="h-4 w-4" />
                     </Button>
@@ -483,12 +498,13 @@ export default function SinhVienPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled
+                      disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
                     <div className="flex items-center gap-1 px-3 text-sm">
-                      <span className="font-medium text-gray-700">1</span>
+                      <span className="font-medium text-gray-700">{safeCurrentPage}</span>
                       <span className="text-gray-400">/</span>
                       <span className="text-gray-600">{totalPages}</span>
                     </div>
@@ -496,7 +512,8 @@ export default function SinhVienPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled={totalRecords <= PAGE_SIZE}
+                      disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
@@ -504,7 +521,8 @@ export default function SinhVienPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled={totalRecords <= PAGE_SIZE}
+                      disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage(totalPages)}
                     >
                       <ChevronsRight className="h-4 w-4" />
                     </Button>

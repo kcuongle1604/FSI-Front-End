@@ -77,6 +77,7 @@ type GraduationClassInfo = {
   elective_credits?: number
   total_credits?: number
   gpa?: number
+  sum_certificate?: number
   total_certificate?: number
   total_students?: number
   eligible_students?: number
@@ -92,6 +93,7 @@ type GraduationStudentItem = {
   elective_credits_earned?: number
   total_credits_earned?: number
   gpa?: number
+  sum_certificate?: number
   certificates?: number
   program_status?: string
   graduation_status?: string
@@ -106,15 +108,6 @@ type GraduationEligibilityResponse = {
 function parseSemestersPayload(
   payload: SemesterApiItem[] | { data?: SemesterApiItem[]; items?: SemesterApiItem[] } | null | undefined
 ): SemesterApiItem[] {
-  if (Array.isArray(payload)) return payload
-  if (Array.isArray(payload?.data)) return payload.data
-  if (Array.isArray(payload?.items)) return payload.items
-  return []
-}
-
-function parseCohortsPayload(
-  payload: CohortApiItem[] | { data?: CohortApiItem[]; items?: CohortApiItem[] } | null | undefined
-): CohortApiItem[] {
   if (Array.isArray(payload)) return payload
   if (Array.isArray(payload?.data)) return payload.data
   if (Array.isArray(payload?.items)) return payload.items
@@ -153,7 +146,6 @@ export default function XetTotNghiepPage() {
   const [students, setStudents] = useState<XetTotNghiep[]>([])
   const [classes, setClasses] = useState<ClassApiItem[]>([])
   const [cohorts, setCohorts] = useState<CohortApiItem[]>([])
-  const [mappedCohorts, setMappedCohorts] = useState<CohortApiItem[]>([])
   const [semesters, setSemesters] = useState<SemesterApiItem[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedSemesterId, setSelectedSemesterId] = useState("")
@@ -203,12 +195,10 @@ export default function XetTotNghiepPage() {
   }
 
   const cohortOptions = useMemo(() => {
-    const source = selectedSemesterId ? mappedCohorts : cohorts
-
-    return source
+    return cohorts
       .filter((item) => getCohortId(item) !== null)
       .sort((a, b) => Number(getCohortId(a)) - Number(getCohortId(b)))
-  }, [cohorts, mappedCohorts, selectedSemesterId])
+  }, [cohorts])
 
   const classOptions = useMemo(() => {
     const filtered = !selectedCourse
@@ -231,7 +221,6 @@ export default function XetTotNghiepPage() {
         setClasses(Array.isArray(classesRes.data) ? classesRes.data : [])
         const cohortList = Array.isArray(cohortsRes.data) ? cohortsRes.data : []
         setCohorts(cohortList)
-        setMappedCohorts(cohortList)
       } catch (error: any) {
         setErrorMessage(extractBackendMessage(error, "Không tải được bộ lọc lớp/khóa"))
       }
@@ -273,39 +262,6 @@ export default function XetTotNghiepPage() {
     fetchSemesters()
   }, [selectedCourse])
 
-  useEffect(() => {
-    const fetchMappedCohorts = async () => {
-      if (!selectedSemesterId) {
-        setMappedCohorts(cohorts)
-        return
-      }
-
-      try {
-        const mappedRes = await api.get<CohortApiItem[] | { data?: CohortApiItem[]; items?: CohortApiItem[] }>(
-          "/api/v1/mapping/cohort-semester-search",
-          { params: { semester_id: Number(selectedSemesterId) } }
-        )
-
-        const nextMapped = parseCohortsPayload(mappedRes.data)
-        setMappedCohorts(nextMapped)
-
-        const selectedCourseStillExists = nextMapped.some(
-          (item) => String(item.cohort_id ?? item.id ?? "") === selectedCourse
-        )
-
-        if (selectedCourse && !selectedCourseStillExists) {
-          setSelectedCourse(undefined)
-          setSelectedClassId("")
-        }
-      } catch (error: any) {
-        setMappedCohorts([])
-        setErrorMessage(extractBackendMessage(error, "Không tải được danh sách khóa theo kỳ"))
-      }
-    }
-
-    fetchMappedCohorts()
-  }, [selectedSemesterId, cohorts, selectedCourse])
-
   const hasRequiredFilters = Boolean(selectedSemesterId && selectedClassId)
 
   useEffect(() => {
@@ -322,15 +278,20 @@ export default function XetTotNghiepPage() {
 
         const response = await api.get<GraduationEligibilityResponse>(
           `/api/v1/graduation-eligibility/class/${selectedClassId}`,
-          { params: { semester_id: Number(selectedSemesterId) } }
+          {
+            params: {
+              class_id: Number(selectedClassId),
+              semester_id: Number(selectedSemesterId),
+            },
+          }
         )
 
         const classInfo = response.data?.class_info || {}
         const studentsFromApi = Array.isArray(response.data?.students) ? response.data.students : []
-        const totalCertificates = Number(classInfo.total_certificate ?? 0)
+        const totalCertificates = Number(classInfo.sum_certificate ?? classInfo.total_certificate ?? 0)
 
         const mappedStudents: XetTotNghiep[] = studentsFromApi.map((student, index) => {
-          const certificates = Number(student.certificates ?? 0)
+          const certificates = Number(student.sum_certificate ?? student.certificates ?? 0)
 
           return {
             id: Number(student.student_id ?? index + 1),

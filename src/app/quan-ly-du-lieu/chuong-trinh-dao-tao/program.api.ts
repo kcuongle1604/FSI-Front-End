@@ -182,6 +182,7 @@ export async function getProgramCohorts(trainingProgramId: number) {
 export async function importProgramSubjects(programName: string, file: File) {
   const formData = new FormData()
   formData.append("file", file)
+  formData.append("file_type", "program")
 
   return api.post(
     `/api/v1/training-programs/${encodeURIComponent(programName)}/subjects/import`,

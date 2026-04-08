@@ -48,6 +48,7 @@ export async function importStudents(
 ) {
   const formData = new FormData()
   formData.append("file", file)
+  formData.append("file_type", "student")
   formData.append("dry_run", dryRun.toString())
   formData.append("column_mapping", JSON.stringify(columnMapping))
 
@@ -70,6 +71,7 @@ export async function importStudents(
 export async function importStudentCertificatesHtml(file: File) {
   const formData = new FormData()
   formData.append("file", file)
+  formData.append("file_type", "certificate")
 
   return api.post("/api/v1/student-certificates/import-html", formData, {
     headers: {
@@ -92,6 +94,7 @@ export async function importStudentCertificatesCsv(file: File) {
 export async function importStudentCertificatesCsvBySemester(file: File, semesterId: number) {
   const formData = new FormData()
   formData.append("file", file)
+  formData.append("file_type", "english")
   formData.append("semester_id", String(semesterId))
 
   return api.post("/api/v1/upload-ta-scores", formData, {

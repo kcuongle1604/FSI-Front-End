@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
 import { Users, FileText } from "lucide-react"
@@ -49,7 +49,7 @@ import ScoreImportDialog from "./components/ScoreImportDialog"
 import ImportHistoryTab from "../sinh-vien/components/ImportHistoryTab"
 import { getScoreMatrix, getClasses } from "./score.api"
 import type { ImportHistory } from "../sinh-vien/types"
-import type { ScoreImportResponse, StudentScore } from "./types"
+import type { ScoreCell, ScoreImportResponse, StudentScore } from "./types"
 
 function extractBackendMessage(error: any, fallback: string): string {
   const detail = error?.response?.data?.detail
@@ -77,6 +77,24 @@ function splitHoTen(fullName: string): { hoLot: string; ten: string } {
   }
 }
 
+function formatScoreCell(value: ScoreCell): string {
+  if (value === null || value === undefined) return "-"
+  if (typeof value === "number") return String(value)
+  if (typeof value === "string") return value
+
+  const scoreValue = value.score_4 ?? value.score ?? value.value
+  if (scoreValue === null || scoreValue === undefined) return "-"
+  return String(scoreValue)
+}
+
+function normalizeScoreKey(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+}
+
 export default function DiemPage() {
   const [activeTab, setActiveTab] = useState("diem")
   const [searchQuery, setSearchQuery] = useState("")
@@ -93,8 +111,96 @@ export default function DiemPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<StudentScore | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const latestRefreshRequestRef = useRef(0)
 
   const [importHistory] = useState<ImportHistory[]>([])
+
+  const toFiniteNumber = (value: unknown): number | null => {
+    const numeric = Number(value)
+    return Number.isFinite(numeric) ? numeric : null
+  }
+
+  const selectedClassId = (() => {
+    if (!selectedClass || selectedClass === "all") return null
+
+    const matchedClass = classes.find((c: any) => {
+      const className = c?.class_name || c?.name || c
+      return className === selectedClass
+    })
+
+    const rawClassId = matchedClass?.class_id ?? matchedClass?.id
+    return toFiniteNumber(rawClassId)
+  })()
+
+  const selectedClassCohortId = (() => {
+    if (!selectedClass || selectedClass === "all") return null
+
+    const matchedClass = classes.find((c: any) => {
+      const className = c?.class_name || c?.name || c
+      return className === selectedClass
+    })
+
+    const rawCohortId = matchedClass?.cohort_id
+    return toFiniteNumber(rawCohortId)
+  })()
+
+  const scoreRefreshKey = `${selectedClass ?? ""}|${selectedClassId ?? ""}`
+
+  const refreshScoreMatrix = async (targetClassName?: string, targetClassId?: number | null) => {
+    const requestId = latestRefreshRequestRef.current + 1
+    latestRefreshRequestRef.current = requestId
+
+    if (!targetClassName || targetClassName === "all") {
+      if (requestId === latestRefreshRequestRef.current) {
+        setScoreData([])
+        setSubjects([])
+      }
+      return
+    }
+
+    try {
+      if (requestId === latestRefreshRequestRef.current) {
+        setLoading(true)
+        setPageError("")
+      }
+      const res = await getScoreMatrix(
+        typeof targetClassId === "number" && Number.isFinite(targetClassId)
+          ? { class_id: targetClassId }
+          : { class_name: targetClassName }
+      )
+      if (requestId === latestRefreshRequestRef.current) {
+        setScoreData(res.data.students)
+        setSubjects(res.data.subjects)
+      }
+    } catch (err: any) {
+      if (requestId === latestRefreshRequestRef.current) {
+        setPageError(extractBackendMessage(err, "Không tải được bảng điểm."))
+        setScoreData([])
+        setSubjects([])
+      }
+    } finally {
+      if (requestId === latestRefreshRequestRef.current) {
+        setLoading(false)
+      }
+    }
+  }
+
+  const refreshScoreMatrixWithRetry = (targetClassName?: string, targetClassId?: number | null) => {
+    void refreshScoreMatrix(targetClassName, targetClassId)
+
+    if (!targetClassName || targetClassName === "all") {
+      return
+    }
+
+    window.setTimeout(() => {
+      void refreshScoreMatrix(targetClassName, targetClassId)
+    }, 500)
+
+    window.setTimeout(() => {
+      void refreshScoreMatrix(targetClassName, targetClassId)
+    }, 1200)
+  }
 
   // Fetch available classes on mount
   useEffect(() => {
@@ -111,30 +217,8 @@ export default function DiemPage() {
 
   // Fetch score matrix when class is selected
   useEffect(() => {
-    if (!selectedClass || selectedClass === "all") {
-      setScoreData([])
-      setSubjects([])
-      return
-    }
-
-    const fetchScores = async () => {
-      try {
-        setLoading(true)
-        setPageError("")
-        const res = await getScoreMatrix({ class_name: selectedClass })
-        setScoreData(res.data.students)
-        setSubjects(res.data.subjects)
-      } catch (err: any) {
-        setPageError(extractBackendMessage(err, "Không tải được bảng điểm."))
-        setScoreData([])
-        setSubjects([])
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchScores()
-  }, [selectedClass])
+    refreshScoreMatrix(selectedClass, selectedClassId)
+  }, [scoreRefreshKey])
 
   // Filter score data by search query
   const filteredScoreData = scoreData.filter((student) => {
@@ -149,11 +233,22 @@ export default function DiemPage() {
 
   const PAGE_SIZE = 30
   const hasData = selectedClass && selectedClass !== "all"
-  const visibleStudents = filteredScoreData.slice(0, PAGE_SIZE)
-
   const totalRecords = filteredScoreData.length
-  const displayCount = Math.min(PAGE_SIZE, totalRecords)
-  const totalPages = Math.max(1, Math.ceil(Math.max(totalRecords, 1) / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages)
+  const startIndex = (safeCurrentPage - 1) * PAGE_SIZE
+  const visibleStudents = filteredScoreData.slice(startIndex, startIndex + PAGE_SIZE)
+  const displayCount = visibleStudents.length
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedClass, searchQuery])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
 
   const handleEdit = (student: StudentScore) => {
     setSelectedStudent(student)
@@ -168,6 +263,73 @@ export default function DiemPage() {
   const handleAdd = () => {
     setSelectedStudent(null)
     setIsFormOpen(true)
+  }
+
+  const applyOptimisticScoreUpdate = (payload?: {
+    studentId: number
+    subjectId: string
+    subjectLabel: string
+    matchedScoreKey?: string
+    score4: string
+  }) => {
+    if (!payload) return
+
+    setScoreData((prev) =>
+      prev.map((student) => {
+        if (student.student_id !== payload.studentId) return student
+
+        const scoreKeys = Object.keys(student.scores || {})
+        const normalizedLabel = normalizeScoreKey(payload.subjectLabel)
+        const normalizedSubjectId = normalizeScoreKey(payload.subjectId)
+
+        const matchedKey =
+          payload.matchedScoreKey ||
+          scoreKeys.find((key) => normalizeScoreKey(key) === normalizedLabel) ||
+          scoreKeys.find((key) => normalizeScoreKey(key) === normalizedSubjectId) ||
+          payload.subjectLabel
+
+        return {
+          ...student,
+          scores: {
+            ...student.scores,
+            [matchedKey]: payload.score4,
+          },
+        }
+      })
+    )
+  }
+
+  const applyOptimisticScoreDelete = (payload?: {
+    studentId: number
+    subjectId: string
+    subjectLabel: string
+    matchedScoreKey?: string
+  }) => {
+    if (!payload) return
+
+    setScoreData((prev) =>
+      prev.map((student) => {
+        if (student.student_id !== payload.studentId) return student
+
+        const scoreKeys = Object.keys(student.scores || {})
+        const normalizedLabel = normalizeScoreKey(payload.subjectLabel)
+        const normalizedSubjectId = normalizeScoreKey(payload.subjectId)
+
+        const matchedKey =
+          payload.matchedScoreKey ||
+          scoreKeys.find((key) => normalizeScoreKey(key) === normalizedLabel) ||
+          scoreKeys.find((key) => normalizeScoreKey(key) === normalizedSubjectId) ||
+          payload.subjectLabel
+
+        return {
+          ...student,
+          scores: {
+            ...student.scores,
+            [matchedKey]: null,
+          },
+        }
+      })
+    )
   }
 
   return (
@@ -319,7 +481,17 @@ export default function DiemPage() {
                               {subject.toUpperCase()}
                             </TableHead>
                           ))}
-                          <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-12" />
+                          <TableHead
+                            className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-12"
+                            style={{
+                              position: "sticky",
+                              right: 0,
+                              zIndex: 20,
+                              minWidth: "56px",
+                              width: "56px",
+                              boxShadow: "-2px 0 4px rgba(0,0,0,0.1)",
+                            }}
+                          />
                         </TableRow>
                       </TableHeader>
 
@@ -333,7 +505,7 @@ export default function DiemPage() {
                                 className="border-b border-gray-200 hover:bg-gray-50"
                               >
                                 <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: 0, zIndex: 5, minWidth: "60px", width: "60px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
-                                  {String(index + 1).padStart(2, "0")}
+                                  {String(startIndex + index + 1).padStart(2, "0")}
                                 </TableCell>
                                 <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "60px", zIndex: 5, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
                                   {student.class_name}
@@ -352,10 +524,20 @@ export default function DiemPage() {
                                     key={subject}
                                     className="h-12 px-4 text-sm text-gray-600 text-center"
                                   >
-                                    {student.scores[subject] ?? "-"}
+                                    {formatScoreCell(student.scores[subject])}
                                   </TableCell>
                                 ))}
-                                <TableCell className="h-12 px-4 text-right w-12">
+                                <TableCell
+                                  className="h-12 px-4 text-right w-12 bg-white"
+                                  style={{
+                                    position: "sticky",
+                                    right: 0,
+                                    zIndex: 6,
+                                    minWidth: "56px",
+                                    width: "56px",
+                                    boxShadow: "-2px 0 4px rgba(0,0,0,0.05)",
+                                  }}
+                                >
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -406,7 +588,8 @@ export default function DiemPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled
+                      disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage(1)}
                     >
                       <ChevronsLeft className="h-4 w-4" />
                     </Button>
@@ -414,12 +597,13 @@ export default function DiemPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled
+                      disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
                     <div className="flex items-center gap-1 px-3 text-sm">
-                      <span className="font-medium text-gray-700">1</span>
+                      <span className="font-medium text-gray-700">{safeCurrentPage}</span>
                       <span className="text-gray-400">/</span>
                       <span className="text-gray-600">{totalPages}</span>
                     </div>
@@ -427,7 +611,8 @@ export default function DiemPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled={totalRecords <= PAGE_SIZE}
+                      disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
@@ -435,7 +620,8 @@ export default function DiemPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled={totalRecords <= PAGE_SIZE}
+                      disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage(totalPages)}
                     >
                       <ChevronsRight className="h-4 w-4" />
                     </Button>
@@ -460,11 +646,25 @@ export default function DiemPage() {
         student={selectedStudent}
         studentOptions={scoreData}
         courseOptions={subjects}
+        classId={selectedClassId}
+        classCohortId={selectedClassCohortId}
+        onSaveSuccess={(payload) => {
+          applyOptimisticScoreUpdate(payload)
+          window.setTimeout(() => {
+            refreshScoreMatrixWithRetry(selectedClass, selectedClassId)
+          }, 2000)
+        }}
       />
       <DeleteScoreDialog
         open={isDeleteOpen}
         onOpenChange={setIsDeleteOpen}
         student={selectedStudent}
+        courseOptions={subjects}
+        classId={selectedClassId}
+        onDeleteSuccess={(payload) => {
+          applyOptimisticScoreDelete(payload)
+          refreshScoreMatrixWithRetry(selectedClass, selectedClassId)
+        }}
       />
       <ScoreImportDialog
         open={isImportOpen}
@@ -472,16 +672,7 @@ export default function DiemPage() {
         onImportSuccess={(result: ScoreImportResponse) => {
           // Refresh scores if a class is selected
           if (selectedClass && selectedClass !== "all") {
-            getScoreMatrix({ class_name: selectedClass })
-              .then((res) => {
-                setScoreData(res.data.students)
-                setSubjects(res.data.subjects)
-              })
-              .catch((err: any) => {
-                setPageError(extractBackendMessage(err, "Không tải được bảng điểm."))
-                setScoreData([])
-                setSubjects([])
-              })
+            refreshScoreMatrixWithRetry(selectedClass, selectedClassId)
           }
         }}
       />

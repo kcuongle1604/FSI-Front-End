@@ -1,6 +1,13 @@
 import { api } from "@/lib/api"
 import { getClasses as getClassesFromStudent } from "../sinh-vien/student.api"
-import type { ScoreImportResponse, ScoreMatrixResponse } from "./types"
+import type {
+    ScoreCreateRequest,
+    ScoreCreateResponse,
+    ScoreDeleteRequest,
+    ScoreImportResponse,
+    ScoreMatrixResponse,
+    ScoreUpdateRequest,
+} from "./types"
 
 /**
  * Upload scores from CSV file
@@ -12,6 +19,7 @@ import type { ScoreImportResponse, ScoreMatrixResponse } from "./types"
 export async function uploadScores(file: File, semesterId: number, classId?: number) {
     const formData = new FormData()
     formData.append("file", file)
+    formData.append("file_type", "score")
     formData.append("semester_id", String(semesterId))
     if (typeof classId === "number" && Number.isFinite(classId)) {
         formData.append("class_id", String(classId))
@@ -35,6 +43,43 @@ export async function getScoreMatrix(params?: {
     semester_id?: number
 }) {
     return api.get<ScoreMatrixResponse>("/api/v1/score-matrix", { params })
+}
+
+/**
+ * Create a score for a student
+ * @param payload - Score payload
+ * @returns Created score data
+ */
+export async function createScore(payload: ScoreCreateRequest) {
+    return api.post<ScoreCreateResponse>("/api/v1/scores", payload)
+}
+
+/**
+ * Update score by student_id + subject_id
+ */
+export async function updateScore(payload: ScoreUpdateRequest) {
+    return api.patch<ScoreCreateResponse>(
+        "/api/v1/scores",
+        { score_4: payload.score_4 },
+        {
+            params: {
+                student_id: payload.student_id,
+                subject_id: payload.subject_id,
+            },
+        }
+    )
+}
+
+/**
+ * Delete score by student_id + subject_id
+ */
+export async function deleteScore(payload: ScoreDeleteRequest) {
+    return api.delete<{ success?: boolean; message?: string }>("/api/v1/scores", {
+        params: {
+            student_id: payload.student_id,
+            subject_id: payload.subject_id,
+        },
+    })
 }
 
 /**
@@ -65,6 +110,30 @@ export async function getSemesters(params?: { skip?: number; limit?: number }) {
             limit: params?.limit ?? 100,
         },
     })
+}
+
+/**
+ * Get list of semesters by cohort
+ */
+export async function getSemestersByCohort(cohortId: number) {
+    return api.get<Semester[] | { data?: Semester[]; items?: Semester[] }>(`/api/v1/cohorts/${cohortId}/semesters`)
+}
+
+export interface StudentProgramScoreSubject {
+    subject_id?: number | string
+    id?: number | string
+    subject_name?: string
+    name?: string
+    code?: string
+}
+
+/**
+ * Get available program subjects by class id
+ */
+export async function getProgramSubjectsByClass(classId: number) {
+    return api.get<StudentProgramScoreSubject[] | { data?: StudentProgramScoreSubject[]; items?: StudentProgramScoreSubject[] }>(
+        `/api/v1/classes/${classId}/program-subjects`
+    )
 }
 
 /**

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, ChevronDown } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -41,6 +41,7 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
   const router = useRouter()
   const [programFilter, setProgramFilter] = useState<"all" | "hoan-thanh" | "chua-hoan-thanh">("all")
   const [statusFilter, setStatusFilter] = useState<"all" | "dat" | "khong-dat">("all")
+  const [currentPage, setCurrentPage] = useState(1)
 
   const filteredStudents = students.filter((student) => {
     const matchesProgram =
@@ -56,8 +57,23 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
     return matchesProgram && matchesStatus
   })
 
+  const PAGE_SIZE = 15
   const totalRecords = filteredStudents.length
-  const displayCount = Math.min(15, totalRecords)
+  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages)
+  const startIndex = (safeCurrentPage - 1) * PAGE_SIZE
+  const pagedStudents = filteredStudents.slice(startIndex, startIndex + PAGE_SIZE)
+  const displayCount = pagedStudents.length
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [programFilter, statusFilter, students])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
 
   const handleStudentClick = (mssv: string) => {
     const search = typeof window !== "undefined" ? window.location.search : ""
@@ -144,10 +160,10 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredStudents.slice(0, 15).map((student, index) => (
+            {pagedStudents.map((student, index) => (
               <TableRow key={student.id} className="border-b border-gray-200 hover:bg-gray-50">
                 <TableCell className="h-12 px-4 text-center text-sm text-gray-600">
-                  {String(index + 1).padStart(2, '0')}
+                  {String(startIndex + index + 1).padStart(2, '0')}
                 </TableCell>
                 <TableCell className="h-12 px-4 text-sm">
                   <button
@@ -189,7 +205,8 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
             variant="outline"
             size="icon"
             className="h-8 w-8 border-gray-300"
-            disabled={true}
+            disabled={safeCurrentPage <= 1}
+            onClick={() => setCurrentPage(1)}
           >
             <ChevronsLeft className="h-4 w-4" />
           </Button>
@@ -197,20 +214,22 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
             variant="outline"
             size="icon"
             className="h-8 w-8 border-gray-300"
-            disabled={true}
+            disabled={safeCurrentPage <= 1}
+            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-1 px-3">
-            <span className="text-sm font-medium text-gray-700">1</span>
+            <span className="text-sm font-medium text-gray-700">{safeCurrentPage}</span>
             <span className="text-sm text-gray-400">/</span>
-            <span className="text-sm text-gray-600">4</span>
+            <span className="text-sm text-gray-600">{totalPages}</span>
           </div>
           <Button
             variant="outline"
             size="icon"
             className="h-8 w-8 border-gray-300"
-            disabled={totalRecords <= 15}
+            disabled={safeCurrentPage >= totalPages}
+            onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -218,7 +237,8 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
             variant="outline"
             size="icon"
             className="h-8 w-8 border-gray-300"
-            disabled={totalRecords <= 15}
+            disabled={safeCurrentPage >= totalPages}
+            onClick={() => setCurrentPage(totalPages)}
           >
             <ChevronsRight className="h-4 w-4" />
           </Button>
