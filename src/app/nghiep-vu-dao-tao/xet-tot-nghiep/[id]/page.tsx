@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { ChevronDown, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react"
-import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react"
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -13,12 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 import AppLayout from "@/components/AppLayout"
 import { api } from "@/lib/api"
@@ -40,13 +34,18 @@ type StudentDetail = {
   major: string
 }
 
-type CourseData = {
-  id: number
-  code: string
-  name: string
+type TranscriptSubject = {
+  subject_id: string
+  subject_name: string
   credits: number
-  type: string
-  status: string
+  score_4: string
+  is_required: boolean | null
+}
+
+type TranscriptResponse = {
+  student_id: number
+  student_name: string
+  subjects: TranscriptSubject[]
 }
 
 type CertificateData = {
@@ -67,28 +66,7 @@ type AcademicSummaryResponse = {
   elective_credits: number
 }
 
-const courseData: CourseData[] = [
-  { id: 1, code: "MIS1600340", name: "Hệ thống thông tin quản lý", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
-  { id: 2, code: "MIS1600341", name: "Cơ sở dữ liệu", credits: 3, type: "Tự chọn", status: "Đã học (Đạt)" },
-  { id: 3, code: "MIS1600342", name: "Lập trình nâng cao", credits: 3, type: "Tự chọn", status: "Chưa học" },
-  { id: 4, code: "MIS1600343", name: "Mạng máy tính", credits: 3, type: "Bắt buộc", status: "Chưa học" },
-  { id: 5, code: "MIS1600344", name: "Phân tích thiết kế Hệ thống", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
-  { id: 6, code: "MIS1600345", name: "Kiến trúc máy tính", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
-  { id: 7, code: "MIS1600346", name: "Hệ điều hành", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
-  { id: 8, code: "MIS1600347", name: "Kỹ thuật phần mềm", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
-  { id: 9, code: "MIS1600348", name: "Thiết kế web", credits: 3, type: "Tự chọn", status: "Đã học (Chưa đạt)" },
-  { id: 10, code: "MIS1600349", name: "Trí tuệ nhân tạo cơ bản", credits: 3, type: "Tự chọn", status: "Đã học (Chưa đạt)" },
-  { id: 11, code: "MIS1600350", name: "Thiết kế giao diện người dùng", credits: 2, type: "Tự chọn", status: "Đã học (Đạt)" },
-  { id: 12, code: "MIS1600351", name: "Bảo mật thông tin", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
-  { id: 13, code: "MIS1600352", name: "Toán rời rạc", credits: 3, type: "Bắt buộc", status: "Chưa học" },
-  { id: 14, code: "MIS1600353", name: "Phân tích dữ liệu", credits: 3, type: "Tự chọn", status: "Đã học (Đạt)" },
-  { id: 15, code: "MIS1600354", name: "Công nghệ đám mây", credits: 3, type: "Tự chọn", status: "Đã học (Đạt)" },
-  { id: 16, code: "MIS1600355", name: "Quản trị hệ thống cơ sở dữ liệu", credits: 3, type: "Bắt buộc", status: "Đã học (Đạt)" },
-  { id: 17, code: "MIS1600356", name: "Kiểm thử phần mềm", credits: 2, type: "Tự chọn", status: "Chưa học" },
-  { id: 18, code: "MIS1600357", name: "Phát triển ứng dụng di động", credits: 3, type: "Tự chọn", status: "Đã học (Đạt)" },
-  { id: 19, code: "MIS1600358", name: "Khung pháp lý CNTT", credits: 2, type: "Tự chọn", status: "Đã học (Chưa đạt)" },
-  { id: 20, code: "MIS1600359", name: "Luận văn/Đồ án tốt nghiệp", credits: 6, type: "Bắt buộc", status: "Chưa học" },
-]
+type DetailTab = "chuong-trinh" | "chung-chi"
 
 const certificateData: CertificateData[] = [
   { id: 1, name: "Chứng chỉ tin học", status: true, note: "Được miễn" },
@@ -100,29 +78,45 @@ const certificateData: CertificateData[] = [
 
 export default function XetTotNghiepDetailPage() {
   const router = useRouter()
+  const pathname = usePathname()
   const params = useParams<{ id?: string | string[] }>()
   const studentIdParam = useMemo(() => {
     if (typeof params?.id === "string") return params.id
     if (Array.isArray(params?.id) && typeof params.id[0] === "string") return params.id[0]
     return ""
   }, [params])
+
   const [student, setStudent] = useState<StudentDetail | null>(null)
   const [loadingStudent, setLoadingStudent] = useState(true)
   const [studentError, setStudentError] = useState("")
-  const [activeTab, setActiveTab] = useState("chuong-trinh")
-  const [filterType, setFilterType] = useState<string | null>(null)
-  const [filterStatus, setFilterStatus] = useState<string | null>(null)
+
+  const [subjects, setSubjects] = useState<TranscriptSubject[]>([])
+  const [loadingSubjects, setLoadingSubjects] = useState(true)
+  const [subjectsError, setSubjectsError] = useState("")
+
+  const [activeTab, setActiveTab] = useState<DetailTab>("chuong-trinh")
 
   const searchParams = useSearchParams()
 
-  useEffect(() => {
-    const fetchAcademicSummary = async () => {
-      if (!studentIdParam) {
-        setStudentError("Thiếu student_id trên đường dẫn")
-        setLoadingStudent(false)
-        return
-      }
+  const getValidTab = (tab: string | null): DetailTab => {
+    return tab === "chung-chi" ? "chung-chi" : "chuong-trinh"
+  }
 
+  useEffect(() => {
+    const tabFromUrl = getValidTab(searchParams?.get("tab"))
+    setActiveTab(tabFromUrl)
+  }, [searchParams])
+
+  useEffect(() => {
+    if (!studentIdParam) {
+      setStudentError("Thiếu student_id trên đường dẫn")
+      setSubjectsError("Thiếu student_id trên đường dẫn")
+      setLoadingStudent(false)
+      setLoadingSubjects(false)
+      return
+    }
+
+    const fetchAcademicSummary = async () => {
       try {
         setLoadingStudent(true)
         setStudentError("")
@@ -157,7 +151,27 @@ export default function XetTotNghiepDetailPage() {
       }
     }
 
+    const fetchTranscript = async () => {
+      try {
+        setLoadingSubjects(true)
+        setSubjectsError("")
+
+        const res = await api.get<TranscriptResponse>(`/api/v1/students/${studentIdParam}/transcript`)
+        setSubjects(Array.isArray(res.data?.subjects) ? res.data.subjects : [])
+      } catch (error: any) {
+        const detail = error?.response?.data?.detail
+        const message = typeof detail === "string" && detail.trim()
+          ? detail
+          : "Không tải được bảng điểm của sinh viên"
+        setSubjectsError(message)
+        setSubjects([])
+      } finally {
+        setLoadingSubjects(false)
+      }
+    }
+
     fetchAcademicSummary()
+    fetchTranscript()
   }, [studentIdParam])
 
   const displayStudent: StudentDetail = student || {
@@ -183,11 +197,26 @@ export default function XetTotNghiepDetailPage() {
     router.push(path)
   }
 
+  const getSubjectTypeLabel = (isRequired: boolean | null) => {
+    if (isRequired === true) return "Bắt buộc"
+    if (isRequired === false) return "Tự chọn"
+    return "Không phân loại"
+  }
+
+  const handleTabChange = (nextTab: string) => {
+    const validTab = getValidTab(nextTab)
+    setActiveTab(validTab)
+
+    const currentParams = new URLSearchParams(searchParams?.toString() ?? "")
+    currentParams.set("tab", validTab)
+
+    const nextQuery = currentParams.toString()
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+  }
+
   return (
     <AppLayout showSearch={false}>
-          <div className="px-8 py-6 bg-[var(--background)] min-h-screen flex flex-col">
-
-        {/* Header breadcrumb */}
+      <div className="px-8 py-6 bg-[var(--background)] min-h-screen flex flex-col">
         <div className="mb-4">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
             <button
@@ -204,9 +233,7 @@ export default function XetTotNghiepDetailPage() {
           {studentError && <p className="text-sm text-red-600 mt-2">{studentError}</p>}
         </div>
 
-            <div className="flex-1 flex flex-col gap-4">
-
-          {/* Student Info Card - sticky */}
+        <div className="flex-1 flex flex-col gap-4">
           <div className="bg-gradient-to-r from-white via-blue-50 to-white rounded-2xl border border-blue-200 p-8 shadow-xl sticky top-0 z-20 transition-all hover:shadow-blue-300 hover:scale-[1.01]">
             <div className="grid grid-cols-2 gap-8">
               <div className="space-y-3">
@@ -252,9 +279,8 @@ export default function XetTotNghiepDetailPage() {
             </div>
           </div>
 
-          {/* Tabs Card */}
-              <div className="flex-1 flex flex-col bg-white rounded-xl border border-[var(--border)] overflow-hidden min-h-0 shadow-sm mt-4">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col bg-white rounded-xl border border-[var(--border)] overflow-hidden min-h-0 shadow-sm mt-4">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col overflow-hidden">
               <div className="px-6 pt-4 border-b border-[var(--border)]">
                 <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start">
                   <TabsTrigger value="chuong-trinh" className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 font-semibold">
@@ -267,80 +293,70 @@ export default function XetTotNghiepDetailPage() {
               </div>
 
               <TabsContent value="chuong-trinh" className="flex-1 flex flex-col px-6 py-4">
-                     <div className="border border-[var(--border)] rounded-lg overflow-hidden flex flex-col flex-1">
-                       <div className="overflow-auto flex-1 max-h-[400px]">
-                         <Table className="min-w-max w-full">
-                           <TableHeader>
-                             <TableRow style={{ position: 'sticky', top: 0, zIndex: 10 }} className="border-b border-gray-200 bg-blue-50">
-                               <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">STT</TableHead>
-                               <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">MÃ HỌC PHẦN</TableHead>
-                               <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">TÊN HỌC PHẦN</TableHead>
-                               <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">SỐ TC</TableHead>
-                               <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
-                                 <DropdownMenu>
-                                   <DropdownMenuTrigger asChild>
-                                     <span className="cursor-pointer select-none flex items-center gap-1">
-                                       PHÂN LOẠI
-                                       <ChevronDown className="w-4 h-4 text-gray-500" />
-                                     </span>
-                                   </DropdownMenuTrigger>
-                                   <DropdownMenuContent align="start" className="w-32">
-                                     <DropdownMenuItem onClick={() => setFilterType(null)} className="cursor-pointer text-sm">Tất cả</DropdownMenuItem>
-                                     <DropdownMenuItem onClick={() => setFilterType("Bắt buộc")} className="cursor-pointer text-sm">Bắt buộc</DropdownMenuItem>
-                                     <DropdownMenuItem onClick={() => setFilterType("Tự chọn")} className="cursor-pointer text-sm">Tự chọn</DropdownMenuItem>
-                                   </DropdownMenuContent>
-                                 </DropdownMenu>
-                               </TableHead>
-                               <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
-                                 <DropdownMenu>
-                                   <DropdownMenuTrigger asChild>
-                                     <span className="cursor-pointer select-none flex items-center gap-1">
-                                       TRẠNG THÁI
-                                       <ChevronDown className="w-4 h-4 text-gray-500" />
-                                     </span>
-                                   </DropdownMenuTrigger>
-                                   <DropdownMenuContent align="start" className="w-40">
-                                     <DropdownMenuItem onClick={() => setFilterStatus(null)} className="cursor-pointer text-sm">Tất cả</DropdownMenuItem>
-                                     <DropdownMenuItem onClick={() => setFilterStatus("Đã học (Đạt)")} className="cursor-pointer text-sm">Đã học (Đạt)</DropdownMenuItem>
-                                     <DropdownMenuItem onClick={() => setFilterStatus("Đã học (Chưa đạt)")} className="cursor-pointer text-sm">Đã học (Chưa đạt)</DropdownMenuItem>
-                                     <DropdownMenuItem onClick={() => setFilterStatus("Chưa học")} className="cursor-pointer text-sm">Chưa học</DropdownMenuItem>
-                                   </DropdownMenuContent>
-                                 </DropdownMenu>
-                               </TableHead>
-                             </TableRow>
-                           </TableHeader>
-                           <TableBody>
-                             {(filterType || filterStatus
-                               ? courseData.filter(c => {
-                                   let typeMatch = filterType ? c.type === filterType : true;
-                                   let statusMatch = filterStatus ? c.status === filterStatus : true;
-                                   return typeMatch && statusMatch;
-                                 })
-                               : courseData
-                             ).map((course, index) => (
-                               <TableRow key={course.id} className="border-b border-transparent odd:bg-white even:bg-slate-50 hover:bg-slate-100">
-                                 <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{String(index + 1).padStart(2, '0')}</TableCell>
-                                 <TableCell className="h-12 px-4 text-sm text-gray-600">{course.code}</TableCell>
-                                 <TableCell className="h-12 px-4 text-sm text-gray-600">{course.name}</TableCell>
-                                 <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{course.credits}</TableCell>
-                                 <TableCell className="h-12 px-4 text-sm text-gray-600"><span className={course.type === "Tự chọn" ? "text-blue-600" : "text-gray-700"}>{course.type}</span></TableCell>
-                                 <TableCell className="h-12 px-4 text-sm"><span className={course.status.includes("Đạt") ? "text-green-600 font-medium" : course.status === "Chưa học" ? "text-gray-600" : "text-red-600 font-medium"}>{course.status}</span></TableCell>
-                               </TableRow>
-                             ))}
-                           </TableBody>
-                         </Table>
-                       </div>
+                <div className="border border-[var(--border)] rounded-lg overflow-hidden flex flex-col flex-1">
+                  <div className="overflow-auto flex-1 max-h-[400px]">
+                    <Table className="w-full table-fixed">
+                      <colgroup>
+                        <col style={{ width: "150px" }} />
+                        <col style={{ width: "280px" }} />
+                        <col style={{ width: "90px" }} />
+                        <col style={{ width: "130px" }} />
+                        <col style={{ width: "90px" }} />
+                      </colgroup>
+                      <TableHeader>
+                        <TableRow style={{ position: "sticky", top: 0, zIndex: 10 }} className="border-b border-gray-200 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">MÃ HỌC PHẦN</TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">TÊN HỌC PHẦN</TableHead>
+                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">SỐ TC</TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">PHÂN LOẠI</TableHead>
+                          <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">ĐIỂM</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {loadingSubjects && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="h-12 px-4 text-sm text-gray-600 text-center">
+                              Đang tải dữ liệu bảng điểm...
+                            </TableCell>
+                          </TableRow>
+                        )}
+
+                        {!loadingSubjects && subjectsError && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="h-12 px-4 text-sm text-red-600 text-center">
+                              {subjectsError}
+                            </TableCell>
+                          </TableRow>
+                        )}
+
+                        {!loadingSubjects && !subjectsError && subjects.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="h-12 px-4 text-sm text-gray-600 text-center">
+                              Không có dữ liệu bảng điểm
+                            </TableCell>
+                          </TableRow>
+                        )}
+
+                        {!loadingSubjects && !subjectsError && subjects.map((subject, index) => (
+                          <TableRow key={`${subject.subject_id}-${index}`} className="border-b border-transparent odd:bg-white even:bg-slate-50 hover:bg-slate-100">
+                            <TableCell className="h-12 px-4 text-sm text-gray-600">{subject.subject_id}</TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600 truncate" title={subject.subject_name}>{subject.subject_name}</TableCell>
+                            <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{subject.credits}</TableCell>
+                            <TableCell className="h-12 px-4 text-sm text-gray-600">
+                              <span className={subject.is_required === false ? "text-blue-600" : "text-gray-700"}>
+                                {getSubjectTypeLabel(subject.is_required)}
+                              </span>
+                            </TableCell>
+                            <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{subject.score_4}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
 
                   <div className="mt-4 pt-4 border-t border-gray-200 sticky bottom-0 z-10 bg-white">
                     <div className="flex items-center justify-between px-6 py-3">
-                      <div className="text-sm text-gray-600">Hiển thị 10/40 dòng</div>
-                      <div className="flex items-center gap-1">
-                        <Button variant="outline" size="icon" className="h-8 w-8"><ChevronsLeft className="h-4 w-4" /></Button>
-                        <Button variant="outline" size="icon" className="h-8 w-8"><ChevronLeft className="h-4 w-4" /></Button>
-                        <div className="px-3 text-sm font-medium">1 / 4</div>
-                        <Button variant="outline" size="icon" className="h-8 w-8"><ChevronRight className="h-4 w-4" /></Button>
-                        <Button variant="outline" size="icon" className="h-8 w-8"><ChevronsRight className="h-4 w-4" /></Button>
-                      </div>
+                      <div className="text-sm text-gray-600">Hiển thị {subjects.length}/{subjects.length} dòng</div>
                     </div>
                   </div>
                 </div>
@@ -351,13 +367,13 @@ export default function XetTotNghiepDetailPage() {
                   <div className="overflow-auto flex-1">
                     <Table className="w-full table-fixed">
                       <colgroup>
-                        <col style={{ width: '60px' }} />
-                        <col style={{ width: '100px' }} />
-                        <col style={{ width: '100px' }} />
-                        <col style={{ width: '120px' }} />
+                        <col style={{ width: "60px" }} />
+                        <col style={{ width: "100px" }} />
+                        <col style={{ width: "100px" }} />
+                        <col style={{ width: "120px" }} />
                       </colgroup>
                       <TableHeader>
-                        <TableRow style={{ position: 'sticky', top: 0, zIndex: 10 }} className="border-b border-gray-200 bg-blue-50">
+                        <TableRow style={{ position: "sticky", top: 0, zIndex: 10 }} className="border-b border-gray-200 bg-blue-50">
                           <TableHead className="h-10 px-2 text-center text-sm font-semibold text-gray-700">STT</TableHead>
                           <TableHead className="h-10 px-2 text-left text-sm font-semibold text-gray-700">LOẠI CHỨNG CHỈ</TableHead>
                           <TableHead className="h-10 px-2 text-center text-sm font-semibold text-gray-700">TRẠNG THÁI</TableHead>
@@ -367,7 +383,7 @@ export default function XetTotNghiepDetailPage() {
                       <TableBody>
                         {certificateData.map((cert, index) => (
                           <TableRow key={cert.id} className="border-b border-transparent odd:bg-white even:bg-slate-50 hover:bg-slate-100">
-                            <TableCell className="h-12 px-2 text-center text-sm text-gray-600">{String(index + 1).padStart(2, '0')}</TableCell>
+                            <TableCell className="h-12 px-2 text-center text-sm text-gray-600">{String(index + 1).padStart(2, "0")}</TableCell>
                             <TableCell className="h-12 px-2 text-sm text-gray-600">{cert.name}</TableCell>
                             <TableCell className="h-12 px-2 text-center"><Checkbox checked={cert.status} disabled /></TableCell>
                             <TableCell className="h-12 px-2 text-sm text-gray-600">{cert.note}</TableCell>

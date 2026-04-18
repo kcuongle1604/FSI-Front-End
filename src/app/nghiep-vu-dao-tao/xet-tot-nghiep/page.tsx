@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Search } from "lucide-react"
 import AppLayout from "@/components/AppLayout"
 import XetTotNghiepTab from "./components/XetTotNghiepTab"
@@ -96,13 +97,26 @@ type GraduationStudentItem = {
   sum_certificate?: number
   certificates?: number
   program_status?: string
-  graduation_status?: string
+  graduation_status?: unknown
   notes?: string | null
 }
 
 type GraduationEligibilityResponse = {
+  status?: string
+  message?: string
   class_info?: GraduationClassInfo
   students?: GraduationStudentItem[]
+}
+
+type GraduationSavePayload = {
+  semester_id: number
+  student_ids: number[]
+}
+
+type GraduationSaveResponse = {
+  saved?: number
+  skipped?: number
+  message?: string
 }
 
 function parseSemestersPayload(
@@ -142,7 +156,81 @@ function formatProgress(earned: unknown, required: unknown, fractionDigits = 0):
   return `${earnedText}/${requiredText}`
 }
 
+function normalizeFilterValue(value: string): string {
+  return value
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toLowerCase()
+}
+
+function isEligibleGraduationStatus(status: unknown): boolean {
+  if (typeof status === "boolean") return status
+  if (typeof status === "number") return status === 1
+
+  if (Array.isArray(status)) {
+    return status.some((item) => isEligibleGraduationStatus(item))
+  }
+
+  if (status && typeof status === "object") {
+    const nested = status as Record<string, unknown>
+    const preferredKeys = ["eligible", "is_eligible", "isEligible", "status", "graduation_status", "value", "result"]
+
+    for (const key of preferredKeys) {
+      if (Object.prototype.hasOwnProperty.call(nested, key) && isEligibleGraduationStatus(nested[key])) {
+        return true
+      }
+    }
+
+    return Object.values(nested).some((value) => isEligibleGraduationStatus(value))
+  }
+
+  const normalized = normalizeFilterValue(String(status || ""))
+  if (!normalized) return false
+
+  const positiveExact = new Set(["1", "true", "yes", "y", "x", "co", "dat", "eligible", "pass", "passed", "checked"])
+  if (positiveExact.has(normalized)) return true
+
+  const negativeExact = new Set(["0", "false", "no", "n", "khong", "khongdat", "chuadat", "ineligible", "fail", "failed", "truot"])
+  if (negativeExact.has(normalized)) return false
+
+  if (
+    normalized.includes("khongdat") ||
+    normalized.includes("chuadat") ||
+    normalized.includes("ineligible") ||
+    normalized.includes("noteligible") ||
+    normalized.includes("failed") ||
+    normalized.includes("fail") ||
+    normalized.includes("truot")
+  ) {
+    return false
+  }
+
+  return (
+    normalized.startsWith("dat") ||
+    normalized.includes("dudieukien") ||
+    normalized.includes("eligible") ||
+    normalized.includes("pass") ||
+    normalized.includes("totnghiep")
+  )
+}
+
+function toGraduationStatusLabel(status: unknown): string {
+  if (isEligibleGraduationStatus(status)) return "Đạt"
+
+  const normalized = normalizeFilterValue(String(status || ""))
+  if (!normalized) return "-"
+
+  return "Không đạt"
+}
+
 export default function XetTotNghiepPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   const [students, setStudents] = useState<XetTotNghiep[]>([])
   const [classes, setClasses] = useState<ClassApiItem[]>([])
   const [cohorts, setCohorts] = useState<CohortApiItem[]>([])
@@ -152,9 +240,19 @@ export default function XetTotNghiepPage() {
   const [selectedCourse, setSelectedCourse] = useState<string | undefined>()
   const [selectedClassId, setSelectedClassId] = useState("")
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [evaluatedCombos, setEvaluatedCombos] = useState<string[]>([])
+  const [eligibleStudentIds, setEligibleStudentIds] = useState<number[]>([])
+
+  const initialKhoa = searchParams?.get("khoa") ?? ""
+  const initialLop = searchParams?.get("lop") ?? ""
+  const initialKy = searchParams?.get("ky") ?? ""
+
+  const [pendingLopQuery, setPendingLopQuery] = useState(initialLop)
+  const [pendingKyQuery, setPendingKyQuery] = useState(initialKy)
 
   const getSemesterLabel = (semester: SemesterApiItem): string => {
     return (
@@ -211,6 +309,27 @@ export default function XetTotNghiepPage() {
   }, [classes, selectedCourse])
 
   useEffect(() => {
+    if (!initialKhoa) return
+    setSelectedCourse((prev) => (prev ? prev : initialKhoa))
+  }, [initialKhoa])
+
+  useEffect(() => {
+    if (!pendingLopQuery || !classOptions.length || selectedClassId) return
+
+    const target = classOptions.find((item) =>
+      normalizeFilterValue(getClassName(item)) === normalizeFilterValue(pendingLopQuery)
+    )
+
+    if (!target) return
+
+    const id = getClassId(target)
+    if (id !== null) {
+      setSelectedClassId(String(id))
+      setPendingLopQuery("")
+    }
+  }, [pendingLopQuery, classOptions, selectedClassId])
+
+  useEffect(() => {
     const fetchFilters = async () => {
       try {
         const [classesRes, cohortsRes] = await Promise.all([
@@ -262,36 +381,105 @@ export default function XetTotNghiepPage() {
     fetchSemesters()
   }, [selectedCourse])
 
+  useEffect(() => {
+    if (!pendingKyQuery || !semesters.length || selectedSemesterId) return
+
+    const target = semesters.find((item) =>
+      normalizeFilterValue(getSemesterLabel(item)) === normalizeFilterValue(pendingKyQuery)
+    )
+
+    if (!target) return
+
+    const id = itemId(target)
+    if (id) {
+      setSelectedSemesterId(id)
+      setPendingKyQuery("")
+    }
+  }, [pendingKyQuery, semesters, selectedSemesterId])
+
+  const itemId = (item: SemesterApiItem): string => String(item.semester_id ?? item.id ?? "")
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+
+    if (selectedCourse) params.set("khoa", selectedCourse)
+    else params.delete("khoa")
+
+    if (selectedClassLabel) params.set("lop", selectedClassLabel)
+    else params.delete("lop")
+
+    if (selectedSemesterLabel) params.set("ky", selectedSemesterLabel)
+    else params.delete("ky")
+
+    const next = params.toString()
+    const current = searchParams?.toString() ?? ""
+
+    if (next !== current) {
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }
+  }, [
+    selectedCourse,
+    selectedClassLabel,
+    selectedSemesterLabel,
+    pathname,
+    router,
+    searchParams,
+  ])
+
   const hasRequiredFilters = Boolean(selectedSemesterId && selectedClassId)
 
   useEffect(() => {
     const fetchEligibility = async () => {
       if (!hasRequiredFilters) {
         setStudents([])
+        setEligibleStudentIds([])
         setErrorMessage("")
+        setSuccessMessage("")
         return
       }
 
       try {
         setLoading(true)
         setErrorMessage("")
+        setSuccessMessage("")
 
-        const response = await api.get<GraduationEligibilityResponse>(
+        const comboKey = `${selectedClassId}__${selectedSemesterId}`
+        const params = {
+          class_id: Number(selectedClassId),
+          semester_id: Number(selectedSemesterId),
+        }
+
+        const eligibilityResponse = await api.get<GraduationEligibilityResponse>(
           `/api/v1/graduation-eligibility/class/${selectedClassId}`,
-          {
-            params: {
-              class_id: Number(selectedClassId),
-              semester_id: Number(selectedSemesterId),
-            },
-          }
+          { params }
         )
 
-        const classInfo = response.data?.class_info || {}
-        const studentsFromApi = Array.isArray(response.data?.students) ? response.data.students : []
-        const totalCertificates = Number(classInfo.sum_certificate ?? classInfo.total_certificate ?? 0)
+        const backendStatus = normalizeFilterValue(String(eligibilityResponse.data?.status || ""))
+        let dataSource = eligibilityResponse.data
 
+        if (backendStatus === "evaluated") {
+          const evaluatedMessage = String(eligibilityResponse.data?.message || "").trim()
+          if (evaluatedMessage) {
+            setSuccessMessage(evaluatedMessage)
+          }
+
+          setEvaluatedCombos((prev) => (prev.includes(comboKey) ? prev : [...prev, comboKey]))
+
+          const resultsResponse = await api.get<GraduationEligibilityResponse>(
+            `/api/v1/graduation-eligibility/class/${selectedClassId}/results`,
+            { params }
+          )
+          dataSource = resultsResponse.data
+        } else {
+          setEvaluatedCombos((prev) => prev.filter((item) => item !== comboKey))
+        }
+
+        const classInfo = dataSource?.class_info || {}
+        const studentsFromApi = Array.isArray(dataSource?.students) ? dataSource.students : []
+        const totalCertificates = Number(classInfo.sum_certificate ?? classInfo.total_certificate ?? 0)
         const mappedStudents: XetTotNghiep[] = studentsFromApi.map((student, index) => {
           const certificates = Number(student.sum_certificate ?? student.certificates ?? 0)
+          const normalizedStatus = toGraduationStatusLabel(student.graduation_status)
 
           return {
             id: Number(student.student_id ?? index + 1),
@@ -306,13 +494,20 @@ export default function XetTotNghiepPage() {
             gpa: formatProgress(student.gpa, classInfo.gpa, 2),
             ccdr: totalCertificates > 0 ? `${certificates}/${totalCertificates}` : String(certificates),
             program: String(student.program_status || "-"),
-            status: String(student.graduation_status || "-"),
+            status: normalizedStatus,
           }
         })
 
+        const eligibleIds = mappedStudents
+          .filter((student) => student.status === "Đạt")
+          .map((student) => Number(student.mssv))
+          .filter((id) => Number.isFinite(id) && id > 0)
+
         setStudents(mappedStudents)
+        setEligibleStudentIds(eligibleIds)
       } catch (error: any) {
         setStudents([])
+        setEligibleStudentIds([])
         setErrorMessage(extractBackendMessage(error, "Không tải được dữ liệu xét tốt nghiệp"))
       } finally {
         setLoading(false)
@@ -336,6 +531,65 @@ export default function XetTotNghiepPage() {
   const visibleStudents = hasRequiredFilters ? filteredStudents : []
   const currentComboKey = hasRequiredFilters ? `${selectedClassId}__${selectedSemesterId}` : null
   const isCurrentComboEvaluated = currentComboKey ? evaluatedCombos.includes(currentComboKey) : false
+
+  const handleConfirmEvaluate = async () => {
+    if (!selectedClassId || !selectedSemesterId) {
+      setErrorMessage("Vui lòng chọn lớp và kỳ trước khi xét tốt nghiệp")
+      setSuccessMessage("")
+      return
+    }
+
+    const semesterId = Number(selectedSemesterId)
+    const classId = Number(selectedClassId)
+
+    if (!Number.isFinite(semesterId) || !Number.isFinite(classId)) {
+      setErrorMessage("Thông tin lớp hoặc kỳ không hợp lệ")
+      setSuccessMessage("")
+      return
+    }
+
+    const studentIdsToSave = eligibleStudentIds
+
+    if (!studentIdsToSave.length) {
+      setErrorMessage("Không có sinh viên đủ điều kiện để lưu kết quả xét tốt nghiệp")
+      setSuccessMessage("")
+      setConfirmOpen(false)
+      return
+    }
+
+    try {
+      setSaving(true)
+      setErrorMessage("")
+      setSuccessMessage("")
+
+      const payload: GraduationSavePayload = {
+        semester_id: semesterId,
+        student_ids: studentIdsToSave,
+      }
+
+      const saveResponse = await api.post<GraduationSaveResponse>(
+        `/api/v1/graduation-eligibility/class/${classId}/save`,
+        payload
+      )
+      const saved = Number(saveResponse.data?.saved ?? 0)
+      const skipped = Number(saveResponse.data?.skipped ?? 0)
+      const backendMessage = String(saveResponse.data?.message ?? "").trim()
+
+      setSuccessMessage(
+        backendMessage || `Đã lưu ${saved} sinh viên, bỏ qua ${skipped} sinh viên.`
+      )
+
+      if (currentComboKey && !evaluatedCombos.includes(currentComboKey)) {
+        setEvaluatedCombos((prev) => [...prev, currentComboKey])
+      }
+      setConfirmOpen(false)
+    } catch (error: any) {
+      setSuccessMessage("")
+      setErrorMessage(extractBackendMessage(error, "Không lưu được kết quả xét tốt nghiệp"))
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <AppLayout showSearch={false}>
@@ -424,7 +678,7 @@ export default function XetTotNghiepPage() {
                 {semesters
                   .filter((item) => Number.isFinite(item.semester_id ?? item.id))
                   .map((item) => {
-                    const id = String(item.semester_id ?? item.id)
+                    const id = itemId(item)
                     return (
                       <SelectItem key={id} value={id}>{getSemesterLabel(item)}</SelectItem>
                     )
@@ -435,11 +689,11 @@ export default function XetTotNghiepPage() {
           <div className="flex items-center gap-2 ml-auto">
             <Button
               className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm"
-              disabled={!hasRequiredFilters || visibleStudents.length === 0 || isCurrentComboEvaluated}
+              disabled={!hasRequiredFilters || visibleStudents.length === 0 || isCurrentComboEvaluated || saving}
               onClick={() => setConfirmOpen(true)}
             >
               <GraduationCap className="h-4 w-4" />
-              Xét tốt nghiệp
+              {saving ? "Đang lưu..." : "Xét tốt nghiệp"}
             </Button>
             <Button
               className="bg-white text-slate-700 border border-slate-200 hover:bg-[#06b6d4] hover:text-black h-9 gap-2 text-sm transition-colors shadow-none"
@@ -452,6 +706,7 @@ export default function XetTotNghiepPage() {
         </div>
 
         {loading && <p className="text-sm text-gray-600 mb-3">Đang tải dữ liệu xét tốt nghiệp...</p>}
+        {successMessage && <p className="text-sm text-emerald-700 mb-3">{successMessage}</p>}
         {errorMessage && <p className="text-sm text-red-600 mb-3">{errorMessage}</p>}
 
         {/* Table */}
@@ -474,14 +729,10 @@ export default function XetTotNghiepPage() {
               </Button>
               <Button
                 className="bg-[#167FFC] hover:bg-[#1470E3]"
-                onClick={() => {
-                  if (currentComboKey && !evaluatedCombos.includes(currentComboKey)) {
-                    setEvaluatedCombos((prev) => [...prev, currentComboKey])
-                  }
-                  setConfirmOpen(false)
-                }}
+                onClick={handleConfirmEvaluate}
+                disabled={saving}
               >
-                Có
+                {saving ? "Đang lưu..." : "Có"}
               </Button>
             </DialogFooter>
           </DialogContent>

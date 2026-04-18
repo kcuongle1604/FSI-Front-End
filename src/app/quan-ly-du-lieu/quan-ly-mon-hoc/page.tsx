@@ -73,6 +73,7 @@ export default function QuanLyMonHocPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState("")
   const [deleteUsedMajors, setDeleteUsedMajors] = useState<string[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     const fetchSubjects = async () => {
@@ -131,10 +132,23 @@ export default function QuanLyMonHocPage() {
     })
   }, [subjects, searchQuery])
 
-  const PAGE_SIZE = 30
+  const PAGE_SIZE = 12
   const totalRecords = filteredSubjects.length
-  const displayCount = Math.min(PAGE_SIZE, totalRecords)
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const startIndex = (safeCurrentPage - 1) * PAGE_SIZE
+  const paginatedSubjects = filteredSubjects.slice(startIndex, startIndex + PAGE_SIZE)
+  const displayCount = paginatedSubjects.length
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
 
   const openEditSubjectDialog = (subject: SubjectRow) => {
     setSelectedSubject(subject)
@@ -340,13 +354,13 @@ export default function QuanLyMonHocPage() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          filteredSubjects.map((subject, index) => (
+                          paginatedSubjects.map((subject, index) => (
                             <TableRow
                               key={subject.id}
                               className="border-b border-gray-200 hover:bg-gray-50"
                             >
                               <TableCell className="h-12 px-4 w-[80px] text-sm text-gray-600">
-                                {String(index + 1).padStart(2, "0")}
+                                {String(startIndex + index + 1).padStart(2, "0")}
                               </TableCell>
                               <TableCell className="h-12 px-4 text-sm text-gray-600">
                                 {subject.code}
@@ -389,21 +403,45 @@ export default function QuanLyMonHocPage() {
                     Hiển thị {displayCount}/{totalRecords} dòng
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button variant="outline" size="icon" className="h-8 w-8 border-gray-300" disabled>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 border-gray-300"
+                      disabled={safeCurrentPage === 1}
+                      onClick={() => setCurrentPage(1)}
+                    >
                       <ChevronsLeft className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" size="icon" className="h-8 w-8 border-gray-300" disabled>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 border-gray-300"
+                      disabled={safeCurrentPage === 1}
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
                     <div className="flex items-center gap-1 px-3 text-sm">
-                      <span className="font-medium text-gray-700">1</span>
+                      <span className="font-medium text-gray-700">{safeCurrentPage}</span>
                       <span className="text-gray-400">/</span>
                       <span className="text-gray-600">{totalPages}</span>
                     </div>
-                    <Button variant="outline" size="icon" className="h-8 w-8 border-gray-300" disabled={totalRecords <= PAGE_SIZE}>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 border-gray-300"
+                      disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" size="icon" className="h-8 w-8 border-gray-300" disabled={totalRecords <= PAGE_SIZE}>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 border-gray-300"
+                      disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage(totalPages)}
+                    >
                       <ChevronsRight className="h-4 w-4" />
                     </Button>
                   </div>

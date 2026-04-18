@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
 import { Award, History, Upload } from "lucide-react"
@@ -40,6 +40,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import CertificateFormDialog from "./components/CertificateFormDialog"
 import DeleteCertificateDialog from "./components/DeleteCertificateDialog"
@@ -138,10 +139,16 @@ const DEFAULT_CERTIFICATE_HEADERS = [
 ]
 
 export default function ChungChiPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   const [activeTab, setActiveTab] = useState("chung-chi")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedKhoa, setSelectedKhoa] = useState<string | undefined>()
   const [selectedLop, setSelectedLop] = useState<string | undefined>()
+  const isSyncingFromUrlRef = useRef(false)
+  const didInitFromUrlRef = useRef(false)
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
@@ -159,6 +166,31 @@ export default function ChungChiPage() {
   const classNameOf = (item: ClassApiItem): string => String(item.class_name || item.name || "").trim()
   const getClassByName = (className?: string) =>
     classes.find((c) => classNameOf(c) === String(className || "").trim())
+
+  const getValidTab = (tab: string | null) => {
+    if (tab === "import-mien-hoc-phan-tieng-anh") return "import-mien-hoc-phan-tieng-anh"
+    if (tab === "lich-su-import") return "lich-su-import"
+    return "chung-chi"
+  }
+
+  useEffect(() => {
+    isSyncingFromUrlRef.current = true
+
+    const tabFromUrl = getValidTab(searchParams?.get("tab"))
+    const queryFromUrl = searchParams?.get("q") ?? ""
+    const khoaFromUrl = searchParams?.get("khoa") ?? undefined
+    const lopFromUrl = searchParams?.get("lop") ?? undefined
+
+    setActiveTab((prev) => (prev === tabFromUrl ? prev : tabFromUrl))
+    setSearchQuery((prev) => (prev === queryFromUrl ? prev : queryFromUrl))
+    setSelectedKhoa((prev) => (prev === khoaFromUrl ? prev : khoaFromUrl))
+    setSelectedLop((prev) => (prev === lopFromUrl ? prev : lopFromUrl))
+
+    didInitFromUrlRef.current = true
+    window.setTimeout(() => {
+      isSyncingFromUrlRef.current = false
+    }, 0)
+  }, [searchParams])
 
   const availableClasses =
     !selectedKhoa || selectedKhoa === "all"
@@ -454,6 +486,31 @@ export default function ChungChiPage() {
 
     void fetchCertificatesByCohort()
   }, [selectedKhoa])
+
+  useEffect(() => {
+    if (!didInitFromUrlRef.current || isSyncingFromUrlRef.current) return
+
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+
+    if (activeTab !== "chung-chi") params.set("tab", activeTab)
+    else params.delete("tab")
+
+    if (searchQuery.trim()) params.set("q", searchQuery.trim())
+    else params.delete("q")
+
+    if (selectedKhoa) params.set("khoa", selectedKhoa)
+    else params.delete("khoa")
+
+    if (selectedLop) params.set("lop", selectedLop)
+    else params.delete("lop")
+
+    const next = params.toString()
+    const current = searchParams?.toString() ?? ""
+
+    if (next !== current) {
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }
+  }, [activeTab, searchQuery, selectedKhoa, selectedLop, pathname, router, searchParams])
 
   const handleEdit = (certificate: Certificate) => {
     setSelectedCertificate(certificate)

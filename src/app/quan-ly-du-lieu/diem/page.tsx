@@ -41,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 // Components and APIs
 import ScoreFormDialog from "./components/ScoreFormDialog"
@@ -48,6 +49,7 @@ import DeleteScoreDialog from "./components/DeleteScoreDialog"
 import ScoreImportDialog from "./components/ScoreImportDialog"
 import ImportHistoryTab from "../sinh-vien/components/ImportHistoryTab"
 import { getScoreMatrix, getClasses } from "./score.api"
+import { getCohorts } from "../sinh-vien/student.api"
 import type { ImportHistory } from "../sinh-vien/types"
 import type { ScoreCell, ScoreImportResponse, StudentScore } from "./types"
 
@@ -96,6 +98,10 @@ function normalizeScoreKey(value: string): string {
 }
 
 export default function DiemPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   const [activeTab, setActiveTab] = useState("diem")
   const [searchQuery, setSearchQuery] = useState("")
   const [loading, setLoading] = useState(false)
@@ -105,6 +111,8 @@ export default function DiemPage() {
   const [scoreData, setScoreData] = useState<StudentScore[]>([])
   const [subjects, setSubjects] = useState<string[]>([])
   const [classes, setClasses] = useState<any[]>([]) // Using any[] to match student API response
+  const [cohorts, setCohorts] = useState<any[]>([])
+  const [selectedKhoa, setSelectedKhoa] = useState<string | undefined>()
   const [selectedClass, setSelectedClass] = useState<string | undefined>()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -113,8 +121,33 @@ export default function DiemPage() {
   const [selectedStudent, setSelectedStudent] = useState<StudentScore | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const latestRefreshRequestRef = useRef(0)
+  const isSyncingFromUrlRef = useRef(false)
+  const didInitFromUrlRef = useRef(false)
 
   const [importHistory] = useState<ImportHistory[]>([])
+
+  const getValidTab = (tab: string | null) => {
+    return tab === "lich-su-import" ? "lich-su-import" : "diem"
+  }
+
+  useEffect(() => {
+    isSyncingFromUrlRef.current = true
+
+    const tabFromUrl = getValidTab(searchParams?.get("tab"))
+    const queryFromUrl = searchParams?.get("q") ?? ""
+    const khoaFromUrl = searchParams?.get("khoa") ?? undefined
+    const lopFromUrl = searchParams?.get("lop") ?? undefined
+
+    setActiveTab((prev) => (prev === tabFromUrl ? prev : tabFromUrl))
+    setSearchQuery((prev) => (prev === queryFromUrl ? prev : queryFromUrl))
+    setSelectedKhoa((prev) => (prev === khoaFromUrl ? prev : khoaFromUrl))
+    setSelectedClass((prev) => (prev === lopFromUrl ? prev : lopFromUrl))
+
+    didInitFromUrlRef.current = true
+    window.setTimeout(() => {
+      isSyncingFromUrlRef.current = false
+    }, 0)
+  }, [searchParams])
 
   const toFiniteNumber = (value: unknown): number | null => {
     const numeric = Number(value)
@@ -146,6 +179,12 @@ export default function DiemPage() {
   })()
 
   const scoreRefreshKey = `${selectedClass ?? ""}|${selectedClassId ?? ""}`
+
+  const availableClasses = !selectedKhoa || selectedKhoa === "all"
+    ? classes.map((c: any) => c.class_name || c.name || c)
+    : classes
+      .filter((c: any) => c.cohort_id === Number(selectedKhoa))
+      .map((c: any) => c.class_name || c.name || c)
 
   const refreshScoreMatrix = async (targetClassName?: string, targetClassId?: number | null) => {
     const requestId = latestRefreshRequestRef.current + 1
@@ -212,7 +251,18 @@ export default function DiemPage() {
         setPageError(extractBackendMessage(err, "Không tải được danh sách lớp."))
       }
     }
+
+    const fetchCohorts = async () => {
+      try {
+        const res = await getCohorts()
+        setCohorts(Array.isArray(res?.data) ? res.data : [])
+      } catch (err: any) {
+        setPageError(extractBackendMessage(err, "Không tải được danh sách khóa."))
+      }
+    }
+
     fetchClasses()
+    fetchCohorts()
   }, [])
 
   // Fetch score matrix when class is selected
@@ -249,6 +299,39 @@ export default function DiemPage() {
       setCurrentPage(totalPages)
     }
   }, [currentPage, totalPages])
+
+  useEffect(() => {
+    if (!didInitFromUrlRef.current || isSyncingFromUrlRef.current) return
+
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+
+    if (activeTab !== "diem") params.set("tab", activeTab)
+    else params.delete("tab")
+
+    if (searchQuery.trim()) params.set("q", searchQuery.trim())
+    else params.delete("q")
+
+    if (selectedKhoa) params.set("khoa", selectedKhoa)
+    else params.delete("khoa")
+
+    if (selectedClass) params.set("lop", selectedClass)
+    else params.delete("lop")
+
+    const next = params.toString()
+    const current = searchParams?.toString() ?? ""
+
+    if (next !== current) {
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }
+  }, [
+    activeTab,
+    searchQuery,
+    selectedKhoa,
+    selectedClass,
+    pathname,
+    router,
+    searchParams,
+  ])
 
   const handleEdit = (student: StudentScore) => {
     setSelectedStudent(student)
@@ -392,8 +475,50 @@ export default function DiemPage() {
 
                 <div className="flex items-center gap-2">
                   <Select
+                    value={selectedKhoa}
+                    onValueChange={(value) => {
+                      setSelectedKhoa(value)
+                      setSelectedClass(undefined)
+                    }}
+                  >
+                    <SelectTrigger className="h-9 w-[140px] bg-white">
+                      <SelectValue placeholder="Khóa" />
+                    </SelectTrigger>
+                    <SelectContent
+                      position="popper"
+                      side="bottom"
+                      align="center"
+                      className="w-[var(--radix-select-trigger-width)]"
+                    >
+                      <SelectItem value="all">Tất cả</SelectItem>
+                      {cohorts.map((cohort: any) => {
+                        const label = cohort.name
+                          ? `${cohort.name} (${cohort.year_start}-${cohort.year_end})`
+                          : `Khóa ${cohort.cohort_id} (${cohort.year_start}-${cohort.year_end})`
+                        return (
+                          <SelectItem key={cohort.cohort_id} value={String(cohort.cohort_id)}>
+                            {label}
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectContent>
+                  </Select>
+
+                  <Select
                     value={selectedClass}
-                    onValueChange={setSelectedClass}
+                    onValueChange={(value) => {
+                      setSelectedClass(value)
+
+                      if (!selectedKhoa || selectedKhoa === "all") {
+                        const selectedClassItem = classes.find((c: any) => {
+                          const className = c.class_name || c.name || c
+                          return className === value
+                        })
+                        if (selectedClassItem?.cohort_id) {
+                          setSelectedKhoa(String(selectedClassItem.cohort_id))
+                        }
+                      }
+                    }}
                   >
                     <SelectTrigger className="h-9 w-[200px] bg-white">
                       <SelectValue placeholder="Chọn lớp" />
@@ -405,13 +530,11 @@ export default function DiemPage() {
                       className="w-[var(--radix-select-trigger-width)]"
                     >
                       <SelectItem value="all">Tất cả</SelectItem>
-                      {classes
-                        .map((c: any) => c.class_name || c.name || c)
-                        .map((className: string) => (
-                          <SelectItem key={className} value={className}>
-                            {className}
-                          </SelectItem>
-                        ))}
+                      {availableClasses.map((className: string) => (
+                        <SelectItem key={className} value={className}>
+                          {className}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

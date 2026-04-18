@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Plus, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,7 @@ import ClassManagementTable from "./components/ClassManagementTable"
 import { AddClassDialog } from "./components/AddClassDialog"
 import { EditClassDialog } from "./components/EditClassDialog"
 import { DeleteClassDialog } from "./components/DeleteClassDialog"
+import { api } from "@/lib/api"
 
 type SchoolClass = {
   id: number
@@ -18,25 +19,71 @@ type SchoolClass = {
   studentCount: number | string
 }
 
-const classes = [
-  { id: 1, name: "48K21.2", specialization: "Quản trị hệ thống thông tin", advisor: "Cao Thị Nhâm", studentCount: "Trống" },
-  { id: 2, name: "48K21.2", specialization: "Quản trị hệ thống thông tin", advisor: "Cao Thị Nhâm", studentCount: "Trống" },
-  { id: 3, name: "48K21.2", specialization: "Quản trị hệ thống thông tin", advisor: "Cao Thị Nhâm", studentCount: 60 },
-  { id: 4, name: "48K21.2", specialization: "Quản trị hệ thống thông tin", advisor: "Cao Thị Nhâm", studentCount: 60 },
-  { id: 5, name: "48K21.2", specialization: "Quản trị hệ thống thông tin", advisor: "Cao Thị Nhâm", studentCount: 60 },
-  { id: 6, name: "48K21.2", specialization: "Quản trị hệ thống thông tin", advisor: "Cao Thị Nhâm", studentCount: 60 },
-  { id: 7, name: "48K21.2", specialization: "Quản trị hệ thống thông tin", advisor: "Cao Thị Nhâm", studentCount: 60 },
-  { id: 8, name: "48K21.2", specialization: "Quản trị hệ thống thông tin", advisor: "Cao Thị Nhâm", studentCount: 60 },
-  { id: 9, name: "48K21.2", specialization: "Quản trị hệ thống thông tin", advisor: "Cao Thị Nhâm", studentCount: 60 },
-  { id: 10, name: "48K21.2", specialization: "Quản trị hệ thống thông tin", advisor: "Cao Thị Nhâm", studentCount: 60 },
-]
+type ClassApiItem = {
+  class_id?: number
+  id?: number
+  name?: string
+  class_name?: string
+  major_id?: number
+  advisor_username?: string
+  advisor_name?: string
+  student_count?: number
+}
+
+function extractBackendMessage(error: any, fallback: string): string {
+  const detail = error?.response?.data?.detail
+  if (typeof detail === "string" && detail.trim()) return detail
+
+  const message = error?.response?.data?.message || error?.message
+  if (typeof message === "string" && message.trim()) return message
+
+  return fallback
+}
 
 export default function QuanLyLopHocPage() {
   const [searchQuery, setSearchQuery] = useState("")
+  const [classes, setClasses] = useState<SchoolClass[]>([])
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState("")
   const [openAddDialog, setOpenAddDialog] = useState(false)
   const [openEditDialog, setOpenEditDialog] = useState(false)
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false)
   const [selectedClass, setSelectedClass] = useState<SchoolClass | undefined>()
+
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        setLoading(true)
+        setLoadError("")
+
+        const res = await api.get<ClassApiItem[]>("/api/v1/classes")
+        const list = Array.isArray(res.data) ? res.data : []
+
+        const mapped = list.map((item, index) => {
+          const rawClassId = Number(item.class_id ?? item.id)
+          const majorId = Number(item.major_id)
+          const studentCount = Number(item.student_count)
+
+          return {
+            id: Number.isFinite(rawClassId) ? rawClassId : index + 1,
+            name: String(item.name || item.class_name || "-").trim() || "-",
+            specialization: Number.isFinite(majorId) ? `Chuyên ngành #${majorId}` : "-",
+            advisor: String(item.advisor_username || item.advisor_name || "-").trim() || "-",
+            studentCount: Number.isFinite(studentCount) ? studentCount : "0",
+          }
+        })
+
+        setClasses(mapped)
+      } catch (error: any) {
+        setLoadError(extractBackendMessage(error, "Không tải được danh sách lớp học."))
+        setClasses([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    void fetchClasses()
+  }, [])
 
   const filteredClasses = classes.filter(schoolClass => 
     schoolClass.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -52,7 +99,7 @@ export default function QuanLyLopHocPage() {
     setOpenDeleteDialog(true)
   }
 
-  const handleAddClass = (data: { name: string; specialization: string; advisor: string; studentCount: string | number }) => {
+  const handleAddClass = (data: { name: string; specialization: string; advisor: string }) => {
   }
 
   const handleUpdateClass = (data: { name: string; specialization: string; advisor: string; studentCount: string | number }) => {
@@ -101,6 +148,9 @@ export default function QuanLyLopHocPage() {
         </div>
 
         {/* Table */}
+        {loadError && <p className="mb-3 text-sm text-red-600">{loadError}</p>}
+        {loading && <p className="mb-3 text-sm text-gray-600">Đang tải danh sách lớp học...</p>}
+
         <ClassManagementTable 
           classes={filteredClasses}
           onEditClick={handleEditClick}

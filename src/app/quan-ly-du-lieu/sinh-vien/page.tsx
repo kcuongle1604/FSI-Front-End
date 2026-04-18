@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
 import { Users, FileText } from "lucide-react"
@@ -41,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 // Components
 import StudentFormDialog from "./components/StudentFormDialog"
@@ -69,6 +70,10 @@ function extractBackendMessage(error: any, fallback: string): string {
 }
 
 export default function SinhVienPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien")
   const [searchQuery, setSearchQuery] = useState("")
   const [students, setStudents] = useState<Student[]>([])
@@ -85,9 +90,34 @@ export default function SinhVienPage() {
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const isSyncingFromUrlRef = useRef(false)
+  const didInitFromUrlRef = useRef(false)
 
   // giữ nguyên để dùng cho tab lịch sử import
   const [importHistory] = useState<ImportHistory[]>([])
+
+  const getValidTab = (tab: string | null) => {
+    return tab === "lich-su-import" ? "lich-su-import" : "thong-tin-sinh-vien"
+  }
+
+  useEffect(() => {
+    isSyncingFromUrlRef.current = true
+
+    const tabFromUrl = getValidTab(searchParams?.get("tab"))
+    const queryFromUrl = searchParams?.get("q") ?? ""
+    const khoaFromUrl = searchParams?.get("khoa") ?? undefined
+    const lopFromUrl = searchParams?.get("lop") ?? undefined
+
+    setActiveTab((prev) => (prev === tabFromUrl ? prev : tabFromUrl))
+    setSearchQuery((prev) => (prev === queryFromUrl ? prev : queryFromUrl))
+    setSelectedKhoa((prev) => (prev === khoaFromUrl ? prev : khoaFromUrl))
+    setSelectedLop((prev) => (prev === lopFromUrl ? prev : lopFromUrl))
+
+    didInitFromUrlRef.current = true
+    window.setTimeout(() => {
+      isSyncingFromUrlRef.current = false
+    }, 0)
+  }, [searchParams])
 
   // ===== FIX: LOAD DATA TỪ API =====
   // Convert yyyy-mm-dd to dd/mm/yyyy for display
@@ -108,6 +138,11 @@ export default function SinhVienPage() {
       const params: any = {}
       if (selectedLop && selectedLop !== "all") {
         params.class_name = selectedLop
+      } else if (selectedKhoa && selectedKhoa !== "all") {
+        const cohortId = Number(selectedKhoa)
+        if (Number.isFinite(cohortId)) {
+          params.cohort_id = cohortId
+        }
       }
 
       const res = await getStudents(params)
@@ -167,12 +202,10 @@ export default function SinhVienPage() {
     fetchCohorts()
   }, [])
 
-  // Refetch students when selectedLop changes
+  // Refetch students when filters change
   useEffect(() => {
-    if (selectedLop) {
-      fetchStudents()
-    }
-  }, [selectedLop])
+    fetchStudents()
+  }, [selectedKhoa, selectedLop])
 
   // ===== Lọc theo Khóa, Lớp và tìm kiếm =====
   const availableClasses = !selectedKhoa || selectedKhoa === "all"
@@ -185,14 +218,22 @@ export default function SinhVienPage() {
       .map((c: any) => c.class_name || c.name || c)
 
   const filteredStudents = students.filter((student) => {
-    // Chưa chọn lớp => không hiển thị dữ liệu
-    if (!selectedLop || selectedLop === "all") {
-      return false
-    }
-
     // Lọc theo Lớp cụ thể
     if (selectedLop && selectedLop !== "all" && student.lop !== selectedLop) {
       return false
+    }
+
+    // Chọn khóa nhưng chưa chọn lớp: lọc theo các lớp thuộc khóa đã chọn
+    if ((!selectedLop || selectedLop === "all") && selectedKhoa && selectedKhoa !== "all") {
+      const allowedClasses = new Set(
+        classes
+          .filter((c: any) => c.cohort_id === Number(selectedKhoa))
+          .map((c: any) => c.class_name || c.name || c)
+      )
+
+      if (!allowedClasses.has(student.lop)) {
+        return false
+      }
     }
 
     // Lọc theo text tìm kiếm (MSSV hoặc Họ tên)
@@ -205,7 +246,7 @@ export default function SinhVienPage() {
     )
   })
 
-  const PAGE_SIZE = 30
+  const PAGE_SIZE = 12
   const totalRecords = filteredStudents.length
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
   const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages)
@@ -222,6 +263,31 @@ export default function SinhVienPage() {
       setCurrentPage(totalPages)
     }
   }, [currentPage, totalPages])
+
+  useEffect(() => {
+    if (!didInitFromUrlRef.current || isSyncingFromUrlRef.current) return
+
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+
+    if (activeTab !== "thong-tin-sinh-vien") params.set("tab", activeTab)
+    else params.delete("tab")
+
+    if (searchQuery.trim()) params.set("q", searchQuery.trim())
+    else params.delete("q")
+
+    if (selectedKhoa) params.set("khoa", selectedKhoa)
+    else params.delete("khoa")
+
+    if (selectedLop) params.set("lop", selectedLop)
+    else params.delete("lop")
+
+    const next = params.toString()
+    const current = searchParams?.toString() ?? ""
+
+    if (next !== current) {
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }
+  }, [activeTab, searchQuery, selectedKhoa, selectedLop, pathname, router, searchParams])
 
   const handleEdit = (student: Student) => {
     setSelectedStudent(student)

@@ -36,6 +36,17 @@ const toNumberWithDefault = (raw: string, fallback: number): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const calculateMinTotalCredits = (requiredRaw: string, electiveRaw: string): string => {
+  if (!requiredRaw.trim() && !electiveRaw.trim()) return "";
+
+  const requiredValue = requiredRaw.trim() ? Number(requiredRaw) : 0;
+  const electiveValue = electiveRaw.trim() ? Number(electiveRaw) : 0;
+
+  if (!Number.isFinite(requiredValue) || !Number.isFinite(electiveValue)) return "";
+
+  return String(requiredValue + electiveValue);
+};
+
 export default function AddRegulationDialog({ open, onOpenChange, onAdd }: AddRegulationDialogProps) {
   const [cohortOptions, setCohortOptions] = useState<string[]>([]);
   const [majorOptionsByCohort, setMajorOptionsByCohort] = useState<Record<string, { id: number; name: string }[]>>({});
@@ -111,7 +122,17 @@ export default function AddRegulationDialog({ open, onOpenChange, onAdd }: AddRe
   }, [open, formData.batches, majorOptionsByCohort]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value };
+
+      if (name === "minRequiredCredits" || name === "minElectiveCredits") {
+        next.minTotalCredits = calculateMinTotalCredits(next.minRequiredCredits, next.minElectiveCredits);
+      }
+
+      return next;
+    });
+
     if (errors[e.target.name as keyof typeof errors]) {
       setErrors((prev) => ({ ...prev, [e.target.name]: undefined }));
     }
@@ -138,10 +159,13 @@ export default function AddRegulationDialog({ open, onOpenChange, onAdd }: AddRe
   };
 
   const handleAdd = async () => {
-    const minTotalCredits = toNumberWithDefault(formData.minTotalCredits, DEFAULT_MIN_TOTAL_CREDITS);
     const minRequiredCredits = toNumberWithDefault(formData.minRequiredCredits, DEFAULT_MIN_REQUIRED_CREDITS);
     const minElectiveCredits = toNumberWithDefault(formData.minElectiveCredits, DEFAULT_MIN_ELECTIVE_CREDITS);
     const minGpa = toNumberWithDefault(formData.minGpa, DEFAULT_MIN_GPA);
+    const minTotalCredits =
+      minRequiredCredits !== null && minElectiveCredits !== null
+        ? minRequiredCredits + minElectiveCredits
+        : null;
 
     const newErrors: { name?: string; batches?: string; batchMajors?: string; detail?: string } = {};
     if (!formData.name.trim()) newErrors.name = "Vui lòng nhập tên quy chế";
@@ -260,7 +284,14 @@ export default function AddRegulationDialog({ open, onOpenChange, onAdd }: AddRe
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-800">Tổng tín chỉ tối thiểu</Label>
-              <Input name="minTotalCredits" type="number" value={formData.minTotalCredits} onChange={handleInputChange} placeholder="120" />
+              <Input
+                name="minTotalCredits"
+                type="number"
+                value={formData.minTotalCredits}
+                placeholder="120"
+                readOnly
+                className="bg-gray-50"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-800">Tín chỉ bắt buộc tối thiểu</Label>
