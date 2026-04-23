@@ -108,7 +108,7 @@ export default function AppLayout({ children, title, actions, showSearch = false
 
   const handleSettings = () => {
     withPointerCursor(() => {
-      router.push('/cai-dat-nguoi-dung')
+      router.push('/cai-dat-tai-khoan')
     })
   }
 
