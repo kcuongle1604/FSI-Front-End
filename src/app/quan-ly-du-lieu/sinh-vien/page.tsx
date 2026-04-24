@@ -526,11 +526,11 @@ export default function SinhVienPage() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-32">
-                                  <DropdownMenuItem className="text-sm" onClick={() => handleEdit(student)}>
+                                  <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => handleEdit(student)}>
                                     <Edit className="h-4 w-4 mr-2" /> Sửa
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
-                                    className="text-sm text-red-600 focus:text-red-600"
+                                    className="cursor-pointer text-sm text-red-600 focus:text-red-600"
                                     onClick={() => handleDelete(student)}
                                   >
                                     <Trash2 className="h-4 w-4 mr-2" /> Xóa

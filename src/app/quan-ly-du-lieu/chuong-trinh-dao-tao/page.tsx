@@ -373,13 +373,13 @@ export default function ChuongTrinhDaoTaoPage() {
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end" className="w-32">
                                     <DropdownMenuItem
-                                      className="text-sm"
+                                      className="cursor-pointer text-sm"
                                       onClick={() => handleEditProgram(program)}
                                     >
                                       Sửa
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
-                                      className="text-sm text-red-600 focus:text-red-600"
+                                      className="cursor-pointer text-sm text-red-600 focus:text-red-600"
                                       onClick={() => handleDeleteProgram(program)}
                                     >
                                       Xóa
