@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Account } from "../page";
+import type { Account } from "../page";
 
 
 type SuspendUserDialogProps = {
@@ -25,7 +25,8 @@ export function SuspendUserDialog({ open, onOpenChange, account, onConfirm, curr
   if (!account) return null;
   
   // Use currentStatus from props if provided, otherwise fallback to account.is_active
-  const status = currentStatus ?? (account.is_active ? "Hoạt động" : "Ngưng hoạt động");
+  const isActiveFallback = account.is_active ?? account.status === "Hoạt động";
+  const status = currentStatus ?? (isActiveFallback ? "Hoạt động" : "Ngưng hoạt động");
   const isActive = status === "Hoạt động";
   const action = isActive ? "Ngưng hoạt động" : "Kích hoạt";
   const newStatus = isActive ? "Ngưng hoạt động" : "Hoạt động";
@@ -54,7 +55,7 @@ export function SuspendUserDialog({ open, onOpenChange, account, onConfirm, curr
         </DialogHeader>
         <div className="space-y-6">
           <p className="text-sm text-gray-700">
-            Bạn có chắc chắn muốn <span className="font-semibold">{action} người dùng {account.username}</span> không?
+            Bạn có chắc chắn muốn <span className="font-semibold">{action} người dùng {account.name ?? account.username ?? ""}</span> không?
           </p>
           <div className="flex gap-3 justify-end">
             <Button

@@ -246,7 +246,7 @@ export default function SinhVienPage() {
     )
   })
 
-  const PAGE_SIZE = 12
+  const PAGE_SIZE = 10
   const totalRecords = filteredStudents.length
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
   const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages)
@@ -373,7 +373,7 @@ export default function SinhVienPage() {
                       setSelectedLop(undefined)
                     }}
                   >
-                    <SelectTrigger className="h-9 w-[120px] bg-white">
+                    <SelectTrigger className="h-9 w-[200px] bg-white">
                       <SelectValue placeholder="Khóa" />
                     </SelectTrigger>
                     <SelectContent
@@ -411,7 +411,7 @@ export default function SinhVienPage() {
                       }
                     }}
                   >
-                    <SelectTrigger className="h-9 w-[140px] bg-white">
+                    <SelectTrigger className="h-9 w-[130px] bg-white">
                       <SelectValue placeholder="Lớp" />
                     </SelectTrigger>
                     <SelectContent
@@ -462,10 +462,10 @@ export default function SinhVienPage() {
                 <p className="mb-3 text-sm text-red-600">{loadError}</p>
               )}
 
-              {/* Card bảng – giống UserManagementTable */}
-              <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
-                <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                  <div className="overflow-auto">
+              {/* Card bảng – vừa đủ 10 dòng mỗi trang */}
+              <div className="flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden">
+                {/* Viewport table: header (h-10 = 2.5rem) + 10 rows (h-12 = 3rem) => 32.5rem */}
+                <div className="overflow-auto h-[32.5rem]">
                     <Table className="w-full" style={{ borderCollapse: "collapse" }}>
                       <TableHeader>
                         <TableRow
@@ -490,7 +490,7 @@ export default function SinhVienPage() {
                           <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
                             GHI CHÚ
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-12" />
+                          <TableHead className="h-10 px-4 min-w-[96px] text-right text-sm font-semibold text-gray-700 bg-blue-50" />
                         </TableRow>
                       </TableHeader>
 
@@ -518,19 +518,19 @@ export default function SinhVienPage() {
                             <TableCell className="h-12 px-4 text-sm text-gray-600">
                               {student.ghiChu || "-"}
                             </TableCell>
-                            <TableCell className="h-12 px-4 text-right w-12">
+                            <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <MoreVertical className="h-4 w-4" />
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100">
+                                    <MoreVertical className="w-4 h-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="start" sideOffset={8}>
-                                  <DropdownMenuItem onClick={() => handleEdit(student)}>
+                                <DropdownMenuContent align="end" className="w-32">
+                                  <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => handleEdit(student)}>
                                     <Edit className="h-4 w-4 mr-2" /> Sửa
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
-                                    className="text-red-600"
+                                    className="cursor-pointer text-sm text-red-600 focus:text-red-600"
                                     onClick={() => handleDelete(student)}
                                   >
                                     <Trash2 className="h-4 w-4 mr-2" /> Xóa
@@ -542,7 +542,6 @@ export default function SinhVienPage() {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
                 </div>
 
                 {/* Pagination – giống UserManagementTable */}

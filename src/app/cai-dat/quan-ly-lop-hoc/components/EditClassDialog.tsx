@@ -44,6 +44,21 @@ type FormData = {
   advisor: string
 }
 
+const SPECIALIZATIONS = [
+  "Chuyên ngành #0",
+  "Quản trị hệ thống thông tin",
+  "Kỹ thuật phần mềm",
+  "Khoa học dữ liệu",
+  "An ninh mạng",
+]
+
+const ADVISORS = [
+  "Uyên Nhi",
+  "Cao Thị Nhâm",
+  "Nguyễn Văn A",
+  "Trần Thị B",
+  "Phạm Văn C",
+]
 type SelectOption = {
   value: string
   label: string

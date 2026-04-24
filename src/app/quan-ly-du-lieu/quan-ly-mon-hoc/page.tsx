@@ -20,10 +20,6 @@ import {
   Edit,
   Trash2,
   MoreVertical,
-  ChevronsLeft,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsRight,
 } from "lucide-react"
 import {
   deleteSubject,
@@ -73,7 +69,6 @@ export default function QuanLyMonHocPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState("")
   const [deleteUsedMajors, setDeleteUsedMajors] = useState<string[]>([])
-  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     const fetchSubjects = async () => {
@@ -132,23 +127,9 @@ export default function QuanLyMonHocPage() {
     })
   }, [subjects, searchQuery])
 
-  const PAGE_SIZE = 12
+  const PAGE_SIZE = 10
   const totalRecords = filteredSubjects.length
-  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
-  const safeCurrentPage = Math.min(currentPage, totalPages)
-  const startIndex = (safeCurrentPage - 1) * PAGE_SIZE
-  const paginatedSubjects = filteredSubjects.slice(startIndex, startIndex + PAGE_SIZE)
-  const displayCount = paginatedSubjects.length
-
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchQuery])
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages)
-    }
-  }, [currentPage, totalPages])
+  const displayCount = totalRecords
 
   const openEditSubjectDialog = (subject: SubjectRow) => {
     setSelectedSubject(subject)
@@ -318,132 +299,95 @@ export default function QuanLyMonHocPage() {
 
               <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
                 <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                  <div className="overflow-auto">
-                    <Table className="w-full min-w-[500px]">
-                      <TableHeader>
-                        <TableRow className="border-b border-gray-200 bg-blue-50">
-                          <TableHead className="h-10 px-4 w-[80px] text-left text-sm font-semibold text-gray-700">
-                            STT
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
-                            MÃ HỌC PHẦN
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
-                            TÊN HỌC PHẦN
-                          </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
-                            SỐ TÍN CHỈ
-                          </TableHead>
-                          <TableHead className="h-10 px-4 w-[100px] text-right text-sm font-semibold text-gray-700">
-                            THAO TÁC
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
+                  <div className="overflow-x-auto">
+                    {/* Header cố định, chỉ body scroll (10 rows) */}
+                    <div>
+                      <Table className="w-full min-w-[640px] table-fixed">
+                        <TableHeader>
+                          <TableRow className="border-b border-gray-200 bg-blue-50">
+                            <TableHead className="h-10 px-4 w-[64px] text-left text-sm font-semibold text-gray-700">
+                              STT
+                            </TableHead>
+                            <TableHead className="h-10 px-4 w-[140px] text-left text-sm font-semibold text-gray-700">
+                              MÃ HỌC PHẦN
+                            </TableHead>
+                            <TableHead className="h-10 px-4 w-[420px] text-left text-sm font-semibold text-gray-700">
+                              TÊN HỌC PHẦN
+                            </TableHead>
+                            <TableHead className="h-10 px-4 w-[120px] text-center text-sm font-semibold text-gray-700">
+                              SỐ TÍN CHỈ
+                            </TableHead>
+                            <TableHead className="h-10 px-4 min-w-[96px] text-right text-sm font-semibold text-gray-700">
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                      </Table>
+                    </div>
 
-                      <TableBody>
-                        {loadingSubjects ? (
-                          <TableRow key="loading">
-                            <TableCell colSpan={5} className="text-center text-gray-500 py-6">
-                              Đang tải...
-                            </TableCell>
-                          </TableRow>
-                        ) : filteredSubjects.length === 0 ? (
-                          <TableRow key="empty">
-                            <TableCell colSpan={5} className="text-center text-gray-500 py-6">
-                              Chưa có học phần nào
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          paginatedSubjects.map((subject, index) => (
-                            <TableRow
-                              key={subject.id}
-                              className="border-b border-gray-200 hover:bg-gray-50"
-                            >
-                              <TableCell className="h-12 px-4 w-[80px] text-sm text-gray-600">
-                                {String(startIndex + index + 1).padStart(2, "0")}
-                              </TableCell>
-                              <TableCell className="h-12 px-4 text-sm text-gray-600">
-                                {subject.code}
-                              </TableCell>
-                              <TableCell className="h-12 px-4 text-sm text-gray-600">
-                                {subject.name}
-                              </TableCell>
-                              <TableCell className="h-12 px-4 text-sm text-gray-600">
-                                {subject.credits}
-                              </TableCell>
-                              <TableCell className="h-12 px-4 text-sm text-gray-600 text-right">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100">
-                                      <MoreVertical className="w-4 h-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-32">
-                                    <DropdownMenuItem className="text-sm" onClick={() => openEditSubjectDialog(subject)}>
-                                      <Edit className="h-4 w-4 mr-2" />
-                                      Sửa
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-sm text-red-600 focus:text-red-600" onClick={() => openDeleteSubjectDialog(subject)}>
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Xóa
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                    <div className="h-[30rem] overflow-y-scroll show-scrollbar">
+                      <Table className="w-full min-w-[640px] table-fixed">
+                        <TableBody>
+                          {loadingSubjects ? (
+                            <TableRow key="loading">
+                              <TableCell colSpan={5} className="text-center text-gray-500 py-6">
+                                Đang tải...
                               </TableCell>
                             </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
+                          ) : filteredSubjects.length === 0 ? (
+                            <TableRow key="empty">
+                              <TableCell colSpan={5} className="text-center text-gray-500 py-6">
+                                Chưa có học phần nào
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredSubjects.map((subject, index) => (
+                              <TableRow
+                                key={subject.id}
+                                className="border-b border-gray-200 hover:bg-gray-50"
+                              >
+                                <TableCell className="h-12 px-4 w-[64px] text-sm text-gray-600 whitespace-nowrap">
+                                  {String(index + 1).padStart(2, "0")}
+                                </TableCell>
+                                <TableCell className="h-12 px-4 w-[140px] text-sm text-gray-600 whitespace-nowrap">
+                                  <div className="truncate">{subject.code}</div>
+                                </TableCell>
+                                <TableCell className="h-12 px-4 w-[420px] text-sm text-gray-600">
+                                  <div className="truncate">{subject.name}</div>
+                                </TableCell>
+                                <TableCell className="h-12 px-4 w-[120px] text-sm text-gray-600 text-center whitespace-nowrap">
+                                  {subject.credits}
+                                </TableCell>
+                                <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100">
+                                        <MoreVertical className="w-4 h-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-32">
+                                      <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => openEditSubjectDialog(subject)}>
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        Sửa
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem className="cursor-pointer text-sm text-red-600 focus:text-red-600" onClick={() => openDeleteSubjectDialog(subject)}>
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Xóa
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50 sticky bottom-0 z-10">
                   <div className="text-sm text-gray-600">
-                    Hiển thị {displayCount}/{totalRecords} dòng
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 border-gray-300"
-                      disabled={safeCurrentPage === 1}
-                      onClick={() => setCurrentPage(1)}
-                    >
-                      <ChevronsLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 border-gray-300"
-                      disabled={safeCurrentPage === 1}
-                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <div className="flex items-center gap-1 px-3 text-sm">
-                      <span className="font-medium text-gray-700">{safeCurrentPage}</span>
-                      <span className="text-gray-400">/</span>
-                      <span className="text-gray-600">{totalPages}</span>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 border-gray-300"
-                      disabled={safeCurrentPage >= totalPages}
-                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 border-gray-300"
-                      disabled={safeCurrentPage >= totalPages}
-                      onClick={() => setCurrentPage(totalPages)}
-                    >
-                      <ChevronsRight className="h-4 w-4" />
-                    </Button>
+                    Hiển thị {displayCount}/{displayCount} dòng
                   </div>
                 </div>
               </div>

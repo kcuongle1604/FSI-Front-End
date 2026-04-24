@@ -12,13 +12,15 @@ import { EditUserDialog } from "./components/EditUserDialog"
 import { DeleteUserDialog } from "./components/DeleteUserDialog"
 import { SuspendUserDialog } from "./components/SuspendUserDialog"
 
-type Account = {
+export type Account = {
   id: number
   name: string
+  username?: string
   email: string
   role: string
   status: string
   isBan: boolean
+  is_active?: boolean
 }
 
 type UserData = {
@@ -87,7 +89,7 @@ export default function QuanLyNguoiDungPage() {
   useEffect(() => {
     // sync search query to URL so returning preserves filters
     try {
-      const params = new URLSearchParams(Array.from(searchParams?.entries() ?? []))
+      const params = new URLSearchParams(searchParams?.toString() ?? "")
       if (searchQuery) params.set("q", searchQuery)
       else params.delete("q")
       const queryString = params.toString()
@@ -188,7 +190,9 @@ export default function QuanLyNguoiDungPage() {
       <AddUserDialog 
         open={openAddDialog}
         onOpenChange={setOpenAddDialog}
-        onAdd={handleAddUser}
+        onSuccess={() => {
+          // placeholder: refresh user list after creating user
+        }}
       />
 
       {/* Edit User Dialog */}

@@ -5,11 +5,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, X } from "lucide-react"
 import { api } from "@/lib/api"
 import { Certificate, StudentCertificateCreatePayload } from "../types"
 import { sampleCertificates } from "../data"
+import { MultiSelect } from "@/components/ui/multi-select"
 
 interface CertificateFormDialogProps {
   open: boolean
@@ -33,7 +33,8 @@ export default function CertificateFormDialog({
 }: CertificateFormDialogProps) {
   const isEdit = !!certificate
 
-  const [selectedCertificateId, setSelectedCertificateId] = useState<string>("")
+  const [selectedCertificateValues, setSelectedCertificateValues] = useState<string[]>([])
+  const [existingCertificateIds, setExistingCertificateIds] = useState<number[]>([])
   const [note, setNote] = useState("")
   const [certificateOptions, setCertificateOptions] = useState<CertificateOption[]>([])
   const [loadingCertificateOptions, setLoadingCertificateOptions] = useState(false)
@@ -101,6 +102,74 @@ export default function CertificateFormDialog({
   }, [open])
 
   useEffect(() => {
+    if (!open) return
+    if (!certificate?.id) {
+      setExistingCertificateIds([])
+      return
+    }
+
+    const studentId = Number(certificate.id)
+    if (!Number.isFinite(studentId)) {
+      setExistingCertificateIds([])
+      return
+    }
+
+    const getListFromPayload = (payload: any): any[] => {
+      if (Array.isArray(payload)) return payload
+      if (!payload || typeof payload !== "object") return []
+      const candidates = [payload.items, payload.data, payload.results, payload.rows]
+      for (const candidate of candidates) {
+        if (Array.isArray(candidate)) return candidate
+      }
+      return []
+    }
+
+    const readCertificateId = (row: any): number | null => {
+      const direct = row?.certificate_id ?? row?.certificateId ?? row?.certificateID ?? row?.id
+      const nested = row?.certificate?.certificate_id ?? row?.certificate?.id
+      const value = direct ?? nested
+      const numeric = Number(value)
+      return Number.isFinite(numeric) ? numeric : null
+    }
+
+    const fetchExistingStudentCertificates = async () => {
+      const candidates: Array<() => Promise<any>> = [
+        () => api.get(`/api/v1/student-certificates`, { params: { student_id: studentId } }),
+        () => api.get(`/api/v1/student-certificates`, { params: { studentId } }),
+        () => api.get(`/api/v1/student-certificates/by-student/${studentId}`),
+        () => api.get(`/api/v1/student-certificates/student/${studentId}`),
+        () => api.get(`/api/v1/students/${studentId}/certificates`),
+      ]
+
+      for (const run of candidates) {
+        try {
+          const res = await run()
+          const list = getListFromPayload(res?.data)
+          const ids = Array.from(
+            new Set(
+              list
+                .map(readCertificateId)
+                .filter((id): id is number => typeof id === "number")
+            )
+          )
+          setExistingCertificateIds(ids)
+          return
+        } catch (error: any) {
+          const status = Number(error?.response?.status)
+          if ([404, 405].includes(status)) continue
+          // If backend doesn't support this endpoint, keep silent and don't block dialog
+          setExistingCertificateIds([])
+          return
+        }
+      }
+
+      setExistingCertificateIds([])
+    }
+
+    void fetchExistingStudentCertificates()
+  }, [open, certificate?.id])
+
+  useEffect(() => {
     if (certificate) {
       setSelectedStudent(certificate)
       setNote(certificate.ghiChu || "")
@@ -109,18 +178,89 @@ export default function CertificateFormDialog({
       setNote("")
     }
 
-    setSelectedCertificateId("")
+    setSelectedCertificateValues([])
+    setExistingCertificateIds([])
     setStudentSearch("")
     setShowStudentLookup(false)
     setErrors({})
   }, [certificate, open])
+
+  useEffect(() => {
+    if (!open) return
+    if (!isEdit) return
+    if (!Array.isArray(existingCertificateIds) || existingCertificateIds.length === 0) {
+      setSelectedCertificateValues([])
+      return
+    }
+
+    const byId = new Map(certificateOptions.map((item) => [item.id, item]))
+    const existingValues = existingCertificateIds
+      .map((id) => byId.get(id))
+      .filter((item): item is CertificateOption => Boolean(item))
+      .map((item) => `${item.id} - ${item.label}`)
+
+    setSelectedCertificateValues(existingValues)
+  }, [open, isEdit, existingCertificateIds, certificateOptions])
+
+  useEffect(() => {
+    if (!open) return
+    if (!isEdit || !certificate) return
+    if (existingCertificateIds.length > 0) return
+    if (selectedCertificateValues.length > 0) return
+    if (certificateOptions.length === 0) return
+
+    const normalizeText = (value: string): string =>
+      value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "")
+
+    const matchesAny = (normalized: string, tokens: string[]) =>
+      tokens.some((token) => normalized.includes(normalizeText(token)))
+
+    const pickByPredicate = (predicate: (normalizedLabel: string) => boolean) => {
+      const found = certificateOptions.find((option) => predicate(normalizeText(option.label)))
+      return found ? `${found.id} - ${found.label}` : null
+    }
+
+    const fallbackValues: string[] = []
+
+    if (certificate.quanSu) {
+      const picked = pickByPredicate((label) => matchesAny(label, ["quansu", "military"]))
+      if (picked) fallbackValues.push(picked)
+    }
+    if (certificate.theDuc) {
+      const picked = pickByPredicate((label) => matchesAny(label, ["theduc", "physical", "pe"]))
+      if (picked) fallbackValues.push(picked)
+    }
+    if (certificate.ngoaiNgu) {
+      const picked = pickByPredicate((label) => matchesAny(label, ["ngoaingu", "foreign", "english", "language", "toeic", "ielts"]))
+      if (picked) fallbackValues.push(picked)
+    }
+    if (certificate.tinhHoc) {
+      const picked = pickByPredicate((label) => matchesAny(label, ["tinhoc", "tinhhoc", "it", "computer", "mos"]))
+      if (picked) fallbackValues.push(picked)
+    }
+
+    if (fallbackValues.length > 0) {
+      setSelectedCertificateValues(Array.from(new Set(fallbackValues)))
+    }
+  }, [
+    open,
+    isEdit,
+    certificate,
+    existingCertificateIds.length,
+    selectedCertificateValues.length,
+    certificateOptions,
+  ])
 
   const validate = () => {
     const newErrors: Record<string, string> = {}
     if (!selectedStudent?.id) {
       newErrors.mssv = "Sinh viên là bắt buộc"
     }
-    if (!selectedCertificateId) {
+    if (selectedCertificateValues.length === 0) {
       newErrors.certificate_id = "Chứng chỉ là bắt buộc"
     }
     setErrors(newErrors)
@@ -131,23 +271,63 @@ export default function CertificateFormDialog({
     if (!validate() || !selectedStudent?.id) return
 
     const studentId = Number(selectedStudent.id)
-    const certificateId = Number(selectedCertificateId)
-    if (!Number.isFinite(studentId) || !Number.isFinite(certificateId)) {
+    if (!Number.isFinite(studentId)) {
       setErrors((prev) => ({
         ...prev,
-        mssv: !Number.isFinite(studentId) ? "Sinh viên không hợp lệ" : prev.mssv,
-        certificate_id: !Number.isFinite(certificateId) ? "Chứng chỉ không hợp lệ" : prev.certificate_id,
+        mssv: "Sinh viên không hợp lệ",
+      }))
+      return
+    }
+
+    const parseCertificateId = (value: string) => {
+      // MultiSelect stores strings; we keep a user-friendly value like "<id> - <name>"
+      const idPart = String(value).split(" - ")[0]
+      const numeric = Number(idPart)
+      return Number.isFinite(numeric) ? numeric : null
+    }
+
+    const certificateIds = Array.from(
+      new Set(
+        selectedCertificateValues
+          .map(parseCertificateId)
+          .filter((id): id is number => typeof id === "number")
+      )
+    )
+
+    if (certificateIds.length === 0) {
+      setErrors((prev) => ({
+        ...prev,
+        certificate_id: "Chứng chỉ không hợp lệ",
       }))
       return
     }
 
     try {
       setSubmitting(true)
-      await onSubmit({
-        student_id: studentId,
-        certificate_id: certificateId,
-        note: note.trim() || undefined,
-      })
+      const existingSet = new Set(existingCertificateIds)
+      const toAdd = isEdit ? certificateIds.filter((id) => !existingSet.has(id)) : certificateIds
+
+      if (toAdd.length === 0) {
+        onOpenChange(false)
+        return
+      }
+
+      for (const certificateId of toAdd) {
+        try {
+          await onSubmit({
+            student_id: studentId,
+            certificate_id: certificateId,
+            note: note.trim() || undefined,
+          })
+        } catch (error: any) {
+          const message = String(error?.message || "")
+          // Only in edit mode: backend may reject duplicates (409); treat as a no-op and continue.
+          if (isEdit && (message.toLowerCase().includes("da co chung chi") || message.includes("đã có chứng chỉ"))) {
+            continue
+          }
+          throw error
+        }
+      }
       onOpenChange(false)
     } catch (error: any) {
       setErrors((prev) => ({
@@ -164,7 +344,7 @@ export default function CertificateFormDialog({
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>
-            {certificate ? "Thêm chứng chỉ cho sinh viên" : "Thêm mới thông tin chứng chỉ"}
+            {certificate ? "Chỉnh sửa chứng chỉ cho sinh viên" : "Thêm mới thông tin chứng chỉ"}
           </DialogTitle>
         </DialogHeader>
 
@@ -274,26 +454,40 @@ export default function CertificateFormDialog({
             <Label className="text-sm font-medium text-gray-700">
               Chứng chỉ <span className="text-red-500">*</span>
             </Label>
-            <Select value={selectedCertificateId} onValueChange={(value) => {
-              setSelectedCertificateId(value)
-              if (errors.certificate_id) {
-                setErrors((prev) => {
-                  const { certificate_id, ...rest } = prev
-                  return rest
-                })
-              }
-            }}>
-              <SelectTrigger className={errors.certificate_id ? "border-red-500" : ""}>
-                <SelectValue placeholder={loadingCertificateOptions ? "Đang tải danh sách chứng chỉ..." : "Chọn chứng chỉ"} />
-              </SelectTrigger>
-              <SelectContent>
-                {certificateOptions.map((item) => (
-                  <SelectItem key={item.id} value={String(item.id)}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className={errors.certificate_id ? "rounded-md border border-red-500" : ""}>
+              <MultiSelect
+                options={certificateOptions.map((item) => `${item.id} - ${item.label}`)}
+                value={selectedCertificateValues}
+                onChange={(values) => {
+                  if (isEdit && existingCertificateIds.length > 0) {
+                    const existingValueSet = new Set(
+                      existingCertificateIds
+                        .map((id) => {
+                          const option = certificateOptions.find((item) => item.id === id)
+                          return option ? `${option.id} - ${option.label}` : null
+                        })
+                        .filter((value): value is string => Boolean(value))
+                    )
+                    const next = Array.from(new Set([...values, ...existingValueSet]))
+                    setSelectedCertificateValues(next)
+                  } else {
+                    setSelectedCertificateValues(values)
+                  }
+                  if (errors.certificate_id) {
+                    setErrors((prev) => {
+                      const { certificate_id, ...rest } = prev
+                      return rest
+                    })
+                  }
+                }}
+                placeholder={
+                  loadingCertificateOptions
+                    ? "Đang tải danh sách chứng chỉ..."
+                    : "Chọn chứng chỉ"
+                }
+                disabled={loadingCertificateOptions || submitting}
+              />
+            </div>
             {errors.certificate_id && <p className="text-red-500 text-xs mt-1">{errors.certificate_id}</p>}
           </div>
 
