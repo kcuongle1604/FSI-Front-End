@@ -41,6 +41,7 @@ type FormData = {
 }
 
 const SPECIALIZATIONS = [
+  "Chuyên ngành #0",
   "Quản trị hệ thống thông tin",
   "Kỹ thuật phần mềm",
   "Khoa học dữ liệu",
@@ -48,6 +49,7 @@ const SPECIALIZATIONS = [
 ]
 
 const ADVISORS = [
+  "Uyên Nhi",
   "Cao Thị Nhâm",
   "Nguyễn Văn A",
   "Trần Thị B",

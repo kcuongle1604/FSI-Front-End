@@ -281,7 +281,7 @@ export default function DiemPage() {
     )
   })
 
-  const PAGE_SIZE = 30
+  const PAGE_SIZE = 10
   const hasData = selectedClass && selectedClass !== "all"
   const totalRecords = filteredScoreData.length
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
@@ -481,7 +481,7 @@ export default function DiemPage() {
                       setSelectedClass(undefined)
                     }}
                   >
-                    <SelectTrigger className="h-9 w-[140px] bg-white">
+                    <SelectTrigger className="h-9 w-[200px] bg-white">
                       <SelectValue placeholder="Khóa" />
                     </SelectTrigger>
                     <SelectContent
@@ -520,7 +520,7 @@ export default function DiemPage() {
                       }
                     }}
                   >
-                    <SelectTrigger className="h-9 w-[200px] bg-white">
+                    <SelectTrigger className="h-9 w-[130px] bg-white">
                       <SelectValue placeholder="Chọn lớp" />
                     </SelectTrigger>
                     <SelectContent
@@ -599,9 +599,11 @@ export default function DiemPage() {
                           {subjects.map((subject) => (
                             <TableHead
                               key={subject}
-                              className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50 whitespace-nowrap"
+                              className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50 whitespace-nowrap min-w-[80px] w-[100px] max-w-[100px]"
                             >
-                              {subject.toUpperCase()}
+                              <div className="truncate" title={subject.toUpperCase()}>
+                                {subject.toUpperCase()}
+                              </div>
                             </TableHead>
                           ))}
                           <TableHead
@@ -642,14 +644,19 @@ export default function DiemPage() {
                                 <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "430px", zIndex: 5, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
                                   {student.dob}
                                 </TableCell>
-                                {subjects.map((subject) => (
-                                  <TableCell
-                                    key={subject}
-                                    className="h-12 px-4 text-sm text-gray-600 text-center"
-                                  >
-                                    {formatScoreCell(student.scores[subject])}
-                                  </TableCell>
-                                ))}
+                                {subjects.map((subject) => {
+                                  const displayValue = formatScoreCell(student.scores[subject])
+                                  return (
+                                    <TableCell
+                                      key={subject}
+                                      className="h-12 px-4 text-sm text-gray-600 text-center min-w-[80px] w-[80px] max-w-[80px]"
+                                    >
+                                      <div className="truncate" title={displayValue}>
+                                        {displayValue}
+                                      </div>
+                                    </TableCell>
+                                  )
+                                })}
                                 <TableCell
                                   className="h-12 px-4 text-right w-12 bg-white"
                                   style={{
@@ -663,16 +670,16 @@ export default function DiemPage() {
                                 >
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                                        <MoreVertical className="h-4 w-4" />
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100">
+                                        <MoreVertical className="w-4 h-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="start" sideOffset={8}>
-                                      <DropdownMenuItem onClick={() => handleEdit(student)}>
+                                    <DropdownMenuContent align="end" className="w-32">
+                                      <DropdownMenuItem className="text-sm" onClick={() => handleEdit(student)}>
                                         <Edit className="h-4 w-4 mr-2" /> Sửa
                                       </DropdownMenuItem>
                                       <DropdownMenuItem
-                                        className="text-red-600"
+                                        className="text-sm text-red-600 focus:text-red-600"
                                         onClick={() => handleDelete(student)}
                                       >
                                         <Trash2 className="h-4 w-4 mr-2" /> Xóa

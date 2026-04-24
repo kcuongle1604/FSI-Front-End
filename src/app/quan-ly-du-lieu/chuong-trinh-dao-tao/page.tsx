@@ -317,7 +317,6 @@ export default function ChuongTrinhDaoTaoPage() {
                             KHÓA ÁP DỤNG
                           </TableHead>
                           <TableHead className="h-10 px-4 w-[60px] text-right text-sm font-semibold text-gray-700">
-                            THAO TÁC
                           </TableHead>
                         </TableRow>
                       </TableHeader>
@@ -361,7 +360,7 @@ export default function ChuongTrinhDaoTaoPage() {
                                   return cohorts?.join(", ") || "-"
                                 })()}
                               </TableCell>
-                              <TableCell className="h-12 px-4 text-sm text-gray-600 text-right">
+                              <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button
@@ -372,7 +371,7 @@ export default function ChuongTrinhDaoTaoPage() {
                                       <MoreVertical className="w-4 h-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-24">
+                                  <DropdownMenuContent align="end" className="w-32">
                                     <DropdownMenuItem
                                       className="text-sm"
                                       onClick={() => handleEditProgram(program)}

@@ -11,10 +11,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  ChevronsLeft,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsRight,
   Search,
   Plus,
   Download,
@@ -111,9 +107,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
 
   const title = program?.name ?? programNameFromUrl ?? "Chương trình đào tạo";
 
-  const PAGE_SIZE = 10;
   const [activeTab, setActiveTab] = useState("chuong-trinh-dao-tao");
-  const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [courses, setCourses] = useState<ProgramCourse[]>([]);
   const [loading, setLoading] = useState(false);
@@ -248,13 +242,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
   });
 
   const totalRecords = filteredCourses.length;
-  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
-  const pagedCourses = filteredCourses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const displayCount = pagedCourses.length;
-
-  const goToPage = (p: number) => {
-    setPage(Math.max(1, Math.min(totalPages, p)));
-  };
+  const displayCount = totalRecords;
 
   const handleAddCourse = async (values: CourseFormValues) => {
     if (!Number.isFinite(programId) || programId <= 0) return;
@@ -425,15 +413,14 @@ export default function ChuongTrinhDaoTaoDetailPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
-                <div className="flex-1 flex flex-col min-h-0">
-                  <div className="flex-1 overflow-auto min-h-0">
+              <div className="flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden">
+                {/* Header cố định, chỉ body scroll: 10 rows (h-12 = 3rem) => 30rem */}
+                <div className="overflow-x-auto">
+                  {/* Chừa chỗ bên phải để khớp với scrollbar của body */}
+                  <div>
                     <table className="w-full table-fixed" style={{ borderCollapse: "collapse" }}>
                       <thead>
-                        <tr
-                          className="border-b border-gray-200 bg-blue-50"
-                          style={{ position: "sticky", top: 0, zIndex: 10 }}
-                        >
+                        <tr className="border-b border-gray-200 bg-blue-50">
                           <th className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 uppercase w-[6%]">
                             STT
                           </th>
@@ -457,6 +444,11 @@ export default function ChuongTrinhDaoTaoDetailPage() {
                           </th>
                         </tr>
                       </thead>
+                    </table>
+                  </div>
+
+                  <div className="h-[30rem] overflow-y-scroll show-scrollbar">
+                    <table className="w-full table-fixed" style={{ borderCollapse: "collapse" }}>
                       <tbody>
                         {loading ? (
                           <tr key="loading">
@@ -464,24 +456,33 @@ export default function ChuongTrinhDaoTaoDetailPage() {
                               Đang tải...
                             </td>
                           </tr>
-                        ) : pagedCourses.length === 0 ? (
+                        ) : filteredCourses.length === 0 ? (
                           <tr key="empty">
                             <td colSpan={7} className="text-center text-gray-500 py-6">
                               Chưa có học phần nào
                             </td>
                           </tr>
                         ) : (
-                          pagedCourses.map((course, idx) => (
-                            <tr key={course.id} className="border-b last:border-b-0">
-                              <td className="px-4 py-2 text-sm text-gray-700">
-                                {String((page - 1) * PAGE_SIZE + idx + 1).padStart(2, "0")}
+                          filteredCourses.map((course, idx) => (
+                            <tr
+                              key={course.id}
+                              className="border-b border-gray-200 hover:bg-gray-50 last:border-b-0"
+                            >
+                              <td className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[6%]">
+                                {String(idx + 1).padStart(2, "0")}
                               </td>
-                              <td className="px-4 py-2 text-sm text-gray-700">{course.code}</td>
-                              <td className="px-4 py-2 text-sm text-gray-700">{course.name}</td>
-                              <td className="px-4 py-2 text-sm text-gray-700">{course.credits}</td>
-                              <td className="px-4 py-2 text-sm text-gray-700">{course.compulsory || ""}</td>
-                              <td className="px-4 py-2 text-sm text-gray-700">{course.optional || ""}</td>
-                              <td className="px-4 py-2 text-right w-12">
+                              <td className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[16%]">
+                                <div className="truncate">{course.code}</div>
+                              </td>
+                              <td className="h-12 px-4 text-sm text-gray-700 w-[32%]">
+                                <div className="truncate">{course.name}</div>
+                              </td>
+                              <td className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[12%]">{course.credits}</td>
+                              <td className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[12%]">
+                                {course.compulsory || ""}
+                              </td>
+                              <td className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[12%]">{course.optional || ""}</td>
+                              <td className="h-12 px-4 text-right whitespace-nowrap w-[10%]">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button
@@ -492,9 +493,9 @@ export default function ChuongTrinhDaoTaoDetailPage() {
                                       <MoreVertical className="w-4 h-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-40">
+                                  <DropdownMenuContent align="end" className="w-32">
                                     <DropdownMenuItem
-                                      className="cursor-pointer text-sm"
+                                      className="text-sm"
                                       onClick={() => {
                                         setEditingCourse(course);
                                         setIsEditCourseDialogOpen(true);
@@ -503,7 +504,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
                                       Sửa
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
-                                      className="cursor-pointer text-sm text-red-600"
+                                      className="text-sm text-red-600 focus:text-red-600"
                                       onClick={() => {
                                         setDeletingCourse(course);
                                         setIsDeleteCourseDialogOpen(true);
@@ -520,58 +521,10 @@ export default function ChuongTrinhDaoTaoDetailPage() {
                       </tbody>
                     </table>
                   </div>
+                </div>
 
-                  <div
-                    className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50"
-                    style={{ minHeight: 56 }}
-                  >
-                    <div className="text-sm text-gray-600">
-                      Hiển thị {displayCount}/{totalRecords} dòng
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 border-gray-300"
-                        onClick={() => goToPage(1)}
-                        disabled={page === 1}
-                      >
-                        <ChevronsLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 border-gray-300"
-                        onClick={() => goToPage(page - 1)}
-                        disabled={page === 1}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <div className="flex items-center gap-1 px-3">
-                        <span className="text-sm font-medium text-gray-700">{page}</span>
-                        <span className="text-sm text-gray-400">/</span>
-                        <span className="text-sm text-gray-600">{totalPages}</span>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 border-gray-300"
-                        onClick={() => goToPage(page + 1)}
-                        disabled={page === totalPages}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 border-gray-300"
-                        onClick={() => goToPage(totalPages)}
-                        disabled={page === totalPages}
-                      >
-                        <ChevronsRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50" style={{ minHeight: 56 }}>
+                  <div className="text-sm text-gray-600">Hiển thị {displayCount}/{displayCount} dòng</div>
                 </div>
               </div>
             </TabsContent>

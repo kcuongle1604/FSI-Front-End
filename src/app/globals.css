@@ -137,6 +137,35 @@
   *::-webkit-scrollbar {
     display: none; /* Chrome, Safari, Opera */
   }
+
+  /* Allow opting back into visible scrollbars for specific scroll containers */
+  .show-scrollbar {
+    scrollbar-width: auto; /* Firefox */
+    -ms-overflow-style: auto; /* IE and Edge */
+    scrollbar-gutter: stable;
+    scrollbar-color: color-mix(in srgb, var(--foreground) 35%, transparent)
+      color-mix(in srgb, var(--muted) 65%, transparent);
+  }
+
+  .show-scrollbar::-webkit-scrollbar {
+    display: block;
+    width: 10px;
+    height: 10px;
+  }
+
+  .show-scrollbar::-webkit-scrollbar-track {
+    background: color-mix(in srgb, var(--muted) 65%, transparent);
+  }
+
+  .show-scrollbar::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--foreground) 30%, transparent);
+    border-radius: 999px;
+    border: 2px solid color-mix(in srgb, var(--muted) 65%, transparent);
+  }
+
+  .show-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--foreground) 45%, transparent);
+  }
 }
 
 /* Custom cursor styles */

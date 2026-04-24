@@ -18,10 +18,10 @@ interface CertificateManagementTableProps {
 }
 
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 10;
 
 const CertificateManagementTable = ({ certificates, onEditClick, onDeleteClick, onStatusClick }: CertificateManagementTableProps) => {
   const [page, setPage] = useState(1);
@@ -31,6 +31,10 @@ const CertificateManagementTable = ({ certificates, onEditClick, onDeleteClick, 
   const displayCount = pagedCertificates.length;
 
   const goToPage = (p: number) => setPage(Math.max(1, Math.min(totalPages, p)));
+
+  useEffect(() => {
+    setPage((prev) => Math.max(1, Math.min(totalPages, prev)));
+  }, [totalPages]);
 
   return (
     <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
@@ -66,19 +70,19 @@ const CertificateManagementTable = ({ certificates, onEditClick, onDeleteClick, 
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="px-4 py-2 text-right w-12">
+                  <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100">
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuContent align="end" className="w-32">
                         <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => onEditClick(certificate)}>
-                          <Edit className="w-4 h-4 mr-2" /> Sửa
+                          <Edit className="h-4 w-4 mr-2" /> Sửa
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer text-sm text-red-600" onClick={() => onDeleteClick(certificate)}>
-                          <Trash2 className="w-4 h-4 mr-2" /> Xóa
+                        <DropdownMenuItem className="cursor-pointer text-sm text-red-600 focus:text-red-600" onClick={() => onDeleteClick(certificate)}>
+                          <Trash2 className="h-4 w-4 mr-2" /> Xóa
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

@@ -162,6 +162,7 @@ export default function ChungChiPage() {
   const [certificateError, setCertificateError] = useState("")
   const [certificateColumnHeaders, setCertificateColumnHeaders] = useState<string[]>(DEFAULT_CERTIFICATE_HEADERS)
   const [importHistory] = useState<ImportHistory[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
 
   const classNameOf = (item: ClassApiItem): string => String(item.class_name || item.name || "").trim()
   const getClassByName = (className?: string) =>
@@ -226,15 +227,28 @@ export default function ChungChiPage() {
     )
   })
 
-  const PAGE_SIZE = 30
+  const PAGE_SIZE = 10
   const API_LIMIT = 100
   const totalRecords = filteredCertificates.length
-  const displayCount = Math.min(PAGE_SIZE, totalRecords)
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages)
+  const startIndex = (safeCurrentPage - 1) * PAGE_SIZE
+  const visibleCertificates = filteredCertificates.slice(startIndex, startIndex + PAGE_SIZE)
+  const displayCount = visibleCertificates.length
   const certificateColumns =
     Array.isArray(certificateColumnHeaders) && certificateColumnHeaders.length > 0
       ? certificateColumnHeaders
       : DEFAULT_CERTIFICATE_HEADERS
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedKhoa, selectedLop, searchQuery])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
 
   const toBoolean = (value: unknown): boolean => {
     if (typeof value === "boolean") return value
@@ -641,7 +655,7 @@ export default function ChungChiPage() {
                       setSelectedLop(undefined)
                     }}
                   >
-                    <SelectTrigger className="h-9 w-[120px] bg-white">
+                    <SelectTrigger className="h-9 w-[200px] bg-white">
                       <SelectValue placeholder="Khóa" />
                     </SelectTrigger>
                     <SelectContent
@@ -681,7 +695,7 @@ export default function ChungChiPage() {
                       setSelectedKhoa(Number.isFinite(cohortId) ? String(cohortId) : undefined)
                     }}
                   >
-                    <SelectTrigger className="h-9 w-[140px] bg-white">
+                    <SelectTrigger className="h-9 w-[130px] bg-white">
                       <SelectValue placeholder="Lớp" />
                     </SelectTrigger>
                     <SelectContent
@@ -769,14 +783,14 @@ export default function ChungChiPage() {
                       </TableHeader>
 
                       <TableBody>
-                        {filteredCertificates.map((certificate, index) => {
+                        {visibleCertificates.map((certificate, index) => {
                           return (
                             <TableRow
                               key={certificate.id}
                               className="border-b border-gray-200 hover:bg-gray-50"
                             >
                               <TableCell className="h-12 px-4 text-sm text-gray-600">
-                                {String(index + 1).padStart(2, "0")}
+                                {String(startIndex + index + 1).padStart(2, "0")}
                               </TableCell>
                               <TableCell className="h-12 px-4 text-sm text-gray-600">
                                 {certificate.lop}
@@ -804,19 +818,19 @@ export default function ChungChiPage() {
                                   </div>
                                 </TableCell>
                               ))}
-                              <TableCell className="h-12 px-4 text-right w-12">
+                              <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                                      <MoreVertical className="h-4 w-4" />
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100">
+                                      <MoreVertical className="w-4 h-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="start" sideOffset={8}>
-                                    <DropdownMenuItem onClick={() => handleEdit(certificate)}>
+                                  <DropdownMenuContent align="end" className="w-32">
+                                    <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => handleEdit(certificate)}>
                                       <Edit className="h-4 w-4 mr-2" /> Sửa
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
-                                      className="text-red-600"
+                                      className="cursor-pointer text-sm text-red-600 focus:text-red-600"
                                       onClick={() => handleDelete(certificate)}
                                     >
                                       <Trash2 className="h-4 w-4 mr-2" /> Xóa
@@ -841,7 +855,8 @@ export default function ChungChiPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled
+                      disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage(1)}
                     >
                       <ChevronsLeft className="h-4 w-4" />
                     </Button>
@@ -849,12 +864,13 @@ export default function ChungChiPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled
+                      disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
                     <div className="flex items-center gap-1 px-3 text-sm">
-                      <span className="font-medium text-gray-700">1</span>
+                      <span className="font-medium text-gray-700">{safeCurrentPage}</span>
                       <span className="text-gray-400">/</span>
                       <span className="text-gray-600">{totalPages}</span>
                     </div>
@@ -862,7 +878,8 @@ export default function ChungChiPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled={totalRecords <= PAGE_SIZE}
+                      disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
@@ -870,7 +887,8 @@ export default function ChungChiPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled={totalRecords <= PAGE_SIZE}
+                      disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage(totalPages)}
                     >
                       <ChevronsRight className="h-4 w-4" />
                     </Button>
