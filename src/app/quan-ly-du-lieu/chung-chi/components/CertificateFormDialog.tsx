@@ -71,8 +71,9 @@ export default function CertificateFormDialog({
           const list = Array.isArray(payload)
             ? payload
             : payload.items || payload.data || payload.results || []
+          const rawPageItems = Array.isArray(list) ? list : []
 
-          const mapped: CertificateOption[] = (Array.isArray(list) ? list : [])
+          const mapped: CertificateOption[] = rawPageItems
             .map((item: any) => {
               const id = Number(item.id ?? item.certificate_id)
               const label = String(item.name ?? item.code ?? item.certificate_name ?? "").trim()
@@ -83,7 +84,7 @@ export default function CertificateFormDialog({
 
           all.push(...mapped)
 
-          if (mapped.length < size) break
+          if (rawPageItems.length < size) break
           page += 1
         }
 

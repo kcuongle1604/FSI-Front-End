@@ -20,7 +20,7 @@ interface DeleteClassDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   schoolClass?: SchoolClass
-  onConfirm: () => void
+  onConfirm: () => Promise<boolean> | boolean
 }
 
 export function DeleteClassDialog({ 
@@ -29,9 +29,11 @@ export function DeleteClassDialog({
   schoolClass,
   onConfirm 
 }: DeleteClassDialogProps) {
-  const handleConfirm = () => {
-    onConfirm()
-    onOpenChange(false)
+  const handleConfirm = async () => {
+    const deleted = await onConfirm()
+    if (deleted) {
+      onOpenChange(false)
+    }
   }
 
   return (

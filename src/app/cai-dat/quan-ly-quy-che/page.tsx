@@ -39,7 +39,7 @@ export type RegulationCondition = {
 type RegulationApplicationApiItem = {
   cohort_id?: number;
   cohort_name?: string;
-  major_id?: number;
+  major_id?: number | string;
   major_name?: string;
 };
 
@@ -75,6 +75,10 @@ export default function QuanLyQuyChePage() {
 
   const mapRegulationItem = (item: GraduationRequirementApiItem, index: number): Regulation => {
     const applications = Array.isArray(item.applications) ? item.applications : [];
+    const toFiniteNumber = (value: unknown): number | null => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
     const batches = Array.from(new Set(applications
       .map((app) => String(app.cohort_name || app.cohort_id || "").trim())
       .filter(Boolean)));
@@ -94,8 +98,8 @@ export default function QuanLyQuyChePage() {
       min_elective_credits: item.min_elective_credits,
       min_gpa: item.min_gpa,
       required_certificates: Array.isArray(item.required_certificates) ? item.required_certificates : [],
-      cohort_ids: Array.from(new Set(applications.map((app) => app.cohort_id).filter((v): v is number => Number.isFinite(v as number)))),
-      major_ids: Array.from(new Set(applications.map((app) => app.major_id).filter((v): v is number => Number.isFinite(v as number)))),
+      cohort_ids: Array.from(new Set(applications.map((app) => toFiniteNumber(app.cohort_id)).filter((v): v is number => v !== null))),
+      major_ids: Array.from(new Set(applications.map((app) => toFiniteNumber(app.major_id)).filter((v): v is number => v !== null))),
       notes: item.notes,
     };
   };

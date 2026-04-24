@@ -12,23 +12,22 @@ import { DeleteSpecializationDialog } from "./components/DeleteSpecializationDia
 import { api } from "@/lib/api"
 
 type Specialization = {
-  id: number
+  id: string
+  apiId?: string
   code: string
   name: string
   batches: string[]
-  deleteId?: number
 }
 
 type SpecializationFormData = {
   code: string
   name: string
-  batches: string[]
 }
 
 type MajorApiItem = {
-  major_id?: number
-  id?: number
-  majorId?: number
+  major_id?: string | number
+  id?: string | number
+  majorId?: string | number
   code?: string | number
   major_code?: string | number
   name?: string
@@ -55,17 +54,8 @@ export default function QuanLyChuyenNganhPage() {
       const res = await api.get<MajorApiItem[]>("/api/v1/majors")
       const rows = Array.isArray(res.data) ? res.data : []
 
-      const mapped = rows.flatMap((item) => {
-        const candidateIds = [item.major_id, item.id, item.majorId]
-        const resolvedId = candidateIds
-          .map((value) => Number(value))
-          .find((value) => Number.isFinite(value))
-
-        if (resolvedId == null || !Number.isFinite(resolvedId)) {
-          return []
-        }
-
-        const majorId = resolvedId
+      const mapped = rows.map((item, index) => {
+        const apiId = String(item.major_id ?? item.id ?? item.majorId ?? "").trim()
 
         const cohortNames = Array.isArray(item.cohorts)
           ? item.cohorts
@@ -76,15 +66,17 @@ export default function QuanLyChuyenNganhPage() {
           ? item.cohort_ids.map((cohortId) => String(cohortId))
           : []
 
-        const codeText = String(item.code ?? item.major_code ?? majorId).trim()
+        const codeText = String(item.code ?? item.major_code ?? apiId).trim()
+        const nameText = String(item.name || item.major_name || "-").trim() || "-"
+        const rowId = apiId || `major-${index}-${codeText || nameText}`
 
-        return [{
-          id: majorId,
+        return {
+          id: rowId,
+          apiId: apiId || undefined,
           code: codeText,
-          name: String(item.name || item.major_name || "-").trim() || "-",
+          name: nameText,
           batches: cohortNames.length > 0 ? cohortNames : cohortIds,
-          deleteId: majorId,
-        }]
+        }
       })
 
       setSpecializations(mapped)
@@ -115,11 +107,24 @@ export default function QuanLyChuyenNganhPage() {
     setOpenDeleteDialog(true)
   }
 
-  const handleAddSpecialization = async (data: { name: string }) => {
+  const normalizeMajorCode = (rawCode: string) => {
+    const trimmed = rawCode.trim()
+    if (!trimmed) return ""
+    return /^k/i.test(trimmed) ? `K${trimmed.slice(1)}` : `K${trimmed}`
+  }
+
+  const handleAddSpecialization = async (data: { code: string; name: string }) => {
     try {
       setSpecializationError("")
 
+      const majorId = normalizeMajorCode(data.code)
+      if (!majorId) {
+        setSpecializationError("Mã chuyên ngành không được để trống")
+        return false
+      }
+
       await api.post("/api/v1/majors", {
+        majorId,
         name: data.name.trim(),
       })
 
@@ -137,7 +142,7 @@ export default function QuanLyChuyenNganhPage() {
   }
 
   const handleUpdateSpecialization = async (data: SpecializationFormData) => {
-    if (!selectedSpecialization?.id) {
+    if (!selectedSpecialization?.apiId) {
       setSpecializationError("Không xác định được chuyên ngành cần cập nhật")
       return false
     }
@@ -145,14 +150,14 @@ export default function QuanLyChuyenNganhPage() {
     try {
       setSpecializationError("")
 
-      const majorId = Number(data.code)
-      if (!Number.isFinite(majorId)) {
-        setSpecializationError("Mã chuyên ngành phải là số")
+      const majorId = normalizeMajorCode(data.code)
+      if (!majorId) {
+        setSpecializationError("Mã chuyên ngành không được để trống")
         return false
       }
 
-      await api.patch(`/api/v1/majors/${selectedSpecialization.id}`, {
-        major_id: majorId,
+      await api.patch(`/api/v1/majors/${encodeURIComponent(selectedSpecialization.apiId)}`, {
+        majorId,
         name: data.name.trim(),
       })
 
@@ -170,7 +175,7 @@ export default function QuanLyChuyenNganhPage() {
   }
 
   const handleConfirmDelete = async () => {
-    if (!selectedSpecialization?.id) {
+    if (!selectedSpecialization?.apiId) {
       setSpecializationError("Không xác định được chuyên ngành cần xóa")
       return false
     }
@@ -178,11 +183,34 @@ export default function QuanLyChuyenNganhPage() {
     try {
       setSpecializationError("")
 
-      const majorId = Number(selectedSpecialization.deleteId ?? selectedSpecialization.id)
-      await api.delete(`/api/v1/majors/${majorId}`, {
-        params: { major_id: majorId },
-        data: { major_id: majorId },
-      })
+      const majorId = selectedSpecialization.apiId.trim()
+
+      const deleteAttempts = [
+        () => api.delete(`/api/v1/majors/${encodeURIComponent(majorId)}`),
+        () => api.delete(`/api/v1/majors/${majorId}`, { params: { major_id: majorId } }),
+        () => api.delete(`/api/v1/majors/${majorId}`, { data: { major_id: majorId } }),
+        () => api.delete(`/api/v1/majors/${majorId}`, {
+          params: { majorId },
+          data: { majorId },
+        }),
+      ]
+
+      let deleteError: any = null
+      let deleted = false
+
+      for (const attempt of deleteAttempts) {
+        try {
+          await attempt()
+          deleted = true
+          break
+        } catch (error) {
+          deleteError = error
+        }
+      }
+
+      if (!deleted) {
+        throw deleteError
+      }
 
       await fetchMajors()
       setSelectedSpecialization(undefined)
@@ -197,7 +225,7 @@ export default function QuanLyChuyenNganhPage() {
           : responseData?.detail || responseData?.message || JSON.stringify(responseData)
 
       setSpecializationError(
-        `Xóa chuyên ngành ID=${selectedSpecialization.deleteId ?? selectedSpecialization.id} thất bại (${statusCode || "unknown"}). ${backendMessage || "Vui lòng thử lại."}`
+        `Xóa chuyên ngành ID=${selectedSpecialization.apiId || selectedSpecialization.id} thất bại (${statusCode || "unknown"}). ${backendMessage || "Vui lòng thử lại."}`
       )
       return false
     }

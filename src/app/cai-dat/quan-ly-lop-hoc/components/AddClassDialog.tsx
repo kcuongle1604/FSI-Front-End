@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState, type ChangeEvent } from "react"
 import {
   Dialog,
   DialogContent,
@@ -17,42 +17,217 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { api } from "@/lib/api"
 
 interface AddClassDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onAdd: (data: { name: string; specialization: string; advisor: string }) => void
+  onAdd: (data: { name: string; cohortId: number; majorId: string; userId: number }) => Promise<boolean> | boolean
 }
 
 type FormData = {
   name: string
   specialization: string
+  cohort: string
   advisor: string
 }
 
-const SPECIALIZATIONS = [
-  "Quản trị hệ thống thông tin",
-  "Kỹ thuật phần mềm",
-  "Khoa học dữ liệu",
-  "An ninh mạng",
-]
+type SelectOption = {
+  value: string
+  label: string
+}
 
-const ADVISORS = [
-  "Cao Thị Nhâm",
-  "Nguyễn Văn A",
-  "Trần Thị B",
-  "Phạm Văn C",
-]
+type UserApiItem = {
+  id?: number
+  user_id?: number
+  username?: string
+  full_name?: string
+  name?: string
+}
+
+type MajorApiItem = {
+  majorId?: string | number
+  major_id?: string | number
+  name?: string
+  major_name?: string
+}
+
+type MajorApiResponse =
+  | MajorApiItem[]
+  | {
+      data?: MajorApiItem[]
+      items?: MajorApiItem[]
+      results?: MajorApiItem[]
+    }
+
+type CohortApiItem = {
+  cohort_id?: number
+}
 
 const initialFormData: FormData = {
   name: "",
   specialization: "",
+  cohort: "",
   advisor: "",
 }
 
 export function AddClassDialog({ open, onOpenChange, onAdd }: AddClassDialogProps) {
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [errors, setErrors] = useState<Partial<FormData>>({})
+  const [specializations, setSpecializations] = useState<SelectOption[]>([])
+  const [specializationsLoading, setSpecializationsLoading] = useState(false)
+  const [specializationsError, setSpecializationsError] = useState("")
+  const [cohorts, setCohorts] = useState<SelectOption[]>([])
+  const [cohortsLoading, setCohortsLoading] = useState(false)
+  const [cohortsError, setCohortsError] = useState("")
+  const [advisors, setAdvisors] = useState<SelectOption[]>([])
+  const [advisorsLoading, setAdvisorsLoading] = useState(false)
+  const [advisorsError, setAdvisorsError] = useState("")
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    const fetchMajors = async () => {
+      try {
+        setSpecializationsLoading(true)
+        setSpecializationsError("")
+
+        const res = await api.get<MajorApiResponse>('/api/v1/majors')
+        const raw = res.data
+        const majors = Array.isArray(raw)
+          ? raw
+          : Array.isArray(raw?.data)
+            ? raw.data
+            : Array.isArray(raw?.items)
+              ? raw.items
+              : Array.isArray(raw?.results)
+                ? raw.results
+                : []
+
+        const majorOptions = majors
+          .map((major) => {
+            const majorIdText = String(major.majorId ?? major.major_id ?? "").trim()
+            const majorName = String(major.name || major.major_name || "").trim()
+
+            if (!majorIdText) {
+              return null
+            }
+
+            const value = majorIdText
+            const label = majorName
+              ? `${majorIdText} - ${majorName}`
+              : majorIdText
+
+            return {
+              value,
+              label,
+            }
+          })
+          .filter((option): option is SelectOption => Boolean(option))
+
+        setSpecializations(
+          majorOptions.filter((option, index, array) =>
+            array.findIndex((item) => item.value === option.value && item.label === option.label) === index
+          )
+        )
+      } catch (error: any) {
+        const detail = error?.response?.data?.detail
+        const message =
+          typeof detail === "string" && detail.trim()
+            ? detail
+            : "Không tải được danh sách chuyên ngành"
+
+        setSpecializations([])
+        setSpecializationsError(message)
+      } finally {
+        setSpecializationsLoading(false)
+      }
+    }
+
+    const fetchUsers = async () => {
+      try {
+        setAdvisorsLoading(true)
+        setAdvisorsError("")
+
+        const res = await api.get<UserApiItem[]>("/api/v1/users/")
+        const users = Array.isArray(res.data) ? res.data : []
+        const userOptions = users
+          .map((user) => {
+            const userId = Number(user.user_id ?? user.id)
+            const displayName = String(user.full_name || user.name || user.username || "").trim()
+
+            if (!displayName || !Number.isFinite(userId)) {
+              return null
+            }
+
+            return {
+              value: String(userId),
+              label: displayName,
+            }
+          })
+          .filter((option): option is SelectOption => Boolean(option))
+
+        setAdvisors(
+          userOptions.filter((option, index, array) => array.findIndex((item) => item.value === option.value) === index)
+        )
+      } catch (error: any) {
+        const detail = error?.response?.data?.detail
+        const message =
+          typeof detail === "string" && detail.trim()
+            ? detail
+            : "Không tải được danh sách giáo viên"
+
+        setAdvisors([])
+        setAdvisorsError(message)
+      } finally {
+        setAdvisorsLoading(false)
+      }
+    }
+
+    const fetchCohorts = async () => {
+      try {
+        setCohortsLoading(true)
+        setCohortsError("")
+
+        const res = await api.get<CohortApiItem[]>("/api/v1/cohorts")
+        const cohortRows = Array.isArray(res.data) ? res.data : []
+        const cohortOptions = cohortRows
+          .map((cohort) => {
+            const cohortId = Number(cohort.cohort_id)
+            if (!Number.isFinite(cohortId)) {
+              return null
+            }
+
+            return {
+              value: String(cohortId),
+              label: String(cohortId),
+            }
+          })
+          .filter((option): option is SelectOption => Boolean(option))
+
+        setCohorts(
+          cohortOptions.filter((option, index, array) => array.findIndex((item) => item.value === option.value) === index)
+        )
+      } catch (error: any) {
+        const detail = error?.response?.data?.detail
+        const message =
+          typeof detail === "string" && detail.trim()
+            ? detail
+            : "Không tải được danh sách khóa"
+
+        setCohorts([])
+        setCohortsError(message)
+      } finally {
+        setCohortsLoading(false)
+      }
+    }
+
+    void fetchMajors()
+    void fetchCohorts()
+    void fetchUsers()
+  }, [open])
 
   const validateForm = () => {
     const newErrors: Partial<FormData> = {}
@@ -63,18 +238,18 @@ export function AddClassDialog({ open, onOpenChange, onAdd }: AddClassDialogProp
     if (!formData.specialization) {
       newErrors.specialization = "Chuyên ngành không được để trống"
     }
+    if (!formData.cohort) {
+      newErrors.cohort = "Khóa không được để trống"
+    }
     if (!formData.advisor) {
       newErrors.advisor = "Giáo viên phụ trách không được để trống"
-    }
-    if (formData.studentCount === "") {
-      newErrors.studentCount = "Số lượng không được để trống"
     }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
@@ -89,10 +264,19 @@ export function AddClassDialog({ open, onOpenChange, onAdd }: AddClassDialogProp
   }
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
+    setFormData(prev => {
+      const nextFormData = {
+        ...prev,
+        [name]: value,
+      }
+
+      if (nextFormData.cohort && nextFormData.specialization) {
+        nextFormData.name = `${nextFormData.cohort}${nextFormData.specialization}`
+      }
+
+      return nextFormData
+    })
+
     if (errors[name as keyof FormData]) {
       setErrors(prev => ({
         ...prev,
@@ -101,9 +285,38 @@ export function AddClassDialog({ open, onOpenChange, onAdd }: AddClassDialogProp
     }
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (validateForm()) {
-      onAdd(formData)
+      const cohortId = Number(formData.cohort)
+      const majorId = formData.specialization.trim()
+      const userId = Number(formData.advisor)
+
+      if (!Number.isFinite(cohortId)) {
+        setErrors(prev => ({ ...prev, cohort: "Khóa không hợp lệ" }))
+        return
+      }
+
+      if (!majorId) {
+        setErrors(prev => ({ ...prev, specialization: "Chuyên ngành không hợp lệ" }))
+        return
+      }
+
+      if (!Number.isFinite(userId)) {
+        setErrors(prev => ({ ...prev, advisor: "Giáo viên phụ trách không hợp lệ" }))
+        return
+      }
+
+      const created = await onAdd({
+        name: formData.name.trim(),
+        cohortId,
+        majorId,
+        userId,
+      })
+
+      if (!created) {
+        return
+      }
+
       setFormData(initialFormData)
       setErrors({})
       onOpenChange(false)
@@ -128,17 +341,29 @@ export function AddClassDialog({ open, onOpenChange, onAdd }: AddClassDialogProp
         <div className="space-y-4">
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-700">
-              Tên lớp <span className="text-red-500">*</span>
+              Khóa <span className="text-red-500">*</span>
             </Label>
-            <Input
-              name="name"
-              placeholder="Tên lớp"
-              value={formData.name}
-              onChange={handleInputChange}
-              className="h-9 w-full"
-            />
-            {errors.name && (
-              <p className="text-sm text-red-500">{errors.name}</p>
+            <Select value={formData.cohort} onValueChange={(value) => handleSelectChange("cohort", value)}>
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue placeholder="Khóa" />
+              </SelectTrigger>
+              <SelectContent>
+                {cohorts.map((cohort, index) => (
+                  <SelectItem key={`${cohort.value}-${index}`} value={cohort.value}>{cohort.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {cohortsLoading && (
+              <p className="text-xs text-gray-500">Đang tải danh sách khóa...</p>
+            )}
+            {!cohortsLoading && cohortsError && (
+              <p className="text-xs text-red-500">{cohortsError}</p>
+            )}
+            {!cohortsLoading && !cohortsError && cohorts.length === 0 && (
+              <p className="text-xs text-gray-500">Không có khóa để lựa chọn</p>
+            )}
+            {errors.cohort && (
+              <p className="text-sm text-red-500">{errors.cohort}</p>
             )}
           </div>
 
@@ -151,11 +376,20 @@ export function AddClassDialog({ open, onOpenChange, onAdd }: AddClassDialogProp
                 <SelectValue placeholder="Chuyên ngành" />
               </SelectTrigger>
               <SelectContent>
-                {SPECIALIZATIONS.map(spec => (
-                  <SelectItem key={spec} value={spec}>{spec}</SelectItem>
+                {specializations.map((spec, index) => (
+                  <SelectItem key={`${spec.value}-${index}`} value={spec.value}>{spec.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {specializationsLoading && (
+              <p className="text-xs text-gray-500">Đang tải danh sách chuyên ngành...</p>
+            )}
+            {!specializationsLoading && specializationsError && (
+              <p className="text-xs text-red-500">{specializationsError}</p>
+            )}
+            {!specializationsLoading && !specializationsError && specializations.length === 0 && (
+              <p className="text-xs text-gray-500">Không có chuyên ngành để lựa chọn</p>
+            )}
             {errors.specialization && (
               <p className="text-sm text-red-500">{errors.specialization}</p>
             )}
@@ -170,13 +404,38 @@ export function AddClassDialog({ open, onOpenChange, onAdd }: AddClassDialogProp
                 <SelectValue placeholder="Giáo viên phụ trách" />
               </SelectTrigger>
               <SelectContent>
-                {ADVISORS.map(advisor => (
-                  <SelectItem key={advisor} value={advisor}>{advisor}</SelectItem>
+              {advisors.map((advisor, index) => (
+                <SelectItem key={`${advisor.value}-${index}`} value={advisor.value}>{advisor.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {advisorsLoading && (
+              <p className="text-xs text-gray-500">Đang tải danh sách giáo viên...</p>
+            )}
+            {!advisorsLoading && advisorsError && (
+              <p className="text-xs text-red-500">{advisorsError}</p>
+            )}
+            {!advisorsLoading && !advisorsError && advisors.length === 0 && (
+              <p className="text-xs text-gray-500">Không có người dùng để lựa chọn</p>
+            )}
             {errors.advisor && (
               <p className="text-sm text-red-500">{errors.advisor}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">
+              Tên lớp <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              name="name"
+              placeholder="Tên lớp"
+              value={formData.name}
+              onChange={handleInputChange}
+              className="h-9 w-full"
+            />
+            {errors.name && (
+              <p className="text-sm text-red-500">{errors.name}</p>
             )}
           </div>
         </div>

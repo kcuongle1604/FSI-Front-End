@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 type Specialization = {
-  id: number
+  id: string
+  apiId?: string
   code: string
   name: string
   batches: string[]

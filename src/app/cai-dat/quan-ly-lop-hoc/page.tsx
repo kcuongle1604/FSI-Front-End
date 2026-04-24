@@ -14,6 +14,10 @@ import { api } from "@/lib/api"
 type SchoolClass = {
   id: number
   name: string
+  cohort: string
+  cohortId?: number
+  majorId?: string | number
+  userId?: number
   specialization: string
   advisor: string
   studentCount: number | string
@@ -24,7 +28,11 @@ type ClassApiItem = {
   id?: number
   name?: string
   class_name?: string
-  major_id?: number
+  cohort_id?: number
+  cohort_name?: string
+  major_id?: string | number
+  major_name?: string
+  user_id?: number
   advisor_username?: string
   advisor_name?: string
   student_count?: number
@@ -50,38 +58,41 @@ export default function QuanLyLopHocPage() {
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false)
   const [selectedClass, setSelectedClass] = useState<SchoolClass | undefined>()
 
-  useEffect(() => {
-    const fetchClasses = async () => {
-      try {
-        setLoading(true)
-        setLoadError("")
+  const fetchClasses = async () => {
+    try {
+      setLoading(true)
+      setLoadError("")
 
-        const res = await api.get<ClassApiItem[]>("/api/v1/classes")
-        const list = Array.isArray(res.data) ? res.data : []
+      const res = await api.get<ClassApiItem[]>("/api/v1/classes")
+      const list = Array.isArray(res.data) ? res.data : []
 
-        const mapped = list.map((item, index) => {
-          const rawClassId = Number(item.class_id ?? item.id)
-          const majorId = Number(item.major_id)
-          const studentCount = Number(item.student_count)
+      const mapped = list.map((item, index) => {
+        const rawClassId = Number(item.class_id ?? item.id)
+        const studentCount = Number(item.student_count)
 
-          return {
-            id: Number.isFinite(rawClassId) ? rawClassId : index + 1,
-            name: String(item.name || item.class_name || "-").trim() || "-",
-            specialization: Number.isFinite(majorId) ? `Chuyên ngành #${majorId}` : "-",
-            advisor: String(item.advisor_username || item.advisor_name || "-").trim() || "-",
-            studentCount: Number.isFinite(studentCount) ? studentCount : "0",
-          }
-        })
+        return {
+          id: Number.isFinite(rawClassId) ? rawClassId : index + 1,
+          name: String(item.name || item.class_name || "-").trim() || "-",
+          cohort: Number.isFinite(Number(item.cohort_id)) ? String(item.cohort_id) : "-",
+          cohortId: Number.isFinite(Number(item.cohort_id)) ? Number(item.cohort_id) : undefined,
+          majorId: item.major_id != null ? String(item.major_id) : undefined,
+          userId: Number.isFinite(Number(item.user_id)) ? Number(item.user_id) : undefined,
+          specialization: String(item.major_name || "").trim() || (Number.isFinite(Number(item.major_id)) ? `Chuyên ngành #${item.major_id}` : "-"),
+          advisor: String(item.advisor_username || item.advisor_name || "-").trim() || "-",
+          studentCount: Number.isFinite(studentCount) ? studentCount : "0",
+        }
+      })
 
-        setClasses(mapped)
-      } catch (error: any) {
-        setLoadError(extractBackendMessage(error, "Không tải được danh sách lớp học."))
-        setClasses([])
-      } finally {
-        setLoading(false)
-      }
+      setClasses(mapped)
+    } catch (error: any) {
+      setLoadError(extractBackendMessage(error, "Không tải được danh sách lớp học."))
+      setClasses([])
+    } finally {
+      setLoading(false)
     }
+  }
 
+  useEffect(() => {
     void fetchClasses()
   }, [])
 
@@ -99,13 +110,72 @@ export default function QuanLyLopHocPage() {
     setOpenDeleteDialog(true)
   }
 
-  const handleAddClass = (data: { name: string; specialization: string; advisor: string }) => {
+  const handleAddClass = async (data: { name: string; cohortId: number; majorId: string; userId: number }) => {
+    try {
+      setLoadError("")
+
+      const payload = {
+        name: String(data.name ?? "").trim(),
+        cohort_id: Number(data.cohortId),
+        major_id: String(data.majorId ?? "").trim(),
+        user_id: Number(data.userId),
+      }
+
+      await api.post("/api/v1/classes", payload)
+
+      await fetchClasses()
+      return true
+    } catch (error: any) {
+      setLoadError(extractBackendMessage(error, "Không thể tạo lớp học."))
+      return false
+    }
   }
 
-  const handleUpdateClass = (data: { name: string; specialization: string; advisor: string; studentCount: string | number }) => {
+  const handleUpdateClass = async (data: { name: string; cohortId: number; majorId: string; userId: number }) => {
+    if (!selectedClass?.id) {
+      setLoadError("Không xác định được lớp học cần cập nhật.")
+      return false
+    }
+
+    try {
+      setLoadError("")
+
+      const payload = {
+        name: String(data.name ?? "").trim(),
+        cohort_id: Number(data.cohortId),
+        major_id: String(data.majorId ?? "").trim(),
+        user_id: Number(data.userId),
+      }
+
+      await api.patch(`/api/v1/classes/${selectedClass.id}`, payload)
+
+      await fetchClasses()
+      setSelectedClass(undefined)
+      return true
+    } catch (error: any) {
+      setLoadError(extractBackendMessage(error, "Không thể cập nhật lớp học."))
+      return false
+    }
   }
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
+    if (!selectedClass?.id) {
+      setLoadError("Không xác định được lớp học cần xóa.")
+      return false
+    }
+
+    try {
+      setLoadError("")
+
+      await api.delete(`/api/v1/classes/${selectedClass.id}`)
+
+      await fetchClasses()
+      setSelectedClass(undefined)
+      return true
+    } catch (error: any) {
+      setLoadError(extractBackendMessage(error, "Không thể xóa lớp học."))
+      return false
+    }
   }
 
   return (

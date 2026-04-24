@@ -18,6 +18,8 @@ type MajorByCohort = {
   name?: string;
 };
 
+const normalizeText = (value: unknown) => String(value ?? "").trim().toLowerCase();
+
 type AddRegulationDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -34,6 +36,28 @@ const toNumberWithDefault = (raw: string, fallback: number): number | null => {
 
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const sanitizeNonNegativeNumberInput = (raw: string, allowDecimal: boolean, maxValue?: number): string => {
+  let cleaned = raw.replace(/-/g, "").replace(/[^\d.]/g, "");
+
+  if (!allowDecimal) {
+    const normalized = cleaned.replace(/\./g, "");
+    if (!normalized || maxValue == null) return normalized;
+
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed)) return "";
+    return parsed > maxValue ? String(maxValue) : normalized;
+  }
+
+  const [integerPart, ...decimalParts] = cleaned.split(".");
+  const normalized = decimalParts.length === 0 ? cleaned : `${integerPart}.${decimalParts.join("")}`;
+  if (!normalized || normalized === ".") return normalized === "." ? "" : normalized;
+  if (maxValue == null) return normalized;
+
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return "";
+  return parsed > maxValue ? String(maxValue) : normalized;
 };
 
 const calculateMinTotalCredits = (requiredRaw: string, electiveRaw: string): string => {
@@ -122,7 +146,17 @@ export default function AddRegulationDialog({ open, onOpenChange, onAdd }: AddRe
   }, [open, formData.batches, majorOptionsByCohort]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+    const { name } = e.target;
+    let { value } = e.target;
+
+    if (name === "minRequiredCredits" || name === "minElectiveCredits") {
+      value = sanitizeNonNegativeNumberInput(value, false);
+    }
+
+    if (name === "minGpa") {
+      value = sanitizeNonNegativeNumberInput(value, true, 4.0);
+    }
+
     setFormData((prev) => {
       const next = { ...prev, [name]: value };
 
@@ -175,6 +209,15 @@ export default function AddRegulationDialog({ open, onOpenChange, onAdd }: AddRe
     if (minTotalCredits === null || minRequiredCredits === null || minElectiveCredits === null || minGpa === null) {
       newErrors.detail = "Vui lòng nhập đúng định dạng số cho tín chỉ và GPA";
     }
+    if (
+      minTotalCredits != null && minRequiredCredits != null && minElectiveCredits != null && minGpa != null &&
+      (minTotalCredits < 0 || minRequiredCredits < 0 || minElectiveCredits < 0 || minGpa < 0)
+    ) {
+      newErrors.detail = "Tín chỉ tối thiểu và GPA tối thiểu không được âm";
+    }
+    if (minGpa != null && minGpa > 4.0) {
+      newErrors.detail = "GPA tối thiểu không được vượt quá 4.0";
+    }
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
 
@@ -182,26 +225,25 @@ export default function AddRegulationDialog({ open, onOpenChange, onAdd }: AddRe
       const cohortId = Number(batch);
       if (!Number.isFinite(cohortId)) return [];
 
-      const selectedMajorNames = batchMajors[batch] ?? [];
+      const selectedMajorValues = batchMajors[batch] ?? [];
       const majorOptions = majorOptionsByCohort[batch] ?? [];
 
-      return selectedMajorNames
-        .map((majorName) => {
-          const major = majorOptions.find((m) => m.name === majorName);
-          if (!major || !Number.isFinite(major.id)) return null;
+      return selectedMajorValues
+        .map((majorValue) => {
+          const majorById = majorOptions.find((m) => String(m.id) === String(majorValue).trim());
+          const majorByName = majorOptions.find((m) => normalizeText(m.name) === normalizeText(majorValue));
+          const matchedMajor = majorById ?? majorByName;
+
+          const resolvedMajorId = Number(matchedMajor?.id ?? majorValue);
+          if (!Number.isFinite(resolvedMajorId)) return null;
 
           return {
             cohort_id: cohortId,
-            major_id: major.id,
+            major_id: String(resolvedMajorId),
           };
         })
-        .filter((item): item is { cohort_id: number; major_id: number } => Boolean(item));
+        .filter((item): item is { cohort_id: number; major_id: string } => Boolean(item));
     });
-
-    if (applications.length === 0) {
-      setErrors((prev) => ({ ...prev, detail: "Không tạo được dữ liệu cặp khóa/chuyên ngành hợp lệ" }));
-      return;
-    }
 
     const payload = {
       name: formData.name.trim(),
@@ -286,7 +328,8 @@ export default function AddRegulationDialog({ open, onOpenChange, onAdd }: AddRe
               <Label className="text-sm font-medium text-gray-800">Tổng tín chỉ tối thiểu</Label>
               <Input
                 name="minTotalCredits"
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={formData.minTotalCredits}
                 placeholder="120"
                 readOnly
@@ -295,15 +338,36 @@ export default function AddRegulationDialog({ open, onOpenChange, onAdd }: AddRe
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-800">Tín chỉ bắt buộc tối thiểu</Label>
-              <Input name="minRequiredCredits" type="number" value={formData.minRequiredCredits} onChange={handleInputChange} placeholder="90" />
+              <Input
+                name="minRequiredCredits"
+                type="text"
+                inputMode="numeric"
+                value={formData.minRequiredCredits}
+                onChange={handleInputChange}
+                placeholder="90"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-800">Tín chỉ tự chọn tối thiểu</Label>
-              <Input name="minElectiveCredits" type="number" value={formData.minElectiveCredits} onChange={handleInputChange} placeholder="30" />
+              <Input
+                name="minElectiveCredits"
+                type="text"
+                inputMode="numeric"
+                value={formData.minElectiveCredits}
+                onChange={handleInputChange}
+                placeholder="30"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-800">GPA tối thiểu</Label>
-              <Input name="minGpa" type="number" step="0.01" value={formData.minGpa} onChange={handleInputChange} placeholder="2.0" />
+              <Input
+                name="minGpa"
+                type="text"
+                inputMode="decimal"
+                value={formData.minGpa}
+                onChange={handleInputChange}
+                placeholder="2.0"
+              />
             </div>
           </div>
           <div className="space-y-2">

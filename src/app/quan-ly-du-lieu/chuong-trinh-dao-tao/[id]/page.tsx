@@ -31,10 +31,11 @@ import ProgramSubjectsImportDialog from "../ProgramSubjectsImportDialog";
 import type { ImportHistory } from "../../sinh-vien/types";
 import CourseFormDialog, { CourseFormValues } from "../CourseFormDialog";
 import DeleteCourseDialog from "../DeleteCourseDialog";
-import { addSubjectToTrainingProgram, deleteSubjectFromTrainingProgram, getProgramCohorts, getSubjectsByProgramId, getTrainingPrograms, type Subject } from "../program.api";
+import { addSubjectToTrainingProgram, deleteSubjectFromTrainingProgram, getProgramCohorts, getSubjectsByProgramId, getTrainingPrograms, updateTrainingProgramSubject, type Subject } from "../program.api";
 
 type ProgramCourse = {
   id: number;
+  programSubjectId?: string;
   specialization: string;
   type: CourseFormValues["type"];
   code: string;
@@ -43,6 +44,42 @@ type ProgramCourse = {
   compulsory: number;
   optional: number;
 };
+
+function resolveProgramSubjectId(subject: any): string | undefined {
+  const directCandidates = [
+    subject?.program_subject_id,
+    subject?.programSubjectId,
+    subject?.id,
+    subject?.training_program_subject_id,
+    subject?.trainingProgramSubjectId,
+    subject?.subject_program_id,
+    subject?.program_subject?.program_subject_id,
+    subject?.program_subject?.id,
+    subject?.programSubject?.programSubjectId,
+    subject?.programSubject?.id,
+    subject?.training_program_subject?.program_subject_id,
+    subject?.trainingProgramSubject?.programSubjectId,
+  ];
+
+  for (const candidate of directCandidates) {
+    const value = String(candidate ?? "").trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  if (subject && typeof subject === "object") {
+    for (const [key, value] of Object.entries(subject)) {
+      if (!/program.*subject.*id|subject.*program.*id/i.test(key)) continue;
+      const candidate = String(value ?? "").trim();
+      if (candidate) {
+        return candidate;
+      }
+    }
+  }
+
+  return undefined;
+}
 
 const INITIAL_COURSES: ProgramCourse[] = [
   {
@@ -125,6 +162,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
   const [editingCourse, setEditingCourse] = useState<ProgramCourse | null>(null);
   const [isDeleteCourseDialogOpen, setIsDeleteCourseDialogOpen] = useState(false);
   const [deletingCourse, setDeletingCourse] = useState<ProgramCourse | null>(null);
+  const [programSubjectIdBySubjectCode, setProgramSubjectIdBySubjectCode] = useState<Record<string, string>>({});
 
   // Fetch training programs from API
   useEffect(() => {
@@ -210,9 +248,21 @@ export default function ChuongTrinhDaoTaoDetailPage() {
         }
 
         if (allSubjects.length > 0) {
+          const idMap: Record<string, string> = {}
+
           // Map API response to ProgramCourse structure
-          const mappedCourses: ProgramCourse[] = allSubjects.map((subject: Subject, index: number) => ({
+          const mappedCourses: ProgramCourse[] = allSubjects.map((subject: Subject, index: number) => {
+            const programSubjectIdFromResponse = String(subject.program_subject_id ?? "").trim()
+            const resolvedProgramSubjectId = programSubjectIdFromResponse || resolveProgramSubjectId(subject)
+            const subjectCode = String(subject.subject_id || "").trim()
+
+            if (subjectCode && resolvedProgramSubjectId) {
+              idMap[subjectCode] = resolvedProgramSubjectId
+            }
+
+            return ({
             id: index + 1,
+            programSubjectId: resolvedProgramSubjectId,
             specialization: title,
             type: subject.is_required ? "bat-buoc" : "tu-chon",
             code: subject.subject_id,
@@ -220,16 +270,20 @@ export default function ChuongTrinhDaoTaoDetailPage() {
             credits: subject.credits,
             compulsory: subject.is_required ? subject.credits : 0,
             optional: subject.is_required ? 0 : subject.credits,
-          }));
+          })
+          });
           
           setCourses(mappedCourses);
+          setProgramSubjectIdBySubjectCode(idMap);
         } else {
           setCourses([]);
+          setProgramSubjectIdBySubjectCode({});
         }
       } catch (err: any) {
         if (err.response?.status === 404) {
         }
         setCourses([]);
+        setProgramSubjectIdBySubjectCode({});
       } finally {
         setLoading(false);
       }
@@ -264,6 +318,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
         program_subject_id: 0,
         training_program_id: programId,
         subject_id: values.code,
+        subject_name: values.name,
         credits: values.credits,
         is_required: values.type === "bat-buoc",
       });
@@ -278,28 +333,41 @@ export default function ChuongTrinhDaoTaoDetailPage() {
     }
   };
 
-  const handleEditCourse = (values: CourseFormValues) => {
+  const handleEditCourse = async (values: CourseFormValues) => {
     if (!editingCourse) return;
 
-    setCourses((prev) =>
-      prev.map((course) => {
-        if (course.id !== editingCourse.id) return course;
+    const fallbackFromCourses = courses.find((course) => {
+      if (course.id === editingCourse.id) return true;
+      const sameCode = String(course.code || "").trim() === String(editingCourse.code || "").trim();
+      const sameName = String(course.name || "").trim() === String(editingCourse.name || "").trim();
+      return sameCode && sameName;
+    });
 
-        const credits = values.credits;
-        const isCompulsory = values.type === "bat-buoc";
+    const resolvedProgramSubjectId = String(
+      values.programSubjectId ||
+      editingCourse.programSubjectId ||
+      fallbackFromCourses?.programSubjectId ||
+      programSubjectIdBySubjectCode[String(editingCourse.code || "").trim()] ||
+      ""
+    ).trim();
 
-        return {
-          ...course,
-          specialization: values.specialization,
-          type: values.type,
-          code: values.code,
-          name: values.name,
-          credits,
-          compulsory: isCompulsory ? credits : 0,
-          optional: isCompulsory ? 0 : credits,
-        };
-      })
-    );
+    if (!resolvedProgramSubjectId) {
+      throw new Error("Không tìm thấy program_subject_id để cập nhật học phần.");
+    }
+
+    try {
+      await updateTrainingProgramSubject(resolvedProgramSubjectId, {
+        is_required: values.type === "bat-buoc",
+      });
+
+      setSubjectsRefreshKey((prev) => prev + 1);
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        "Không thể cập nhật loại học phần.";
+      throw new Error(String(message));
+    }
   };
 
   const handleDeleteCourse = async () => {
@@ -612,6 +680,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
           onSave={handleEditCourse}
           mode="edit"
           initialValues={{
+            programSubjectId: editingCourse?.programSubjectId,
             specialization: editingCourse?.specialization ?? "",
             code: editingCourse?.code ?? "",
             name: editingCourse?.name ?? "",

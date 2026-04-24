@@ -18,6 +18,7 @@ import {
 type SchoolClass = {
   id: number
   name: string
+  cohort: string
   specialization: string
   advisor: string
   studentCount: number | string
@@ -47,6 +48,7 @@ export default function ClassManagementTable({
               <TableRow className="border-b border-gray-200 bg-blue-50">
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">STT</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">TÊN LỚP</TableHead>
+                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">KHÓA</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">CHUYÊN NGÀNH</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">GIÁO VIÊN PHỤ TRÁCH</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">SỐ LƯỢNG</TableHead>
@@ -62,6 +64,7 @@ export default function ClassManagementTable({
                     {String(index + 1).padStart(2, '0')}
                   </TableCell>
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{schoolClass.name}</TableCell>
+                  <TableCell className="h-12 px-4 text-sm text-gray-600">{schoolClass.cohort}</TableCell>
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{schoolClass.specialization}</TableCell>
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{schoolClass.advisor}</TableCell>
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{schoolClass.studentCount}</TableCell>

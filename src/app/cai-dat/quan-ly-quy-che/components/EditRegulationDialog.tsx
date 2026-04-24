@@ -15,10 +15,12 @@ type CohortItem = {
 };
 
 type MajorByCohort = {
-  major_id: number;
+  major_id: number | string;
   major_name?: string;
   name?: string;
 };
+
+const normalizeText = (value: unknown) => String(value ?? "").trim().toLowerCase();
 
 type EditRegulationDialogProps = {
   open: boolean;
@@ -39,9 +41,31 @@ const toNumberWithDefault = (raw: string, fallback: number): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const sanitizeNonNegativeNumberInput = (raw: string, allowDecimal: boolean, maxValue?: number): string => {
+  let cleaned = raw.replace(/-/g, "").replace(/[^\d.]/g, "");
+
+  if (!allowDecimal) {
+    const normalized = cleaned.replace(/\./g, "");
+    if (!normalized || maxValue == null) return normalized;
+
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed)) return "";
+    return parsed > maxValue ? String(maxValue) : normalized;
+  }
+
+  const [integerPart, ...decimalParts] = cleaned.split(".");
+  const normalized = decimalParts.length === 0 ? cleaned : `${integerPart}.${decimalParts.join("")}`;
+  if (!normalized || normalized === ".") return normalized === "." ? "" : normalized;
+  if (maxValue == null) return normalized;
+
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return "";
+  return parsed > maxValue ? String(maxValue) : normalized;
+};
+
 export default function EditRegulationDialog({ open, onOpenChange, regulation, onUpdate }: EditRegulationDialogProps) {
   const [cohortOptions, setCohortOptions] = useState<string[]>([]);
-  const [majorOptionsByCohort, setMajorOptionsByCohort] = useState<Record<string, { id: number; name: string }[]>>({});
+  const [majorOptionsByCohort, setMajorOptionsByCohort] = useState<Record<string, { id: string; name: string }[]>>({});
   const [loadingCohorts, setLoadingCohorts] = useState(false);
   const [loadingMajorsByCohort, setLoadingMajorsByCohort] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState({
@@ -97,7 +121,7 @@ export default function EditRegulationDialog({ open, onOpenChange, regulation, o
           setMajorOptionsByCohort((prev) => ({
             ...prev,
             [cohortId]: majors.map((m) => ({
-              id: m.major_id,
+              id: String(m.major_id),
               name: m.major_name || m.name || String(m.major_id),
             })),
           }));
@@ -115,8 +139,16 @@ export default function EditRegulationDialog({ open, onOpenChange, regulation, o
 
   useEffect(() => {
     if (regulation && open) {
-      const batches = Array.isArray((regulation as any).batches)
-        ? (regulation as any).batches.map((value: unknown) => String(value))
+      const batches = Array.isArray((regulation as any).cohort_ids)
+        ? (regulation as any).cohort_ids
+            .map((value: unknown) => Number(value))
+            .filter((value: number) => Number.isFinite(value))
+            .map((value: number) => String(value))
+        : Array.isArray((regulation as any).batches)
+        ? (regulation as any).batches
+            .map((value: unknown) => Number(value))
+            .filter((value: number) => Number.isFinite(value))
+            .map((value: number) => String(value))
         : [];
       const specializations = Array.isArray((regulation as any).specializations)
         ? (regulation as any).specializations.map((value: unknown) => String(value))
@@ -141,7 +173,18 @@ export default function EditRegulationDialog({ open, onOpenChange, regulation, o
   }, [regulation, open]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name } = e.target;
+    let { value } = e.target;
+
+    if (name === "minTotalCredits" || name === "minRequiredCredits" || name === "minElectiveCredits") {
+      value = sanitizeNonNegativeNumberInput(value, false);
+    }
+
+    if (name === "minGpa") {
+      value = sanitizeNonNegativeNumberInput(value, true, 4.0);
+    }
+
+    setFormData({ ...formData, [name]: value });
     if (errors[e.target.name as keyof typeof errors]) {
       setErrors((prev) => ({ ...prev, [e.target.name]: undefined }));
     }
@@ -181,6 +224,15 @@ export default function EditRegulationDialog({ open, onOpenChange, regulation, o
     if (minTotalCredits === null || minRequiredCredits === null || minElectiveCredits === null || minGpa === null) {
       newErrors.detail = "Vui lòng nhập đúng định dạng số cho tín chỉ và GPA";
     }
+    if (
+      minTotalCredits != null && minRequiredCredits != null && minElectiveCredits != null && minGpa != null &&
+      (minTotalCredits < 0 || minRequiredCredits < 0 || minElectiveCredits < 0 || minGpa < 0)
+    ) {
+      newErrors.detail = "Tín chỉ tối thiểu và GPA tối thiểu không được âm";
+    }
+    if (minGpa != null && minGpa > 4.0) {
+      newErrors.detail = "GPA tối thiểu không được vượt quá 4.0";
+    }
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
 
@@ -193,26 +245,25 @@ export default function EditRegulationDialog({ open, onOpenChange, regulation, o
       const cohortId = Number(batch);
       if (!Number.isFinite(cohortId)) return [];
 
-      const selectedMajorNames = batchMajors[batch] ?? [];
+      const selectedMajorValues = batchMajors[batch] ?? [];
       const majorOptions = majorOptionsByCohort[batch] ?? [];
 
-      return selectedMajorNames
-        .map((majorName) => {
-          const major = majorOptions.find((m) => m.name === majorName);
-          if (!major || !Number.isFinite(major.id)) return null;
+      return selectedMajorValues
+        .map((majorValue) => {
+          const majorById = majorOptions.find((m) => String(m.id) === String(majorValue).trim());
+          const majorByName = majorOptions.find((m) => normalizeText(m.name) === normalizeText(majorValue));
+          const matchedMajor = majorById ?? majorByName;
+
+          const resolvedMajorId = String(matchedMajor?.id ?? majorValue).trim();
+          if (!resolvedMajorId) return null;
 
           return {
             cohort_id: cohortId,
-            major_id: major.id,
+            major_id: resolvedMajorId,
           };
         })
-        .filter((item): item is { cohort_id: number; major_id: number } => Boolean(item));
+        .filter((item): item is { cohort_id: number; major_id: string } => Boolean(item));
     });
-
-    if (applications.length === 0) {
-      setErrors((prev) => ({ ...prev, detail: "Không tạo được dữ liệu cặp khóa/chuyên ngành hợp lệ" }));
-      return;
-    }
 
     const payload = {
       name: formData.name.trim(),
@@ -276,19 +327,47 @@ export default function EditRegulationDialog({ open, onOpenChange, regulation, o
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-800">Tổng tín chỉ tối thiểu</Label>
-              <Input name="minTotalCredits" type="number" value={formData.minTotalCredits} onChange={handleInputChange} placeholder="120" />
+              <Input
+                name="minTotalCredits"
+                type="text"
+                inputMode="numeric"
+                value={formData.minTotalCredits}
+                onChange={handleInputChange}
+                placeholder="120"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-800">Tín chỉ bắt buộc tối thiểu</Label>
-              <Input name="minRequiredCredits" type="number" value={formData.minRequiredCredits} onChange={handleInputChange} placeholder="90" />
+              <Input
+                name="minRequiredCredits"
+                type="text"
+                inputMode="numeric"
+                value={formData.minRequiredCredits}
+                onChange={handleInputChange}
+                placeholder="90"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-800">Tín chỉ tự chọn tối thiểu</Label>
-              <Input name="minElectiveCredits" type="number" value={formData.minElectiveCredits} onChange={handleInputChange} placeholder="30" />
+              <Input
+                name="minElectiveCredits"
+                type="text"
+                inputMode="numeric"
+                value={formData.minElectiveCredits}
+                onChange={handleInputChange}
+                placeholder="30"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-800">GPA tối thiểu</Label>
-              <Input name="minGpa" type="number" step="0.01" value={formData.minGpa} onChange={handleInputChange} placeholder="2.0" />
+              <Input
+                name="minGpa"
+                type="text"
+                inputMode="decimal"
+                value={formData.minGpa}
+                onChange={handleInputChange}
+                placeholder="2.0"
+              />
             </div>
           </div>
           <div className="space-y-2">
