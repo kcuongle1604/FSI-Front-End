@@ -1,6 +1,9 @@
 import { api } from "@/lib/api"
 
 export interface Subject {
+  program_subject_id?: string | number
+  programSubjectId?: string | number
+  id?: string | number
   subject_id: string
   name: string
   credits: number
@@ -25,6 +28,22 @@ export interface SubjectsResponse {
   total?: number
   page?: number
   size?: number
+}
+
+function toSortableProgramSubjectId(value: Subject["program_subject_id"] | Subject["programSubjectId"] | Subject["id"]) {
+  const raw = String(value ?? "").trim()
+  if (!raw) return Number.POSITIVE_INFINITY
+
+  const normalized = Number(raw)
+  return Number.isFinite(normalized) ? normalized : Number.POSITIVE_INFINITY
+}
+
+function sortSubjectsByProgramSubjectId(subjects: Subject[]) {
+  return [...subjects].sort((a, b) => {
+    const aId = toSortableProgramSubjectId(a.program_subject_id ?? a.programSubjectId ?? a.id)
+    const bId = toSortableProgramSubjectId(b.program_subject_id ?? b.programSubjectId ?? b.id)
+    return aId - bId
+  })
 }
 
 /**
@@ -54,7 +73,7 @@ export async function getSubjectsByProgramName(programName: string, page = 1, si
  * @returns Paginated list of subjects in the program
  */
 export async function getSubjectsByProgramId(trainingProgramId: number, page = 1, size = 20) {
-  return api.get<SubjectsResponse | Subject[]>(
+  const response = await api.get<SubjectsResponse | Subject[]>(
     `/api/v1/training-programs/${trainingProgramId}/subjects`,
     {
       params: {
@@ -63,6 +82,21 @@ export async function getSubjectsByProgramId(trainingProgramId: number, page = 1
       },
     }
   )
+
+  const payload = response.data
+  if (Array.isArray(payload)) {
+    response.data = sortSubjectsByProgramSubjectId(payload)
+    return response
+  }
+
+  if (payload?.data && Array.isArray(payload.data)) {
+    response.data = {
+      ...payload,
+      data: sortSubjectsByProgramSubjectId(payload.data),
+    }
+  }
+
+  return response
 }
 
 /**
@@ -95,6 +129,7 @@ export interface ProgramSubjectPayload {
   program_subject_id: number
   training_program_id: number
   subject_id: string
+  subject_name: string
   credits: number
   is_required: boolean
 }
@@ -136,6 +171,16 @@ export async function addSubjectToTrainingProgram(payload: ProgramSubjectPayload
     }
     throw error
   }
+}
+
+export async function updateTrainingProgramSubject(
+  programSubjectId: string | number,
+  payload: { is_required: boolean }
+) {
+  return api.put(
+    `/api/v1/training-programs/subjects/${encodeURIComponent(String(programSubjectId))}`,
+    payload
+  )
 }
 
 export async function deleteSubjectFromTrainingProgram(trainingProgramId: number, subjectId: string) {

@@ -23,7 +23,7 @@ type RegulationCondition = {
 
 type RegulationApplicationApiItem = {
   cohort_id?: number;
-  major_id?: number;
+  major_id?: string | number;
 };
 
 type GraduationRequirementDetail = {
@@ -61,6 +61,19 @@ const toDisplayValue = (value: unknown): string => {
   }
 
   return "-";
+};
+
+const toNormalizedMajorId = (value: unknown): string | null => {
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    return normalized ? normalized : null;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return null;
 };
 
 const mapDetailToConditions = (detail?: GraduationRequirementDetail): RegulationCondition[] => {
@@ -146,9 +159,22 @@ export default function RegulationDetailPage() {
     id: number,
     changes: Partial<Pick<RegulationCondition, "value">>
   ) => {
-    setConditions((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...changes } : c))
-    );
+    setConditions((prev) => {
+      const next = prev.map((c) => (c.id === id ? { ...c, ...changes } : c));
+
+      if (id !== 2 && id !== 3) {
+        return next;
+      }
+
+      const requiredValue = Number(next.find((c) => c.id === 2)?.value);
+      const electiveValue = Number(next.find((c) => c.id === 3)?.value);
+      const totalValue =
+        Number.isFinite(requiredValue) && Number.isFinite(electiveValue)
+          ? String(requiredValue + electiveValue)
+          : "-";
+
+      return next.map((c) => (c.id === 1 ? { ...c, value: totalValue } : c));
+    });
   };
 
   const getConditionValueAsNumber = (id: number): number | null => {
@@ -166,10 +192,13 @@ export default function RegulationDetailPage() {
       return;
     }
 
-    const minTotalCredits = getConditionValueAsNumber(1);
     const minRequiredCredits = getConditionValueAsNumber(2);
     const minElectiveCredits = getConditionValueAsNumber(3);
     const minGpa = getConditionValueAsNumber(4);
+    const minTotalCredits =
+      minRequiredCredits !== null && minElectiveCredits !== null
+        ? minRequiredCredits + minElectiveCredits
+        : null;
 
     if (
       minTotalCredits === null
@@ -194,9 +223,11 @@ export default function RegulationDetailPage() {
         ? requirementDetail.applications
             .map((item) => ({
               cohort_id: Number(item.cohort_id),
-              major_id: Number(item.major_id),
+              major_id: toNormalizedMajorId(item.major_id),
             }))
-            .filter((item) => Number.isFinite(item.cohort_id) && Number.isFinite(item.major_id))
+            .filter((item): item is { cohort_id: number; major_id: string } => (
+              Number.isFinite(item.cohort_id) && typeof item.major_id === "string"
+            ))
         : [],
       notes: requirementDetail.notes || "",
     };
@@ -305,7 +336,7 @@ export default function RegulationDetailPage() {
                           )}
                         </td>
                         <td className="px-4 py-2 text-right">
-                          {cond.id !== 5 ? (
+                          {cond.id !== 1 && cond.id !== 5 ? (
                             <div className="flex justify-end items-center gap-1">
                               <button
                                 type="button"

@@ -14,11 +14,12 @@ import { Label } from "@/components/ui/label"
 type AddSpecializationDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onAdd?: (data: { name: string }) => Promise<boolean> | boolean
+  onAdd?: (data: { code: string; name: string }) => Promise<boolean> | boolean
 }
 
 export function AddSpecializationDialog({ open, onOpenChange, onAdd }: AddSpecializationDialogProps) {
   const [formData, setFormData] = useState({
+    code: "",
     name: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -34,6 +35,11 @@ export function AddSpecializationDialog({ open, onOpenChange, onAdd }: AddSpecia
   const handleAdd = async () => {
     const newErrors: Record<string, string> = {}
 
+    if (!formData.code.trim()) {
+      newErrors.code = "Vui lòng nhập mã chuyên ngành"
+    } else if (!/^\d+$/.test(formData.code.trim())) {
+      newErrors.code = "Vui lòng chỉ nhập số"
+    }
     if (!formData.name) newErrors.name = "Vui lòng nhập tên chuyên ngành"
 
     setErrors(newErrors)
@@ -52,6 +58,7 @@ export function AddSpecializationDialog({ open, onOpenChange, onAdd }: AddSpecia
     }
 
     setFormData({
+      code: "",
       name: "",
     })
     setErrors({})
@@ -61,6 +68,7 @@ export function AddSpecializationDialog({ open, onOpenChange, onAdd }: AddSpecia
 
   const handleCancel = () => {
     setFormData({
+      code: "",
       name: "",
     })
     setErrors({})
@@ -75,6 +83,27 @@ export function AddSpecializationDialog({ open, onOpenChange, onAdd }: AddSpecia
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Code */}
+          <div className="space-y-2">
+            <Label htmlFor="code" className="text-sm font-medium text-gray-800">
+              Mã chuyên ngành<span className="text-red-500">*</span>
+            </Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">K</span>
+              <Input
+                id="code"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Nhập số mã chuyên ngành"
+                value={formData.code}
+                onChange={(e) => handleInputChange("code", e.target.value.replace(/\D/g, ""))}
+                className={`w-full pl-8 border-gray-300 ${errors.code ? "border-red-500" : ""}`}
+              />
+            </div>
+            {errors.code && <p className="text-xs text-red-500">{errors.code}</p>}
+          </div>
+
           {/* Name */}
           <div className="space-y-2">
             <Label htmlFor="name" className="text-sm font-medium text-gray-800">

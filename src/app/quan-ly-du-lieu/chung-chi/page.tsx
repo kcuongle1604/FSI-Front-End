@@ -342,8 +342,7 @@ export default function ChungChiPage() {
     }
     if (
       normalized.includes("theduc") ||
-      normalized.includes("physical") ||
-      normalized.includes("pe")
+      normalized.includes("physical")
     ) {
       return Boolean(certificate.theDuc)
     }
@@ -359,7 +358,6 @@ export default function ChungChiPage() {
     if (
       normalized.includes("tinhoc") ||
       normalized.includes("tinhhoc") ||
-      normalized.includes("it") ||
       normalized.includes("computer")
     ) {
       return Boolean(certificate.tinhHoc)
@@ -393,9 +391,9 @@ export default function ChungChiPage() {
       donTN: readBooleanByKeys(source, ["don_tn", "application_for_graduation", "donTN", "has_don_tn"], ["don", "tn", "totnghiep", "graduation"]),
       kiemDiem: readBooleanByKeys(source, ["kiem_diem", "personal_evaluation", "kiemDiem", "has_kiem_diem"], ["kiemdiem", "evaluation"]),
       quanSu: toBoolean(item.cc_quan_su) || readBooleanByKeys(source, ["quan_su", "military_certificate", "quanSu", "has_quan_su", "cc_quan_su"], ["quansu", "military"]),
-      theDuc: toBoolean(item.cc_the_duc) || readBooleanByKeys(source, ["the_duc", "physical_education_certificate", "theDuc", "has_the_duc", "cc_the_duc"], ["theduc", "physical", "pe"]),
-      ngoaiNgu: toBoolean(item.cc_ngoai_ngu) || readBooleanByKeys(source, ["ngoai_ngu", "foreign_language_certificate", "ngoaiNgu", "has_ngoai_ngu", "cc_ngoai_ngu"], ["ngoaingu", "foreign", "english", "language"]),
-      tinhHoc: toBoolean(item.cc_tin_hoc) || readBooleanByKeys(source, ["tinh_hoc", "it_certificate", "tinhHoc", "has_tinh_hoc", "cc_tin_hoc", "cc_tinh_hoc"], ["tinhoc", "tinhhoc", "it", "computer"]),
+      theDuc: toBoolean(item.cc_the_duc) || readBooleanByKeys(source, ["the_duc", "physical_education_certificate", "theDuc", "has_the_duc", "cc_the_duc"], ["theduc", "physical"]),
+      ngoaiNgu: toBoolean(item.cc_ngoai_ngu) || readBooleanByKeys(source, ["ngoai_ngu", "foreign_language_certificate", "ngoaiNgu", "has_ngoai_ngu", "cc_ngoai_ngu"], ["ngoaingu", "foreign", "english"]),
+      tinhHoc: toBoolean(item.cc_tin_hoc) || readBooleanByKeys(source, ["tinh_hoc", "it_certificate", "tinhHoc", "has_tinh_hoc", "cc_tin_hoc", "cc_tinh_hoc"], ["tinhoc", "tinhhoc", "computer"]),
       ghiChu: String(item.ghi_chu || item.notes || ""),
     }
   }
@@ -544,6 +542,7 @@ export default function ChungChiPage() {
   const handleSubmitCertificate = async (payload: StudentCertificateCreatePayload) => {
     try {
       setCertificateError("")
+      debugger; // xem payload.certificate_id tại đây
       await api.post("/api/v1/student-certificates/", payload)
       await fetchCertificateSummary()
     } catch (error: any) {

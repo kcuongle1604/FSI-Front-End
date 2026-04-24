@@ -125,6 +125,22 @@ export interface StudentProgramScoreSubject {
     subject_name?: string
     name?: string
     code?: string
+    course_display_name?: string
+}
+
+export interface SubjectListResponse {
+    data?: StudentProgramScoreSubject[]
+    items?: StudentProgramScoreSubject[]
+    results?: StudentProgramScoreSubject[]
+}
+
+/**
+ * Get all subjects
+ */
+export async function getAllSubjects(params?: { page?: number; size?: number }) {
+    return api.get<StudentProgramScoreSubject[] | SubjectListResponse>("/api/v1/subjects", {
+        params,
+    })
 }
 
 /**

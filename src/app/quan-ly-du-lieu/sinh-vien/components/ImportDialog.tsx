@@ -104,7 +104,7 @@ export default function ImportDialog({
   const isCertificateHtmlImport = isCertificateImport && certificateImportFormat === 'html'
   const resolvedUploadTitle = uploadTitle || 'Tải tệp lên'
   const resolvedUploadDescription = uploadDescription || (isCertificateImport
-    ? (isCertificateCsvImport ? 'Chọn file Excel/CSV chứa dữ liệu chứng chỉ' : 'Chọn file HTML chứa dữ liệu chứng chỉ')
+    ? (isCertificateCsvImport ? 'Chọn file CSV chứa dữ liệu chứng chỉ' : 'Chọn file HTML chứa dữ liệu chứng chỉ')
     : 'Chọn file CSV chứa dữ liệu sinh viên')
 
   // Cấu hình cột hiển thị & bắt buộc theo loại import
@@ -341,13 +341,10 @@ export default function ImportDialog({
         return
       }
     } else if (isCertificateCsvImport) {
-      const isValidTaScoreFile =
-        lowerName.endsWith('.csv') ||
-        lowerName.endsWith('.xlsx') ||
-        lowerName.endsWith('.xls')
+      const isValidTaScoreFile = lowerName.endsWith('.csv')
 
       if (!isValidTaScoreFile) {
-        setImportError("Định dạng file không hợp lệ, chỉ chấp nhận .xlsx, .xls hoặc .csv")
+        setImportError("Định dạng file không hợp lệ, chỉ chấp nhận .csv")
         setImportFile(null)
         return
       }
@@ -568,20 +565,20 @@ export default function ImportDialog({
             <>
               <p className="text-gray-800 font-medium mb-1">{importFile.name}</p>
               <p className="text-xs text-gray-500 mb-3">
-                {isCertificateHtmlImport ? "Định dạng HTML (.html)" : "Định dạng Excel/CSV (.xlsx, .xls, .csv)"}, {(importFile.size / 1024).toFixed(2)}KB
+                {isCertificateHtmlImport ? "Định dạng HTML (.html)" : isCertificateCsvImport ? "Định dạng CSV (.csv)" : "Định dạng CSV (.csv)"}, {(importFile.size / 1024).toFixed(2)}KB
               </p>
             </>
           ) : (
             <>
               <p className="text-gray-800 font-medium mb-1">Chọn một tệp hoặc kéo và thả vào đây</p>
               <p className="text-xs text-gray-500 mb-3">
-                {isCertificateHtmlImport ? "Định dạng HTML (.html)" : "Định dạng Excel/CSV (.xlsx, .xls, .csv)"}, dung lượng tối đa 50MB
+                {isCertificateHtmlImport ? "Định dạng HTML (.html)" : isCertificateCsvImport ? "Định dạng CSV (.csv)" : "Định dạng CSV (.csv)"}, dung lượng tối đa 50MB
               </p>
             </>
           )}
           <Button variant="outline" size="sm" onClick={() => {
             const input = document.createElement('input')
-            input.type = 'file'; input.accept = isCertificateHtmlImport ? '.html,.htm,text/html' : '.xlsx,.xls,.csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            input.type = 'file'; input.accept = isCertificateHtmlImport ? '.html,.htm,text/html' : '.csv,text/csv'
             input.onchange = (e) => {
               const file = (e.target as HTMLInputElement).files?.[0]
               if (file) {

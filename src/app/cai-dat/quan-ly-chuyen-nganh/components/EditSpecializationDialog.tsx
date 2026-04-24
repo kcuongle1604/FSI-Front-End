@@ -10,18 +10,15 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { MultiSelect } from "@/components/ui/multi-select"
-
-const BATCHES = ["48K", "49K", "50K", "51K", "52K"]
 
 type FormData = {
   code: string
   name: string
-  batches: string[]
 }
 
 type Specialization = {
-  id: number
+  id: string
+  apiId?: string
   code: string
   name: string
   batches: string[]
@@ -38,16 +35,15 @@ export function EditSpecializationDialog({ open, onOpenChange, specialization, o
   const [formData, setFormData] = useState({
     code: "",
     name: "",
-    batches: [] as string[],
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (specialization && open) {
+      const normalizedCode = specialization.code.trim().replace(/^k/i, "")
       const newFormData = {
-        code: specialization.code,
+        code: normalizedCode,
         name: specialization.name,
-        batches: specialization.batches,
       }
       setFormData(newFormData)
       setErrors({})
@@ -62,21 +58,15 @@ export function EditSpecializationDialog({ open, onOpenChange, specialization, o
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: "" }))
   }
 
-  const handleBatchToggle = (batch: string) => {
-    setFormData(prev => ({
-      ...prev,
-      batches: prev.batches.includes(batch)
-        ? prev.batches.filter(b => b !== batch)
-        : [...prev.batches, batch]
-    }))
-  }
-
   const handleUpdate = async () => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.code) newErrors.code = "Vui lòng nhập mã chuyên ngành"
+    if (!formData.code.trim()) {
+      newErrors.code = "Vui lòng nhập mã chuyên ngành"
+    } else if (!/^\d+$/.test(formData.code.trim())) {
+      newErrors.code = "Vui lòng chỉ nhập số"
+    }
     if (!formData.name) newErrors.name = "Vui lòng nhập tên chuyên ngành"
-    if (formData.batches.length === 0) newErrors.batches = "Vui lòng chọn ít nhất một khóa"
 
     setErrors(newErrors)
 
@@ -94,7 +84,6 @@ export function EditSpecializationDialog({ open, onOpenChange, specialization, o
     setFormData({
       code: "",
       name: "",
-      batches: [],
     })
     setErrors({})
 
@@ -105,7 +94,6 @@ export function EditSpecializationDialog({ open, onOpenChange, specialization, o
     setFormData({
       code: "",
       name: "",
-      batches: [],
     })
     setErrors({})
     onOpenChange(false)
@@ -124,14 +112,19 @@ export function EditSpecializationDialog({ open, onOpenChange, specialization, o
             <Label htmlFor="code" className="text-sm font-medium text-gray-800">
               Mã chuyên ngành<span className="text-red-500">*</span>
             </Label>
-            <Input
-              id="code"
-              type="text"
-              placeholder="Nhập mã chuyên ngành"
-              value={formData.code}
-              onChange={(e) => handleInputChange("code", e.target.value)}
-              className={`w-full border-gray-300 ${errors.code ? "border-red-500" : ""}`}
-            />
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">K</span>
+              <Input
+                id="code"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Nhập số mã chuyên ngành"
+                value={formData.code}
+                onChange={(e) => handleInputChange("code", e.target.value.replace(/\D/g, ""))}
+                className={`w-full pl-8 border-gray-300 ${errors.code ? "border-red-500" : ""}`}
+              />
+            </div>
             {errors.code && <p className="text-xs text-red-500">{errors.code}</p>}
           </div>
 
@@ -149,22 +142,6 @@ export function EditSpecializationDialog({ open, onOpenChange, specialization, o
               className={`w-full border-gray-300 ${errors.name ? "border-red-500" : ""}`}
             />
             {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
-          </div>
-
-          {/* Batches */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-gray-800">
-              Khóa áp dụng<span className="text-red-500">*</span>
-            </Label>
-            <div style={{ zIndex: 30 }}>
-              <MultiSelect
-                options={BATCHES}
-                value={formData.batches}
-                onChange={batches => setFormData(prev => ({ ...prev, batches }))}
-                placeholder="Chọn khóa áp dụng"
-              />
-            </div>
-            {errors.batches && <p className="text-xs text-red-500">{errors.batches}</p>}
           </div>
         </div>
 

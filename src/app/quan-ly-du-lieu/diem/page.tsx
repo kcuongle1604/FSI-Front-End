@@ -780,8 +780,16 @@ export default function DiemPage() {
         classCohortId={selectedClassCohortId}
         onSaveSuccess={(payload) => {
           applyOptimisticScoreUpdate(payload)
+          const classFromRoute = searchParams?.get("lop") ?? selectedClass
+          const matchedClassFromRoute = classes.find((c: any) => {
+            const className = c?.class_name || c?.name || c
+            return className === classFromRoute
+          })
+          const routeClassId = toFiniteNumber(matchedClassFromRoute?.class_id ?? matchedClassFromRoute?.id)
+
+          router.refresh()
           window.setTimeout(() => {
-            refreshScoreMatrixWithRetry(selectedClass, selectedClassId)
+            refreshScoreMatrixWithRetry(classFromRoute || selectedClass, routeClassId ?? selectedClassId)
           }, 2000)
         }}
       />

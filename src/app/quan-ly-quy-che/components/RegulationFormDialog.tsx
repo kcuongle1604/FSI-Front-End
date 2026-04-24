@@ -75,6 +75,27 @@ const toNumberWithDefault = (raw: string, fallback: number): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const sanitizeNonNegativeNumberInput = (raw: string, allowDecimal: boolean, maxValue?: number): string => {
+  let cleaned = raw.replace(/-/g, "").replace(/[^\d.]/g, "");
+
+  if (!allowDecimal) {
+    const normalized = cleaned.replace(/\./g, "");
+    if (!normalized || maxValue == null) return normalized;
+
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed)) return "";
+    return parsed > maxValue ? String(maxValue) : normalized;
+  }
+
+  const [integerPart, ...decimalParts] = cleaned.split(".");
+  const normalized = decimalParts.length === 0 ? cleaned : `${integerPart}.${decimalParts.join("")}`;
+  if (!normalized || normalized === "." || maxValue == null) return normalized;
+
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return "";
+  return parsed > maxValue ? String(maxValue) : normalized;
+};
+
 export default function RegulationFormDialog({ open, onOpenChange, mode, regulation, onSubmit }: RegulationFormDialogProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [error, setError] = useState<string>("");
@@ -105,6 +126,10 @@ export default function RegulationFormDialog({ open, onOpenChange, mode, regulat
     if (error) setError("");
   };
 
+  const updateNonNegativeNumberField = (key: keyof FormState, value: string, allowDecimal = false, maxValue?: number) => {
+    updateField(key, sanitizeNonNegativeNumberInput(value, allowDecimal, maxValue));
+  };
+
   const handleSubmit = () => {
     const minTotalCredits = toNumberWithDefault(form.min_total_credits, DEFAULT_MIN_TOTAL_CREDITS);
     const minRequiredCredits = toNumberWithDefault(form.min_required_credits, DEFAULT_MIN_REQUIRED_CREDITS);
@@ -130,6 +155,16 @@ export default function RegulationFormDialog({ open, onOpenChange, mode, regulat
 
     if (!Number.isFinite(payload.min_total_credits) || !Number.isFinite(payload.min_required_credits) || !Number.isFinite(payload.min_elective_credits) || !Number.isFinite(payload.min_gpa)) {
       setError("Vui lòng nhập đúng định dạng số cho tín chỉ và GPA");
+      return;
+    }
+
+    if (payload.min_total_credits < 0 || payload.min_required_credits < 0 || payload.min_elective_credits < 0 || payload.min_gpa < 0) {
+      setError("Tín chỉ tối thiểu và GPA tối thiểu không được âm");
+      return;
+    }
+
+    if (payload.min_gpa > 4.0) {
+      setError("GPA tối thiểu không được vượt quá 4.0");
       return;
     }
 
@@ -163,19 +198,43 @@ export default function RegulationFormDialog({ open, onOpenChange, mode, regulat
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Tổng tín chỉ tối thiểu</Label>
-              <Input type="number" value={form.min_total_credits} onChange={(e) => updateField("min_total_credits", e.target.value)} placeholder="120" />
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={form.min_total_credits}
+                onChange={(e) => updateNonNegativeNumberField("min_total_credits", e.target.value)}
+                placeholder="120"
+              />
             </div>
             <div className="space-y-2">
               <Label>Tín chỉ bắt buộc tối thiểu</Label>
-              <Input type="number" value={form.min_required_credits} onChange={(e) => updateField("min_required_credits", e.target.value)} placeholder="90" />
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={form.min_required_credits}
+                onChange={(e) => updateNonNegativeNumberField("min_required_credits", e.target.value)}
+                placeholder="90"
+              />
             </div>
             <div className="space-y-2">
               <Label>Tín chỉ tự chọn tối thiểu</Label>
-              <Input type="number" value={form.min_elective_credits} onChange={(e) => updateField("min_elective_credits", e.target.value)} placeholder="30" />
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={form.min_elective_credits}
+                onChange={(e) => updateNonNegativeNumberField("min_elective_credits", e.target.value)}
+                placeholder="30"
+              />
             </div>
             <div className="space-y-2">
               <Label>GPA tối thiểu</Label>
-              <Input type="number" step="0.01" value={form.min_gpa} onChange={(e) => updateField("min_gpa", e.target.value)} placeholder="2.0" />
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={form.min_gpa}
+                onChange={(e) => updateNonNegativeNumberField("min_gpa", e.target.value, true, 4.0)}
+                placeholder="2.0"
+              />
             </div>
           </div>
 

@@ -14,8 +14,10 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, X } from "lucide-react"
 import type { ScoreCell, StudentScore } from "../types"
-import { createScore, getProgramSubjectsByClass, getSemesters, getSemestersByCohort, updateScore } from "../score.api"
+import { createScore, getAllSubjects, getSemesters, getSemestersByCohort, updateScore } from "../score.api"
 import type { Semester, StudentProgramScoreSubject } from "../score.api"
+import { getStudents } from "../../sinh-vien/student.api"
+import type { StudentPublic } from "../../sinh-vien/types"
 
 interface ScoreFormDialogProps {
   open: boolean
@@ -37,6 +39,7 @@ interface ScoreFormDialogProps {
 interface SubjectOption {
   id: string
   label: string
+  displayLabel: string
   aliases: string[]
 }
 
@@ -77,6 +80,8 @@ export default function ScoreFormDialog({
   const [derivedCohortId, setDerivedCohortId] = useState<number | null>(null)
 
   const [selectedStudent, setSelectedStudent] = useState<StudentScore | null>(null)
+  const [studentLookupOptions, setStudentLookupOptions] = useState<StudentScore[]>([])
+  const [loadingStudents, setLoadingStudents] = useState(false)
   const [studentSearch, setStudentSearch] = useState("")
   const [showStudentLookup, setShowStudentLookup] = useState(false)
 
@@ -89,13 +94,26 @@ export default function ScoreFormDialog({
   const lastSemesterFetchKeyRef = useRef("")
 
   const selectedCourseLabel =
-    subjectOptions.find((option) => option.id === selectedCourse)?.label || selectedCourse
+    subjectOptions.find((option) => option.id === selectedCourse)?.displayLabel || selectedCourse
 
-  const filteredStudentOptions = studentOptions.filter((s) => {
+  const filteredStudentOptions = studentLookupOptions.filter((s) => {
     const keyword = studentSearch.trim().toLowerCase()
     if (!keyword) return true
     return `${String(s.student_id)} ${s.full_name}`.toLowerCase().includes(keyword)
   })
+
+  const mapStudentPublicToStudentScore = (studentItem: StudentPublic): StudentScore | null => {
+    const studentId = Number(studentItem?.student_id)
+    if (!Number.isFinite(studentId)) return null
+
+    return {
+      student_id: studentId,
+      full_name: String(studentItem?.full_name || "").trim(),
+      dob: String(studentItem?.dob || ""),
+      class_name: String(studentItem?.class_name || ""),
+      scores: {},
+    }
+  }
 
   const filteredCourseOptions = subjectOptions.filter((option) => {
     const keyword = courseSearch.trim().toLowerCase()
@@ -106,20 +124,22 @@ export default function ScoreFormDialog({
   const normalizeSubjectOptions = (rawList: StudentProgramScoreSubject[]): SubjectOption[] => {
     const mapped = rawList
       .map((item) => {
-        const rawId = item.subject_id ?? item.id
+        const rawId = item.subject_id ?? item.id ?? item.code
         const subjectName = typeof item.subject_name === "string" ? item.subject_name.trim() : ""
         const name = typeof item.name === "string" ? item.name.trim() : ""
+        const displayName = typeof item.course_display_name === "string" ? item.course_display_name.trim() : ""
         const code = typeof item.code === "string" ? item.code.trim() : ""
-        const rawLabel = subjectName || name || code
+        const rawLabel = subjectName || name || displayName || code
         const id = rawId === undefined || rawId === null ? "" : String(rawId).trim()
         const label = (typeof rawLabel === "string" ? rawLabel : String(rawLabel || "")).trim()
         if (!id || !label) return null
+        const displayLabel = `${id} - ${label}`
 
         const aliases = [subjectName, name, code, id]
           .map((value) => value.trim())
           .filter((value) => value.length > 0)
 
-        return { id, label, aliases }
+        return { id, label, displayLabel, aliases }
       })
       .filter((item): item is SubjectOption => item !== null)
 
@@ -221,6 +241,38 @@ export default function ScoreFormDialog({
   }
 
   useEffect(() => {
+    const fetchStudents = async () => {
+      if (!open || isEdit) {
+        setStudentLookupOptions([])
+        setLoadingStudents(false)
+        return
+      }
+
+      try {
+        setLoadingStudents(true)
+        setFormError("")
+
+        const response = await getStudents(
+          classId && Number.isFinite(classId) ? { class_id: classId } : undefined
+        )
+        const apiStudents = Array.isArray(response?.data?.students) ? response.data.students : []
+        const normalized = apiStudents
+          .map(mapStudentPublicToStudentScore)
+          .filter((item): item is StudentScore => item !== null)
+
+        setStudentLookupOptions(normalized)
+      } catch (error: any) {
+        setStudentLookupOptions(studentOptions)
+        setFormError(extractBackendMessage(error, "Không tải được danh sách sinh viên."))
+      } finally {
+        setLoadingStudents(false)
+      }
+    }
+
+    fetchStudents()
+  }, [open, isEdit, classId, studentOptions])
+
+  useEffect(() => {
     const fetchKey = `${open}|${selectedStudent?.student_id ?? ""}|${classCohortId ?? ""}`
     if (lastSemesterFetchKeyRef.current === fetchKey) {
       return
@@ -279,8 +331,8 @@ export default function ScoreFormDialog({
   })
 
   useEffect(() => {
-    const fetchSubjectsByClass = async () => {
-      if (!open || !selectedStudent || !classId) {
+    const fetchSubjects = async () => {
+      if (!open || !selectedStudent) {
         setSubjectOptions([])
         setSelectedCourse("")
         return
@@ -292,38 +344,54 @@ export default function ScoreFormDialog({
 
       try {
         setLoadingSubjects(true)
-        const res = await getProgramSubjectsByClass(classId)
-        const payload = res.data as StudentProgramScoreSubject[] | { data?: StudentProgramScoreSubject[]; items?: StudentProgramScoreSubject[] }
-        const list = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload?.data)
-            ? payload.data
-            : Array.isArray(payload?.items)
-              ? payload.items
-              : []
+        const allSubjects: StudentProgramScoreSubject[] = []
+        const size = 100
+        let page = 1
 
-        const normalized = normalizeSubjectOptions(list)
+        while (true) {
+          const res = await getAllSubjects({ page, size })
+          const payload = res.data as StudentProgramScoreSubject[] | { data?: StudentProgramScoreSubject[]; items?: StudentProgramScoreSubject[]; results?: StudentProgramScoreSubject[] }
+          const list = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.data)
+              ? payload.data
+              : Array.isArray(payload?.items)
+                ? payload.items
+                : Array.isArray(payload?.results)
+                  ? payload.results
+                  : []
+
+          if (!Array.isArray(list) || list.length === 0) {
+            break
+          }
+
+          allSubjects.push(...list)
+          if (list.length < size) break
+          page += 1
+        }
+
+        const normalized = normalizeSubjectOptions(allSubjects)
         setSubjectOptions(normalized)
         if (normalized.length === 0) {
-          setFormError("Không có học phần trong chương trình của lớp đã chọn.")
+          setFormError("Không có học phần khả dụng.")
         } else {
           setFormError("")
         }
       } catch (error: any) {
         const fallback = courseOptions
           .filter((name) => typeof name === "string" && name.trim().length > 0)
-          .map((name) => ({ id: name, label: name, aliases: [name] }))
+          .map((name) => ({ id: name, label: name, displayLabel: name, aliases: [name] }))
         setSubjectOptions(fallback)
         setFormError(
-          extractBackendMessage(error, "Không tải được danh sách học phần theo lớp. Đang dùng danh sách dự phòng.")
+          extractBackendMessage(error, "Không tải được danh sách học phần. Đang dùng danh sách dự phòng.")
         )
       } finally {
         setLoadingSubjects(false)
       }
     }
 
-    fetchSubjectsByClass()
-  }, [open, selectedStudent, classId, courseOptions])
+    fetchSubjects()
+  }, [open, selectedStudent, courseOptions])
 
   useEffect(() => {
     if (!isEdit || !selectedCourse) {
@@ -353,8 +421,12 @@ export default function ScoreFormDialog({
   useEffect(() => {
     if (student) {
       setSelectedStudent(student)
+      setStudentLookupOptions([])
     } else {
       setSelectedStudent(null)
+      if (!open) {
+        setStudentLookupOptions([])
+      }
     }
 
     setStudentSearch("")
@@ -473,8 +545,9 @@ export default function ScoreFormDialog({
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               {!selectedStudent && (
                 <Input
-                  placeholder="Nhập MSSV/Họ và tên"
+                  placeholder={loadingStudents ? "Đang tải danh sách sinh viên..." : "Nhập MSSV/Họ và tên"}
                   value={studentSearch}
+                  disabled={loadingStudents}
                   onChange={(e) => {
                     const value = e.target.value
                     setStudentSearch(value)
@@ -506,9 +579,22 @@ export default function ScoreFormDialog({
                 />
               )}
               {selectedStudent && (
-                <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 flex items-center gap-2 text-sm font-semibold text-gray-800">
+                <div className="w-full pr-9 px-3 py-2 border border-gray-300 rounded-md bg-white flex items-center gap-2 text-sm">
                   <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">
                     {`${selectedStudent.student_id} - ${selectedStudent.full_name}`}
+                    {!isEdit && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedStudent(null)
+                          setStudentSearch("")
+                          setShowStudentLookup(false)
+                        }}
+                        className="hover:text-blue-900"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
                   </span>
                 </div>
               )}
@@ -531,6 +617,15 @@ export default function ScoreFormDialog({
                   </button>
                 ))}
               </div>
+            )}
+            {!selectedStudent && !showStudentLookup && (
+              <p className="text-xs text-gray-500">
+                {loadingStudents
+                  ? "Đang tải danh sách sinh viên..."
+                  : studentLookupOptions.length > 0
+                    ? `Có ${studentLookupOptions.length} sinh viên khả dụng.`
+                    : "Không có sinh viên khả dụng."}
+              </p>
             )}
           </div>
 
@@ -647,7 +742,7 @@ export default function ScoreFormDialog({
                       setCourseSearch("")
                     }}
                   >
-                    {option.label}
+                    {option.displayLabel}
                   </button>
                 ))}
               </div>
@@ -656,8 +751,6 @@ export default function ScoreFormDialog({
               <p className="text-xs text-gray-500">
                 {!selectedStudent
                   ? "Chọn sinh viên trước để tải học phần."
-                  : !classId
-                    ? "Chọn lớp trước để tải học phần."
                   : loadingSubjects
                     ? "Đang tải học phần theo lớp..."
                     : subjectOptions.length === 0
