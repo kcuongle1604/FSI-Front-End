@@ -92,8 +92,8 @@ export function AddUserDialog({
       })
 
       if (!res.status.toString().startsWith("2")) {
-        const text = res.statusText
-        throw new Error(text || "Tạo người dùng thất bại")
+        const text = (res.data as any).detail;
+        throw new Error(text)
       }
 
       // 🔥 QUAN TRỌNG: refresh danh sách ở page cha
