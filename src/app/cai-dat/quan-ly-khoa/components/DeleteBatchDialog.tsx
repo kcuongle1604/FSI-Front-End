@@ -17,7 +17,7 @@ interface DeleteBatchDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   batch?: Batch
-  onConfirm: () => void
+  onConfirm: () => Promise<boolean> | boolean
 }
 
 export function DeleteBatchDialog({ 
@@ -26,9 +26,11 @@ export function DeleteBatchDialog({
   batch,
   onConfirm 
 }: DeleteBatchDialogProps) {
-  const handleConfirm = () => {
-    onConfirm()
-    onOpenChange(false)
+  const handleConfirm = async () => {
+    const deleted = await onConfirm()
+    if (deleted) {
+      onOpenChange(false)
+    }
   }
 
   return (

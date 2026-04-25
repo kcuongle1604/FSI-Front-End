@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,8 @@ import RegulationManagementTable from "./components/RegulationManagementTable";
 import AddRegulationDialog from "./components/AddRegulationDialog";
 import EditRegulationDialog from "./components/EditRegulationDialog";
 import DeleteRegulationDialog from "./components/DeleteRegulationDialog";
+import { api } from "@/lib/api";
+import axios from "axios";
 
 export type Regulation = {
   id: number;
@@ -17,6 +19,14 @@ export type Regulation = {
   issuedDate: string;
   batches?: string[];
   specializations?: string[];
+  min_total_credits?: number;
+  min_required_credits?: number;
+  min_elective_credits?: number;
+  min_gpa?: number;
+  required_certificates?: string[];
+  cohort_ids?: number[];
+  major_ids?: number[];
+  notes?: string;
 }
 
 export type RegulationCondition = {
@@ -26,33 +36,138 @@ export type RegulationCondition = {
   value: string;
 };
 
-export const regulations: Regulation[] = [
-  {
-    id: 1,
-    name: "Quy chế xét tốt nghiệp từ khóa 46K",
-    code: "QCXTN46K",
-    issuedDate: "2022-01-01",
-    batches: ["46K", "47K", "48K"],
-    specializations: [
-      "Tin học quản lý",
-      "Quản trị hệ thống thông tin",
-      "Thống kê"
-    ]
-  }
-];
+type RegulationApplicationApiItem = {
+  cohort_id?: number;
+  cohort_name?: string;
+  major_id?: number | string;
+  major_name?: string;
+};
 
-const regulationConditions: Record<number, RegulationCondition[]> = {};
+type GraduationRequirementApiItem = {
+  requirement_id?: number;
+  id?: number;
+  name?: string;
+  min_total_credits?: number;
+  min_required_credits?: number;
+  min_elective_credits?: number;
+  min_gpa?: number;
+  required_certificates?: string[];
+  applications?: RegulationApplicationApiItem[];
+  notes?: string;
+};
+
+type GraduationRequirementListResponse =
+  | GraduationRequirementApiItem[]
+  | { items?: GraduationRequirementApiItem[]; data?: GraduationRequirementApiItem[]; results?: GraduationRequirementApiItem[]; total?: number };
+
+// Kept for compatibility with detail page import.
+export const regulations: Regulation[] = [];
 
 export default function QuanLyQuyChePage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [regulations, setRegulations] = useState<Regulation[]>([]);
+  const [loadingRegulations, setLoadingRegulations] = useState(false);
+  const [regulationError, setRegulationError] = useState("");
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [selectedRegulation, setSelectedRegulation] = useState<Regulation | undefined>();
 
+  const mapRegulationItem = (item: GraduationRequirementApiItem, index: number): Regulation => {
+    const applications = Array.isArray(item.applications) ? item.applications : [];
+    const toFiniteNumber = (value: unknown): number | null => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+    const batches = Array.from(new Set(applications
+      .map((app) => String(app.cohort_name || app.cohort_id || "").trim())
+      .filter(Boolean)));
+    const specializations = Array.from(new Set(applications
+      .map((app) => String(app.major_name || app.major_id || "").trim())
+      .filter(Boolean)));
+
+    return {
+      id: item.requirement_id ?? item.id ?? index + 1,
+      name: item.name || "-",
+      code: "-",
+      issuedDate: "-",
+      batches,
+      specializations,
+      min_total_credits: item.min_total_credits,
+      min_required_credits: item.min_required_credits,
+      min_elective_credits: item.min_elective_credits,
+      min_gpa: item.min_gpa,
+      required_certificates: Array.isArray(item.required_certificates) ? item.required_certificates : [],
+      cohort_ids: Array.from(new Set(applications.map((app) => toFiniteNumber(app.cohort_id)).filter((v): v is number => v !== null))),
+      major_ids: Array.from(new Set(applications.map((app) => toFiniteNumber(app.major_id)).filter((v): v is number => v !== null))),
+      notes: item.notes,
+    };
+  };
+
+  const fetchRegulations = async () => {
+    try {
+      setLoadingRegulations(true);
+      setRegulationError("");
+
+      const allItems: GraduationRequirementApiItem[] = [];
+      const size = 100;
+      let page = 1;
+
+      while (true) {
+        const res = await api.get<GraduationRequirementListResponse>("/api/v1/graduation-requirements", {
+          params: { page, size },
+        });
+
+        const payload = res.data;
+        const pageItems = Array.isArray(payload)
+          ? payload
+          : payload.items || payload.data || payload.results || [];
+
+        allItems.push(...pageItems);
+
+        if (pageItems.length < size) break;
+        page += 1;
+      }
+
+      setRegulations(allItems.map(mapRegulationItem));
+    } catch (error) {
+      console.error("Load graduation requirements failed", error);
+      setRegulationError("Không thể tải danh sách quy chế");
+      setRegulations([]);
+    } finally {
+      setLoadingRegulations(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRegulations();
+  }, []);
+
   const filteredRegulations = regulations.filter((r) =>
     r.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleDeleteRegulation = async () => {
+    if (!selectedRegulation?.id) {
+      throw new Error("Không xác định được quy chế cần xóa");
+    }
+
+    try {
+      await api.delete(`/api/v1/graduation-requirements/${selectedRegulation.id}`);
+      setOpenDeleteDialog(false);
+      setSelectedRegulation(undefined);
+      await fetchRegulations();
+      return true;
+    } catch (error) {
+      const backendMessage = axios.isAxiosError(error)
+        ? (typeof error.response?.data === "string"
+          ? error.response.data
+          : (error.response?.data?.detail || error.response?.data?.message || error.message))
+        : "";
+
+      throw new Error(backendMessage || "Không thể xóa quy chế. Vui lòng thử lại.");
+    }
+  };
 
   return (
     <AppLayout showSearch={false}>
@@ -88,6 +203,8 @@ export default function QuanLyQuyChePage() {
             </Button>
           </div>
         </div>
+        {regulationError && <p className="text-sm text-red-600 mb-3">{regulationError}</p>}
+        {loadingRegulations && <p className="text-sm text-gray-600 mb-3">Đang tải danh sách quy chế...</p>}
         {/* Table */}
         <RegulationManagementTable
           regulations={filteredRegulations}
@@ -102,18 +219,24 @@ export default function QuanLyQuyChePage() {
       <AddRegulationDialog
         open={openAddDialog}
         onOpenChange={setOpenAddDialog}
+        onAdd={fetchRegulations}
       />
       {/* Edit Regulation Dialog */}
       <EditRegulationDialog
         open={openEditDialog}
         onOpenChange={setOpenEditDialog}
         regulation={selectedRegulation}
+        onUpdate={() => {
+          setOpenEditDialog(false);
+          fetchRegulations();
+        }}
       />
       {/* Delete Regulation Dialog */}
       <DeleteRegulationDialog
         open={openDeleteDialog}
         onOpenChange={setOpenDeleteDialog}
         regulation={selectedRegulation}
+        onConfirm={handleDeleteRegulation}
       />
     </AppLayout>
   );

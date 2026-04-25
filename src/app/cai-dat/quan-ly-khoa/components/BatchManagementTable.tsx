@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, MoreVertical, Edit, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -33,8 +34,25 @@ export default function BatchManagementTable({
   onEditClick,
   onDeleteClick
 }: BatchManagementTableProps) {
+  const PAGE_SIZE = 10
+  const [currentPage, setCurrentPage] = useState(1)
+
   const totalRecords = batches.length
-  const displayCount = Math.min(30, totalRecords)
+  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages)
+  const startIndex = (safeCurrentPage - 1) * PAGE_SIZE
+  const visibleBatches = batches.slice(startIndex, startIndex + PAGE_SIZE)
+  const displayCount = visibleBatches.length
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [totalRecords])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
 
   return (
     <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
@@ -54,15 +72,15 @@ export default function BatchManagementTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {batches.slice(0, 30).map((batch, index) => (
+              {visibleBatches.map((batch, index) => (
                 <TableRow key={batch.id} className="border-b border-gray-200 hover:bg-gray-50">
                   <TableCell className="h-12 px-4 text-sm text-gray-600">
-                    {String(index + 1).padStart(2, '0')}
+                    {String(startIndex + index + 1).padStart(2, '0')}
                   </TableCell>
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{batch.code}</TableCell>
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{batch.startYear}</TableCell>
                   <TableCell className="h-12 px-4 text-sm text-gray-600">{batch.endYear}</TableCell>
-                  <TableCell className="h-12 px-4 text-right w-12">
+                  <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -73,20 +91,20 @@ export default function BatchManagementTable({
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuContent align="end" className="w-32">
                         <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => onEditClick(batch)}>
-                          <Edit className="w-4 h-4 mr-2" />Sửa
+                          <Edit className="h-4 w-4 mr-2" />Sửa
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer text-sm text-red-600" onClick={() => onDeleteClick(batch)}>
-                          <Trash2 className="w-4 h-4 mr-2" />Xóa
+                        <DropdownMenuItem className="cursor-pointer text-sm text-red-600 focus:text-red-600" onClick={() => onDeleteClick(batch)}>
+                          <Trash2 className="h-4 w-4 mr-2" />Xóa
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       </div>
 
@@ -100,7 +118,8 @@ export default function BatchManagementTable({
             variant="outline"
             size="icon"
             className="h-8 w-8 border-gray-300"
-            disabled={true}
+            disabled={safeCurrentPage <= 1}
+            onClick={() => setCurrentPage(1)}
           >
             <ChevronsLeft className="h-4 w-4" />
           </Button>
@@ -108,20 +127,22 @@ export default function BatchManagementTable({
             variant="outline"
             size="icon"
             className="h-8 w-8 border-gray-300"
-            disabled={true}
+            disabled={safeCurrentPage <= 1}
+            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-1 px-3">
-            <span className="text-sm font-medium text-gray-700">1</span>
+            <span className="text-sm font-medium text-gray-700">{safeCurrentPage}</span>
             <span className="text-sm text-gray-400">/</span>
-            <span className="text-sm text-gray-600">{Math.ceil(totalRecords / 30)}</span>
+            <span className="text-sm text-gray-600">{totalPages}</span>
           </div>
           <Button
             variant="outline"
             size="icon"
             className="h-8 w-8 border-gray-300"
-            disabled={totalRecords <= 30}
+            disabled={safeCurrentPage >= totalPages}
+            onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -129,7 +150,8 @@ export default function BatchManagementTable({
             variant="outline"
             size="icon"
             className="h-8 w-8 border-gray-300"
-            disabled={totalRecords <= 30}
+            disabled={safeCurrentPage >= totalPages}
+            onClick={() => setCurrentPage(totalPages)}
           >
             <ChevronsRight className="h-4 w-4" />
           </Button>

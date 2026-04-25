@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, ChevronDown } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -23,10 +24,10 @@ type XetTotNghiep = {
   class: string
   year: string
   course: string
-  tcbb: number
-  tctc: number
-  totalCredits: number
-  gpa: number
+  tcbb: string
+  tctc: string
+  totalCredits: string
+  gpa: string
   ccdr: string
   program: string
   status: string
@@ -38,30 +39,65 @@ interface XetTotNghiepTabProps {
 
 export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
   const router = useRouter()
-  const totalRecords = students.length
-  const displayCount = Math.min(15, totalRecords)
+  const [programFilter, setProgramFilter] = useState<"all" | "hoan-thanh" | "chua-hoan-thanh">("all")
+  const [statusFilter, setStatusFilter] = useState<"all" | "dat" | "khong-dat">("all")
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const filteredStudents = students.filter((student) => {
+    const matchesProgram =
+      programFilter === "all" ||
+      (programFilter === "hoan-thanh" && student.program === "Hoàn thành") ||
+      (programFilter === "chua-hoan-thanh" && student.program === "Chưa hoàn thành")
+
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "dat" && student.status === "Đạt") ||
+      (statusFilter === "khong-dat" && student.status === "Không đạt")
+
+    return matchesProgram && matchesStatus
+  })
+
+  const PAGE_SIZE = 15
+  const totalRecords = filteredStudents.length
+  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages)
+  const startIndex = (safeCurrentPage - 1) * PAGE_SIZE
+  const pagedStudents = filteredStudents.slice(startIndex, startIndex + PAGE_SIZE)
+  const displayCount = pagedStudents.length
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [programFilter, statusFilter, students])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
 
   const handleStudentClick = (mssv: string) => {
-    router.push(`/nghiep-vu-dao-tao/xet-tot-nghiep/${mssv}`)
+    const search = typeof window !== "undefined" ? window.location.search : ""
+    router.push(`/nghiep-vu-dao-tao/xet-tot-nghiep/${mssv}${search}`)
   }
 
   return (
     <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
       {/* Table */}
-      <div className="flex-1 overflow-auto">
-        <Table className="min-w-max">
-          <TableHeader>
-            <TableRow className="border-b border-gray-200 bg-blue-50">
-              <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">STT</TableHead>
-              <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">MSSV</TableHead>
-              <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">HỌ & TÊN</TableHead>
-              <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">LỚP</TableHead>
-              <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">TCBB</TableHead>
-              <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">TCTC</TableHead>
-              <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">TỔNG TC</TableHead>
-              <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">GPA</TableHead>
-              <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700">CCDR</TableHead>
-              <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <div className="overflow-auto">
+          <Table className="w-full" style={{ borderCollapse: 'collapse' }}>
+            <TableHeader>
+              <TableRow className="border-b border-gray-200 bg-blue-50" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">STT</TableHead>
+                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">MSSV</TableHead>
+                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">HỌ & TÊN</TableHead>
+                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">LỚP</TableHead>
+                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">TCBB</TableHead>
+                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">TCTC</TableHead>
+                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">TỔNG TC</TableHead>
+                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">GPA</TableHead>
+                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">CCDR</TableHead>
+                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <div className="flex items-center gap-1 cursor-pointer hover:text-gray-900">
@@ -70,13 +106,22 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
                     </div>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-48">
-                    <DropdownMenuCheckboxItem checked>
+                    <DropdownMenuCheckboxItem
+                      checked={programFilter === "all"}
+                      onCheckedChange={() => setProgramFilter("all")}
+                    >
                       Tất cả
                     </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={programFilter === "hoan-thanh"}
+                      onCheckedChange={() => setProgramFilter("hoan-thanh")}
+                    >
                       Hoàn thành
                     </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={programFilter === "chua-hoan-thanh"}
+                      onCheckedChange={() => setProgramFilter("chua-hoan-thanh")}
+                    >
                       Chưa hoàn thành
                     </DropdownMenuCheckboxItem>
                   </DropdownMenuContent>
@@ -91,13 +136,22 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
                     </div>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-48">
-                    <DropdownMenuCheckboxItem checked>
+                    <DropdownMenuCheckboxItem
+                      checked={statusFilter === "all"}
+                      onCheckedChange={() => setStatusFilter("all")}
+                    >
                       Tất cả
                     </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={statusFilter === "dat"}
+                      onCheckedChange={() => setStatusFilter("dat")}
+                    >
                       Đạt
                     </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={statusFilter === "khong-dat"}
+                      onCheckedChange={() => setStatusFilter("khong-dat")}
+                    >
                       Không đạt
                     </DropdownMenuCheckboxItem>
                   </DropdownMenuContent>
@@ -106,16 +160,20 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {students.slice(0, 15).map((student, index) => (
+            {pagedStudents.map((student, index) => (
               <TableRow key={student.id} className="border-b border-gray-200 hover:bg-gray-50">
                 <TableCell className="h-12 px-4 text-center text-sm text-gray-600">
-                  {String(index + 1).padStart(2, '0')}
+                  {String(startIndex + index + 1).padStart(2, '0')}
                 </TableCell>
-                <TableCell 
-                  className="h-12 px-4 text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
-                  onClick={() => handleStudentClick(student.mssv)}
-                >
-                  {student.mssv}
+                <TableCell className="h-12 px-4 text-sm">
+                  <button
+                    type="button"
+                    onClick={() => handleStudentClick(student.mssv)}
+                    className="text-blue-600 hover:text-blue-800 hover:underline font-normal text-sm cursor-pointer"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    {student.mssv}
+                  </button>
                 </TableCell>
                 <TableCell className="h-12 px-4 text-sm text-gray-600">{student.name}</TableCell>
                 <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{student.class}</TableCell>
@@ -133,11 +191,12 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50">
+      <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50 sticky bottom-0 z-10">
         <div className="text-sm text-gray-600">
           Hiển thị {displayCount}/{totalRecords} dòng
         </div>
@@ -146,7 +205,8 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
             variant="outline"
             size="icon"
             className="h-8 w-8 border-gray-300"
-            disabled={true}
+            disabled={safeCurrentPage <= 1}
+            onClick={() => setCurrentPage(1)}
           >
             <ChevronsLeft className="h-4 w-4" />
           </Button>
@@ -154,20 +214,22 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
             variant="outline"
             size="icon"
             className="h-8 w-8 border-gray-300"
-            disabled={true}
+            disabled={safeCurrentPage <= 1}
+            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-1 px-3">
-            <span className="text-sm font-medium text-gray-700">1</span>
+            <span className="text-sm font-medium text-gray-700">{safeCurrentPage}</span>
             <span className="text-sm text-gray-400">/</span>
-            <span className="text-sm text-gray-600">4</span>
+            <span className="text-sm text-gray-600">{totalPages}</span>
           </div>
           <Button
             variant="outline"
             size="icon"
             className="h-8 w-8 border-gray-300"
-            disabled={totalRecords <= 15}
+            disabled={safeCurrentPage >= totalPages}
+            onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -175,7 +237,8 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
             variant="outline"
             size="icon"
             className="h-8 w-8 border-gray-300"
-            disabled={totalRecords <= 15}
+            disabled={safeCurrentPage >= totalPages}
+            onClick={() => setCurrentPage(totalPages)}
           >
             <ChevronsRight className="h-4 w-4" />
           </Button>

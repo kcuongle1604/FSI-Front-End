@@ -46,8 +46,9 @@ export default function StudentFormDialog({ open, onOpenChange, student, onSucce
         if (res?.data) {
           setClasses(Array.isArray(res.data) ? res.data : [])
         }
-      } catch (err) {
-        console.error("Load classes failed", err)
+      } catch (err: any) {
+        const message = err?.response?.data?.detail || err?.response?.data?.message || err?.message
+        setError(typeof message === "string" ? message : "Không tải được danh sách lớp")
       }
     }
 
@@ -93,37 +94,42 @@ export default function StudentFormDialog({ open, onOpenChange, student, onSucce
   const handleNgaySinhChange = (raw: string) => {
     const digits = raw.replace(/\D/g, "").slice(0, 8)
     let formatted = ""
-    if (digits.length <= 4) {
+    if (digits.length <= 2) {
       formatted = digits
-    } else if (digits.length <= 6) {
-      formatted = `${digits.slice(0, 4)}/${digits.slice(4)}`
+    } else if (digits.length <= 4) {
+      formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`
     } else {
-      formatted = `${digits.slice(0, 4)}/${digits.slice(4, 6)}/${digits.slice(6)}`
+      formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
     }
     setFormData({ ...formData, ngaySinh: formatted })
   }
 
-  // Convert dd/mm/yyyy to yyyy-mm-dd
+  // Convert dd/mm/yyyy to yyyy-mm-dd (flexible format)
   const convertDateToISO = (dateStr: string): string => {
     if (!dateStr) return ""
 
     // Remove any whitespace
     dateStr = dateStr.trim()
 
-    // Check format dd/mm/yyyy
-    if (dateStr.length !== 10 || dateStr[2] !== '/' || dateStr[5] !== '/') {
-      console.error('Invalid date format:', dateStr)
+    // Split by slash
+    const parts = dateStr.split("/")
+    if (parts.length !== 3) {
       return ""
     }
-
-    const parts = dateStr.split("/")
-    if (parts.length !== 3) return ""
 
     const [day, month, year] = parts
 
     // Validate parts are numbers
     if (isNaN(Number(day)) || isNaN(Number(month)) || isNaN(Number(year))) {
-      console.error('Invalid date parts:', { day, month, year })
+      return ""
+    }
+
+    // Validate ranges
+    const dayNum = Number(day)
+    const monthNum = Number(month)
+    const yearNum = Number(year)
+
+    if (dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12 || yearNum < 1900) {
       return ""
     }
 
@@ -131,10 +137,7 @@ export default function StudentFormDialog({ open, onOpenChange, student, onSucce
     const paddedDay = day.padStart(2, '0')
     const paddedMonth = month.padStart(2, '0')
 
-    const isoDate = `${year}-${paddedMonth}-${paddedDay}`
-    console.log('Date conversion:', { input: dateStr, output: isoDate })
-
-    return isoDate
+    return `${yearNum}-${paddedMonth}-${paddedDay}`
   }
 
   const handleSave = async () => {
@@ -186,10 +189,6 @@ export default function StudentFormDialog({ open, onOpenChange, student, onSucce
         onSuccess()
       }
     } catch (err: any) {
-      console.error("Save student error:", err)
-      console.error("Error response data:", err.response?.data)
-      console.error("Error response status:", err.response?.status)
-
       // Format error message
       let errorMsg = "Có lỗi xảy ra khi lưu dữ liệu"
 

@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
-import { Users, History } from "lucide-react"
+import { Users, FileText } from "lucide-react"
+import { History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -40,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 // Components
 import StudentFormDialog from "./components/StudentFormDialog"
@@ -48,16 +50,37 @@ import ImportDialog from "./components/ImportDialog"
 import ImportHistoryTab from "./components/ImportHistoryTab"
 
 // API & Types
-import { getStudents, getClasses } from "./student.api"
+import { getStudents, getClasses, getCohorts } from "./student.api"
 import type { Student, ImportHistory } from "./types"
 import { sampleStudents } from "./data"
 
+function extractBackendMessage(error: any, fallback: string): string {
+  const detail = error?.response?.data?.detail
+  if (typeof detail === "string" && detail.trim()) return detail
+  if (Array.isArray(detail) && detail.length > 0) {
+    return detail
+      .map((item: any) => (typeof item === "string" ? item : item?.msg || JSON.stringify(item)))
+      .join(", ")
+  }
+
+  const message = error?.response?.data?.message || error?.message
+  if (typeof message === "string" && message.trim()) return message
+
+  return fallback
+}
+
 export default function SinhVienPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien")
   const [searchQuery, setSearchQuery] = useState("")
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState("")
   const [classes, setClasses] = useState<any[]>([])
+  const [cohorts, setCohorts] = useState<any[]>([])
 
   const [selectedKhoa, setSelectedKhoa] = useState<string | undefined>()
   const [selectedLop, setSelectedLop] = useState<string | undefined>()
@@ -66,9 +89,35 @@ export default function SinhVienPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const isSyncingFromUrlRef = useRef(false)
+  const didInitFromUrlRef = useRef(false)
 
   // giữ nguyên để dùng cho tab lịch sử import
   const [importHistory] = useState<ImportHistory[]>([])
+
+  const getValidTab = (tab: string | null) => {
+    return tab === "lich-su-import" ? "lich-su-import" : "thong-tin-sinh-vien"
+  }
+
+  useEffect(() => {
+    isSyncingFromUrlRef.current = true
+
+    const tabFromUrl = getValidTab(searchParams?.get("tab"))
+    const queryFromUrl = searchParams?.get("q") ?? ""
+    const khoaFromUrl = searchParams?.get("khoa") ?? undefined
+    const lopFromUrl = searchParams?.get("lop") ?? undefined
+
+    setActiveTab((prev) => (prev === tabFromUrl ? prev : tabFromUrl))
+    setSearchQuery((prev) => (prev === queryFromUrl ? prev : queryFromUrl))
+    setSelectedKhoa((prev) => (prev === khoaFromUrl ? prev : khoaFromUrl))
+    setSelectedLop((prev) => (prev === lopFromUrl ? prev : lopFromUrl))
+
+    didInitFromUrlRef.current = true
+    window.setTimeout(() => {
+      isSyncingFromUrlRef.current = false
+    }, 0)
+  }, [searchParams])
 
   // ===== FIX: LOAD DATA TỪ API =====
   // Convert yyyy-mm-dd to dd/mm/yyyy for display
@@ -83,11 +132,17 @@ export default function SinhVienPage() {
   const fetchStudents = async () => {
     try {
       setLoading(true)
+      setLoadError("")
 
       // Build query params
       const params: any = {}
       if (selectedLop && selectedLop !== "all") {
         params.class_name = selectedLop
+      } else if (selectedKhoa && selectedKhoa !== "all") {
+        const cohortId = Number(selectedKhoa)
+        if (Number.isFinite(cohortId)) {
+          params.cohort_id = cohortId
+        }
       }
 
       const res = await getStudents(params)
@@ -110,8 +165,8 @@ export default function SinhVienPage() {
         // fallback: hiển thị 5 bản ghi mẫu
         setStudents(sampleStudents.slice(0, 5))
       }
-    } catch (err) {
-      console.error("Load sinh viên thất bại", err)
+    } catch (err: any) {
+      setLoadError(extractBackendMessage(err, "Không tải được danh sách sinh viên."))
       // fallback khi API lỗi: hiển thị 5 bản ghi mẫu
       setStudents(sampleStudents.slice(0, 5))
     } finally {
@@ -125,47 +180,60 @@ export default function SinhVienPage() {
       if (res?.data) {
         setClasses(Array.isArray(res.data) ? res.data : [])
       }
-    } catch (err) {
-      console.error("Load classes failed", err)
+    } catch (err: any) {
+      setLoadError(extractBackendMessage(err, "Không tải được danh sách lớp."))
+    }
+  }
+
+  const fetchCohorts = async () => {
+    try {
+      const res = await getCohorts()
+      if (res?.data) {
+        setCohorts(Array.isArray(res.data) ? res.data : [])
+      }
+    } catch (err: any) {
+      setLoadError(extractBackendMessage(err, "Không tải được danh sách khóa."))
     }
   }
 
   useEffect(() => {
     fetchStudents()
     fetchClasses()
+    fetchCohorts()
   }, [])
 
-  // Refetch students when selectedLop changes
+  // Refetch students when filters change
   useEffect(() => {
-    if (selectedLop) {
-      fetchStudents()
-    }
-  }, [selectedLop])
+    fetchStudents()
+  }, [selectedKhoa, selectedLop])
 
   // ===== Lọc theo Khóa, Lớp và tìm kiếm =====
   const availableClasses = !selectedKhoa || selectedKhoa === "all"
     ? classes.map((c: any) => c.class_name || c.name || c)
     : classes
       .filter((c: any) => {
-        const className = c.class_name || c.name || c
-        return String(className).startsWith(selectedKhoa)
+        // Filter classes by cohort_id
+        return c.cohort_id === Number(selectedKhoa)
       })
       .map((c: any) => c.class_name || c.name || c)
 
   const filteredStudents = students.filter((student) => {
-    // Chưa chọn lớp => không hiển thị dữ liệu
-    if (!selectedLop || selectedLop === "all") {
-      return false
-    }
-
-    // Lọc theo Khóa nếu được chọn
-    if (selectedKhoa && selectedKhoa !== "all" && !String(student.lop).startsWith(selectedKhoa)) {
-      return false
-    }
-
     // Lọc theo Lớp cụ thể
     if (selectedLop && selectedLop !== "all" && student.lop !== selectedLop) {
       return false
+    }
+
+    // Chọn khóa nhưng chưa chọn lớp: lọc theo các lớp thuộc khóa đã chọn
+    if ((!selectedLop || selectedLop === "all") && selectedKhoa && selectedKhoa !== "all") {
+      const allowedClasses = new Set(
+        classes
+          .filter((c: any) => c.cohort_id === Number(selectedKhoa))
+          .map((c: any) => c.class_name || c.name || c)
+      )
+
+      if (!allowedClasses.has(student.lop)) {
+        return false
+      }
     }
 
     // Lọc theo text tìm kiếm (MSSV hoặc Họ tên)
@@ -178,10 +246,48 @@ export default function SinhVienPage() {
     )
   })
 
-  const PAGE_SIZE = 30
+  const PAGE_SIZE = 10
   const totalRecords = filteredStudents.length
-  const displayCount = Math.min(PAGE_SIZE, totalRecords)
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages)
+  const startIndex = (safeCurrentPage - 1) * PAGE_SIZE
+  const pagedStudents = filteredStudents.slice(startIndex, startIndex + PAGE_SIZE)
+  const displayCount = pagedStudents.length
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedKhoa, selectedLop, searchQuery])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
+
+  useEffect(() => {
+    if (!didInitFromUrlRef.current || isSyncingFromUrlRef.current) return
+
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+
+    if (activeTab !== "thong-tin-sinh-vien") params.set("tab", activeTab)
+    else params.delete("tab")
+
+    if (searchQuery.trim()) params.set("q", searchQuery.trim())
+    else params.delete("q")
+
+    if (selectedKhoa) params.set("khoa", selectedKhoa)
+    else params.delete("khoa")
+
+    if (selectedLop) params.set("lop", selectedLop)
+    else params.delete("lop")
+
+    const next = params.toString()
+    const current = searchParams?.toString() ?? ""
+
+    if (next !== current) {
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }
+  }, [activeTab, searchQuery, selectedKhoa, selectedLop, pathname, router, searchParams])
 
   const handleEdit = (student: Student) => {
     setSelectedStudent(student)
@@ -222,9 +328,9 @@ export default function SinhVienPage() {
             <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start">
               <TabsTrigger
                 value="thong-tin-sinh-vien"
-                className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
+                className="relative min-w-[180px] justify-center flex rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2 w-full">
                   <Users className="w-4 h-4" />
                   Thông tin sinh viên
                 </div>
@@ -267,7 +373,7 @@ export default function SinhVienPage() {
                       setSelectedLop(undefined)
                     }}
                   >
-                    <SelectTrigger className="h-9 w-[120px] bg-white">
+                    <SelectTrigger className="h-9 w-[200px] bg-white">
                       <SelectValue placeholder="Khóa" />
                     </SelectTrigger>
                     <SelectContent
@@ -277,27 +383,35 @@ export default function SinhVienPage() {
                       className="w-[var(--radix-select-trigger-width)]"
                     >
                       <SelectItem value="all">Tất cả</SelectItem>
-                      <SelectItem value="48K">48K</SelectItem>
-                      <SelectItem value="49K">49K</SelectItem>
-                      <SelectItem value="50K">50K</SelectItem>
+                      {cohorts.map((cohort: any) => {
+                        const label = cohort.name 
+                          ? `${cohort.name} (${cohort.year_start}-${cohort.year_end})`
+                          : `Khóa ${cohort.cohort_id} (${cohort.year_start}-${cohort.year_end})`
+                        return (
+                          <SelectItem key={cohort.cohort_id} value={String(cohort.cohort_id)}>
+                            {label}
+                          </SelectItem>
+                        )
+                      })}
                     </SelectContent>
                   </Select>
                   <Select
                     value={selectedLop}
                     onValueChange={(value) => {
                       setSelectedLop(value)
-                      // Nếu chưa chọn Khóa, tự suy ra từ tiền tố của Lớp (vd: 48K21.2 -> 48K)
+                      // Nếu chưa chọn Khóa, tự suy ra từ cohort_id của lớp
                       if (!selectedKhoa || selectedKhoa === "all") {
-                        const matchedKhoa = ["48K", "49K", "50K"].find((khoa) =>
-                          String(value).startsWith(khoa)
-                        )
-                        if (matchedKhoa) {
-                          setSelectedKhoa(matchedKhoa)
+                        const selectedClass = classes.find((c: any) => {
+                          const className = c.class_name || c.name || c
+                          return className === value
+                        })
+                        if (selectedClass?.cohort_id) {
+                          setSelectedKhoa(String(selectedClass.cohort_id))
                         }
                       }
                     }}
                   >
-                    <SelectTrigger className="h-9 w-[140px] bg-white">
+                    <SelectTrigger className="h-9 w-[130px] bg-white">
                       <SelectValue placeholder="Lớp" />
                     </SelectTrigger>
                     <SelectContent
@@ -344,10 +458,14 @@ export default function SinhVienPage() {
                 </div>
               </div>
 
-              {/* Card bảng – giống UserManagementTable */}
-              <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
-                <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                  <div className="overflow-auto">
+              {loadError && (
+                <p className="mb-3 text-sm text-red-600">{loadError}</p>
+              )}
+
+              {/* Card bảng – vừa đủ 10 dòng mỗi trang */}
+              <div className="flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden">
+                {/* Viewport table: header (h-10 = 2.5rem) + 10 rows (h-12 = 3rem) => 32.5rem */}
+                <div className="overflow-auto h-[32.5rem]">
                     <Table className="w-full" style={{ borderCollapse: "collapse" }}>
                       <TableHeader>
                         <TableRow
@@ -372,18 +490,18 @@ export default function SinhVienPage() {
                           <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
                             GHI CHÚ
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-12" />
+                          <TableHead className="h-10 px-4 min-w-[96px] text-right text-sm font-semibold text-gray-700 bg-blue-50" />
                         </TableRow>
                       </TableHeader>
 
                       <TableBody>
-                        {filteredStudents.slice(0, 30).map((student, index) => (
+                        {pagedStudents.map((student, index) => (
                           <TableRow
                             key={student.id}
                             className="border-b border-gray-200 hover:bg-gray-50"
                           >
                             <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {String(index + 1).padStart(2, "0")}
+                              {String(startIndex + index + 1).padStart(2, "0")}
                             </TableCell>
                             <TableCell className="h-12 px-4 text-sm text-gray-600">
                               {student.mssv}
@@ -400,19 +518,19 @@ export default function SinhVienPage() {
                             <TableCell className="h-12 px-4 text-sm text-gray-600">
                               {student.ghiChu || "-"}
                             </TableCell>
-                            <TableCell className="h-12 px-4 text-right w-12">
+                            <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <MoreVertical className="h-4 w-4" />
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100">
+                                    <MoreVertical className="w-4 h-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="start" sideOffset={8}>
-                                  <DropdownMenuItem onClick={() => handleEdit(student)}>
+                                <DropdownMenuContent align="end" className="w-32">
+                                  <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => handleEdit(student)}>
                                     <Edit className="h-4 w-4 mr-2" /> Sửa
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
-                                    className="text-red-600"
+                                    className="cursor-pointer text-sm text-red-600 focus:text-red-600"
                                     onClick={() => handleDelete(student)}
                                   >
                                     <Trash2 className="h-4 w-4 mr-2" /> Xóa
@@ -424,7 +542,6 @@ export default function SinhVienPage() {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
                 </div>
 
                 {/* Pagination – giống UserManagementTable */}
@@ -437,7 +554,8 @@ export default function SinhVienPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled
+                      disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage(1)}
                     >
                       <ChevronsLeft className="h-4 w-4" />
                     </Button>
@@ -445,12 +563,13 @@ export default function SinhVienPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled
+                      disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
                     <div className="flex items-center gap-1 px-3 text-sm">
-                      <span className="font-medium text-gray-700">1</span>
+                      <span className="font-medium text-gray-700">{safeCurrentPage}</span>
                       <span className="text-gray-400">/</span>
                       <span className="text-gray-600">{totalPages}</span>
                     </div>
@@ -458,7 +577,8 @@ export default function SinhVienPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled={totalRecords <= PAGE_SIZE}
+                      disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
@@ -466,7 +586,8 @@ export default function SinhVienPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 border-gray-300"
-                      disabled={totalRecords <= PAGE_SIZE}
+                      disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage(totalPages)}
                     >
                       <ChevronsRight className="h-4 w-4" />
                     </Button>

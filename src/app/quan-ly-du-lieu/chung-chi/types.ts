@@ -27,4 +27,10 @@ export interface FileImport {
 
 export type CertificateFormData = Omit<Certificate, 'id'>
 
+export interface StudentCertificateCreatePayload {
+  student_id: number
+  certificate_id: number
+  note?: string
+}
+
 export type { Certificate as default }

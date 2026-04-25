@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label"
 interface AddBatchDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onAdd: (data: { code: string; startYear: string; endYear: string }) => void
+  onAdd: (data: { code?: string; startYear: string; endYear?: string }) => Promise<boolean> | boolean
 }
 
 type FormData = {
@@ -53,16 +53,8 @@ export function AddBatchDialog({ open, onOpenChange, onAdd }: AddBatchDialogProp
   const validateForm = () => {
     const newErrors: Partial<FormData> = {}
 
-    if (!formData.code.trim()) {
-      newErrors.code = "Mã khoá không được để trống"
-    }
-
     if (!formData.startYear.trim()) {
       newErrors.startYear = "Năm bắt đầu không được để trống"
-    }
-
-    if (!formData.endYear.trim()) {
-      newErrors.endYear = "Năm kết thúc không được để trống"
     }
 
     if (formData.startYear && formData.startYear.length !== 4) {
@@ -73,11 +65,11 @@ export function AddBatchDialog({ open, onOpenChange, onAdd }: AddBatchDialogProp
       newErrors.endYear = "Năm kết thúc phải gồm 4 chữ số"
     }
 
-    if (!newErrors.startYear && !newErrors.endYear) {
+    if (!newErrors.startYear && !newErrors.endYear && formData.endYear) {
       const start = parseInt(formData.startYear, 10)
       const end = parseInt(formData.endYear, 10)
-      if (!Number.isNaN(start) && !Number.isNaN(end) && start > end) {
-        newErrors.endYear = "Năm kết thúc phải lớn hơn hoặc bằng năm bắt đầu"
+      if (!Number.isNaN(start) && !Number.isNaN(end) && end <= start) {
+        newErrors.endYear = "Năm kết thúc phải lớn hơn năm bắt đầu"
       }
     }
 
@@ -85,12 +77,19 @@ export function AddBatchDialog({ open, onOpenChange, onAdd }: AddBatchDialogProp
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (validateForm()) {
-      onAdd(formData)
-      setFormData(initialFormData)
-      setErrors({})
-      onOpenChange(false)
+      const created = await onAdd({
+        code: formData.code.trim() || undefined,
+        startYear: formData.startYear,
+        endYear: formData.endYear.trim() || undefined,
+      })
+
+      if (created) {
+        setFormData(initialFormData)
+        setErrors({})
+        onOpenChange(false)
+      }
     }
   }
 
@@ -112,7 +111,7 @@ export function AddBatchDialog({ open, onOpenChange, onAdd }: AddBatchDialogProp
         <div className="space-y-4">
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-700">
-              Mã khoá <span className="text-red-500">*</span>
+              Mã khoá
             </Label>
             <Input
               name="code"
@@ -144,7 +143,7 @@ export function AddBatchDialog({ open, onOpenChange, onAdd }: AddBatchDialogProp
 
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-700">
-              Năm kết thúc <span className="text-red-500">*</span>
+              Năm kết thúc
             </Label>
             <Input
               name="endYear"

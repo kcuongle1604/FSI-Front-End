@@ -224,7 +224,7 @@ export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) 
       <DialogFooter>
         <Button variant="outline" onClick={() => { setImportStep('upload'); handleOpenChange(false); }}>Hủy</Button>
         <Button variant="outline" onClick={() => setImportStep('upload')}>Trở lại</Button>
-        <Button className="bg-[#167FFC] hover:bg-[#1470E3]" disabled={hasUnmappedRequired} onClick={() => { console.log("Importing..."); handleOpenChange(false); }}>Import</Button>
+        <Button className="bg-[#167FFC] hover:bg-[#1470E3]" disabled={hasUnmappedRequired} onClick={() => { handleOpenChange(false); }}>Import</Button>
       </DialogFooter>
     </>
   )

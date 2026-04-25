@@ -1,7 +1,9 @@
 import axios from "axios"
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
+  baseURL: API_URL,
 })
 
 api.interceptors.request.use(
@@ -14,5 +16,10 @@ api.interceptors.request.use(
     }
     return config
   },
+  (error) => Promise.reject(error)
+)
+
+api.interceptors.response.use(
+  (response) => response,
   (error) => Promise.reject(error)
 )

@@ -9,7 +9,8 @@ import {
 import { Button } from "@/components/ui/button"
 
 type Specialization = {
-  id: number
+  id: string
+  apiId?: string
   code: string
   name: string
   batches: string[]
@@ -19,15 +20,18 @@ type DeleteSpecializationDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   specialization?: Specialization
-  onConfirm?: () => void
+  onConfirm?: () => Promise<boolean> | boolean
 }
 
 export function DeleteSpecializationDialog({ open, onOpenChange, specialization, onConfirm }: DeleteSpecializationDialogProps) {
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    let deleted = true
     if (onConfirm) {
-      onConfirm()
+      deleted = await onConfirm()
     }
-    onOpenChange(false)
+    if (deleted) {
+      onOpenChange(false)
+    }
   }
 
   const handleCancel = () => {

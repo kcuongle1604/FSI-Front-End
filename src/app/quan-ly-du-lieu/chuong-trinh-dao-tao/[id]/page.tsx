@@ -11,29 +11,27 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  ChevronsLeft,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsRight,
   Search,
   Plus,
   Download,
   Upload,
   MoreVertical,
-  Users,
+  BookOpen,
   History,
 } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
-import { INITIAL_PROGRAMS, Program } from "../page";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { Program } from "../page";
 import ImportHistoryTab from "../../sinh-vien/components/ImportHistoryTab";
-import ImportDialog from "../../sinh-vien/components/ImportDialog";
+import ProgramSubjectsImportDialog from "../ProgramSubjectsImportDialog";
 import type { ImportHistory } from "../../sinh-vien/types";
 import CourseFormDialog, { CourseFormValues } from "../CourseFormDialog";
 import DeleteCourseDialog from "../DeleteCourseDialog";
+import { addSubjectToTrainingProgram, deleteSubjectFromTrainingProgram, getProgramCohorts, getSubjectsByProgramId, getTrainingPrograms, updateTrainingProgramSubject, type Subject } from "../program.api";
 
 type ProgramCourse = {
   id: number;
+  programSubjectId?: string;
   specialization: string;
   type: CourseFormValues["type"];
   code: string;
@@ -42,6 +40,42 @@ type ProgramCourse = {
   compulsory: number;
   optional: number;
 };
+
+function resolveProgramSubjectId(subject: any): string | undefined {
+  const directCandidates = [
+    subject?.program_subject_id,
+    subject?.programSubjectId,
+    subject?.id,
+    subject?.training_program_subject_id,
+    subject?.trainingProgramSubjectId,
+    subject?.subject_program_id,
+    subject?.program_subject?.program_subject_id,
+    subject?.program_subject?.id,
+    subject?.programSubject?.programSubjectId,
+    subject?.programSubject?.id,
+    subject?.training_program_subject?.program_subject_id,
+    subject?.trainingProgramSubject?.programSubjectId,
+  ];
+
+  for (const candidate of directCandidates) {
+    const value = String(candidate ?? "").trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  if (subject && typeof subject === "object") {
+    for (const [key, value] of Object.entries(subject)) {
+      if (!/program.*subject.*id|subject.*program.*id/i.test(key)) continue;
+      const candidate = String(value ?? "").trim();
+      if (candidate) {
+        return candidate;
+      }
+    }
+  }
+
+  return undefined;
+}
 
 const INITIAL_COURSES: ProgramCourse[] = [
   {
@@ -99,27 +133,158 @@ const INITIAL_COURSES: ProgramCourse[] = [
 export default function ChuongTrinhDaoTaoDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const programId = Number(params?.id);
+  const programNameFromUrl = searchParams.get('name');
 
-  const program: Program | undefined = useMemo(
-    () => INITIAL_PROGRAMS.find((p) => p.id === programId),
-    [programId]
-  );
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [program, setProgram] = useState<Program | null>(null);
+  const [programLoading, setProgramLoading] = useState(true);
+  const [appliedCourseNames, setAppliedCourseNames] = useState<string[]>([]);
 
-  const title = program?.name ?? "Chương trình đào tạo";
+  const title = program?.name ?? programNameFromUrl ?? "Chương trình đào tạo";
 
-  const PAGE_SIZE = 10;
-  const [activeTab, setActiveTab] = useState("thong-tin-sinh-vien");
-  const [page, setPage] = useState(1);
+  const [activeTab, setActiveTab] = useState("chuong-trinh-dao-tao");
   const [searchQuery, setSearchQuery] = useState("");
-  const [courses, setCourses] = useState<ProgramCourse[]>(INITIAL_COURSES);
+  const [courses, setCourses] = useState<ProgramCourse[]>([]);
+  const [loading, setLoading] = useState(false);
   const [importHistory] = useState<ImportHistory[]>([]);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [subjectsRefreshKey, setSubjectsRefreshKey] = useState(0);
   const [isCourseDialogOpen, setIsCourseDialogOpen] = useState(false);
   const [isEditCourseDialogOpen, setIsEditCourseDialogOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<ProgramCourse | null>(null);
   const [isDeleteCourseDialogOpen, setIsDeleteCourseDialogOpen] = useState(false);
   const [deletingCourse, setDeletingCourse] = useState<ProgramCourse | null>(null);
+  const [programSubjectIdBySubjectCode, setProgramSubjectIdBySubjectCode] = useState<Record<string, string>>({});
+
+  // Fetch training programs from API
+  useEffect(() => {
+    // If we have program name from URL, use it directly
+    if (programNameFromUrl) {
+      setProgram({ id: programId, name: programNameFromUrl });
+      setProgramLoading(false);
+      return;
+    }
+
+    // Otherwise, fetch from API
+    const fetchPrograms = async () => {
+      try {
+        setProgramLoading(true);
+        const response = await getTrainingPrograms();
+        if (response?.data && Array.isArray(response.data)) {
+          const programsList = response.data.map((p: any) => ({
+            id: p.program_id || p.id,
+            name: p.program_name || p.name,
+          }));
+          setPrograms(programsList);
+          
+          // Find matching program
+          const matchedProgram = programsList.find((p: Program) => p.id === programId);
+          if (matchedProgram) {
+            setProgram(matchedProgram);
+          }
+        }
+      } catch (err) {
+      } finally {
+        setProgramLoading(false);
+      }
+    };
+
+    fetchPrograms();
+  }, [programId, programNameFromUrl]);
+
+  useEffect(() => {
+    if (!Number.isFinite(programId) || programId <= 0) {
+      setAppliedCourseNames([]);
+      return;
+    }
+
+    const fetchAppliedCourses = async () => {
+      try {
+        const response = await getProgramCohorts(programId);
+        const cohorts = Array.isArray(response?.data) ? response.data : [];
+        const names = cohorts
+          .map((cohort: any) => String(cohort?.name || cohort?.cohort_id || "").trim())
+          .filter(Boolean);
+        setAppliedCourseNames(names);
+      } catch {
+        setAppliedCourseNames([]);
+      }
+    };
+
+    fetchAppliedCourses();
+  }, [programId, subjectsRefreshKey]);
+
+  // Fetch subjects when training program ID is available
+  useEffect(() => {
+    if (!Number.isFinite(programId) || programId <= 0) return;
+
+    const fetchSubjects = async () => {
+      try {
+        setLoading(true);
+        const allSubjects: Subject[] = [];
+        const size = 100;
+        let page = 1;
+
+        while (true) {
+          const response = await getSubjectsByProgramId(programId, page, size);
+          const payload = response?.data;
+          const pageSubjects = Array.isArray(payload)
+            ? payload
+            : payload?.data || payload?.items || payload?.results || [];
+
+          if (!Array.isArray(pageSubjects)) break;
+          allSubjects.push(...pageSubjects);
+
+          if (pageSubjects.length < size) break;
+          page += 1;
+        }
+
+        if (allSubjects.length > 0) {
+          const idMap: Record<string, string> = {}
+
+          // Map API response to ProgramCourse structure
+          const mappedCourses: ProgramCourse[] = allSubjects.map((subject: Subject, index: number) => {
+            const programSubjectIdFromResponse = String(subject.program_subject_id ?? "").trim()
+            const resolvedProgramSubjectId = programSubjectIdFromResponse || resolveProgramSubjectId(subject)
+            const subjectCode = String(subject.subject_id || "").trim()
+
+            if (subjectCode && resolvedProgramSubjectId) {
+              idMap[subjectCode] = resolvedProgramSubjectId
+            }
+
+            return ({
+            id: index + 1,
+            programSubjectId: resolvedProgramSubjectId,
+            specialization: title,
+            type: subject.is_required ? "bat-buoc" : "tu-chon",
+            code: subject.subject_id,
+            name: subject.name || subject.course_display_name,
+            credits: subject.credits,
+            compulsory: subject.is_required ? subject.credits : 0,
+            optional: subject.is_required ? 0 : subject.credits,
+          })
+          });
+          
+          setCourses(mappedCourses);
+          setProgramSubjectIdBySubjectCode(idMap);
+        } else {
+          setCourses([]);
+          setProgramSubjectIdBySubjectCode({});
+        }
+      } catch (err: any) {
+        if (err.response?.status === 404) {
+        }
+        setCourses([]);
+        setProgramSubjectIdBySubjectCode({});
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSubjects();
+  }, [programId, subjectsRefreshKey, title]);
 
   const filteredCourses = courses.filter((course) => {
     const query = searchQuery.toLowerCase();
@@ -131,64 +296,91 @@ export default function ChuongTrinhDaoTaoDetailPage() {
   });
 
   const totalRecords = filteredCourses.length;
-  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
-  const pagedCourses = filteredCourses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const displayCount = pagedCourses.length;
+  const displayCount = totalRecords;
 
-  const goToPage = (p: number) => {
-    setPage(Math.max(1, Math.min(totalPages, p)));
+  const handleAddCourse = async (values: CourseFormValues) => {
+    if (!Number.isFinite(programId) || programId <= 0) return;
+
+    try {
+      await addSubjectToTrainingProgram({
+        program_subject_id: 0,
+        training_program_id: programId,
+        subject_id: values.code,
+        subject_name: values.name,
+        credits: values.credits,
+        is_required: values.type === "bat-buoc",
+      });
+
+      setSubjectsRefreshKey((prev) => prev + 1);
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        "Không thể thêm học phần vào chương trình đào tạo."
+      throw new Error(String(message))
+    }
   };
 
-  const handleAddCourse = (values: CourseFormValues) => {
-    setCourses((prev) => {
-      const nextId = prev.length > 0 ? Math.max(...prev.map((c) => c.id)) + 1 : 1;
-      const credits = values.credits;
-      const isCompulsory = values.type === "bat-buoc";
-
-      const newCourse: ProgramCourse = {
-        id: nextId,
-        specialization: values.specialization,
-        type: values.type,
-        code: values.code,
-        name: values.name,
-        credits,
-        compulsory: isCompulsory ? credits : 0,
-        optional: isCompulsory ? 0 : credits,
-      };
-
-      return [...prev, newCourse];
-    });
-  };
-
-  const handleEditCourse = (values: CourseFormValues) => {
+  const handleEditCourse = async (values: CourseFormValues) => {
     if (!editingCourse) return;
 
-    setCourses((prev) =>
-      prev.map((course) => {
-        if (course.id !== editingCourse.id) return course;
+    const fallbackFromCourses = courses.find((course) => {
+      if (course.id === editingCourse.id) return true;
+      const sameCode = String(course.code || "").trim() === String(editingCourse.code || "").trim();
+      const sameName = String(course.name || "").trim() === String(editingCourse.name || "").trim();
+      return sameCode && sameName;
+    });
 
-        const credits = values.credits;
-        const isCompulsory = values.type === "bat-buoc";
+    const resolvedProgramSubjectId = String(
+      values.programSubjectId ||
+      editingCourse.programSubjectId ||
+      fallbackFromCourses?.programSubjectId ||
+      programSubjectIdBySubjectCode[String(editingCourse.code || "").trim()] ||
+      ""
+    ).trim();
 
-        return {
-          ...course,
-          specialization: values.specialization,
-          type: values.type,
-          code: values.code,
-          name: values.name,
-          credits,
-          compulsory: isCompulsory ? credits : 0,
-          optional: isCompulsory ? 0 : credits,
-        };
-      })
-    );
+    if (!resolvedProgramSubjectId) {
+      throw new Error("Không tìm thấy program_subject_id để cập nhật học phần.");
+    }
+
+    try {
+      await updateTrainingProgramSubject(resolvedProgramSubjectId, {
+        is_required: values.type === "bat-buoc",
+      });
+
+      setSubjectsRefreshKey((prev) => prev + 1);
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        "Không thể cập nhật loại học phần.";
+      throw new Error(String(message));
+    }
   };
 
-  const handleDeleteCourse = () => {
+  const handleDeleteCourse = async () => {
     if (!deletingCourse) return;
 
-    setCourses((prev) => prev.filter((course) => course.id !== deletingCourse.id));
-    setDeletingCourse(null);
+    if (!Number.isFinite(programId) || programId <= 0) {
+      throw new Error("Không xác định được chương trình đào tạo.")
+    }
+
+    if (!deletingCourse.code || deletingCourse.code === "-") {
+      throw new Error("Mã học phần không hợp lệ.")
+    }
+
+    try {
+      await deleteSubjectFromTrainingProgram(programId, deletingCourse.code)
+      setCourses((prev) => prev.filter((course) => course.id !== deletingCourse.id));
+      setDeletingCourse(null);
+      setSubjectsRefreshKey((prev) => prev + 1);
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        "Không thể xóa học phần khỏi chương trình đào tạo."
+      throw new Error(String(message))
+    }
   };
 
   return (
@@ -206,10 +398,10 @@ export default function ChuongTrinhDaoTaoDetailPage() {
               >
                 Chương trình đào tạo
               </button>
-              {title && (
+              {(title || programLoading) && (
                 <>
                   <span className="mx-1">&gt;</span>
-                  {title}
+                  {programLoading ? "Đang tải..." : title}
                 </>
               )}
             </span>
@@ -223,12 +415,12 @@ export default function ChuongTrinhDaoTaoDetailPage() {
           <div className="border-b border-slate-200">
             <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start">
               <TabsTrigger
-                value="thong-tin-sinh-vien"
-                className="relative rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
+                value="chuong-trinh-dao-tao"
+                className="relative min-w-[180px] justify-center flex rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none px-0 py-3 text-sm font-semibold transition-all"
               >
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Thông tin sinh viên
+                <div className="flex items-center justify-center gap-2 w-full">
+                  <BookOpen className="w-4 h-4" />
+                  Chương trình đào tạo
                 </div>
               </TabsTrigger>
 
@@ -246,7 +438,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
 
           <div className="flex-1 min-h-0 mt-5 flex flex-col">
             <TabsContent
-              value="thong-tin-sinh-vien"
+              value="chuong-trinh-dao-tao"
               className="m-0 h-full outline-none flex flex-col"
             >
               {/* Thanh tìm kiếm & nút hành động giống màn danh sách CTĐT */}
@@ -289,15 +481,14 @@ export default function ChuongTrinhDaoTaoDetailPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
-                <div className="flex-1 flex flex-col min-h-0">
-                  <div className="flex-1 overflow-auto min-h-0">
+              <div className="flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden">
+                {/* Header cố định, chỉ body scroll: 10 rows (h-12 = 3rem) => 30rem */}
+                <div className="overflow-x-auto">
+                  {/* Chừa chỗ bên phải để khớp với scrollbar của body */}
+                  <div>
                     <table className="w-full table-fixed" style={{ borderCollapse: "collapse" }}>
                       <thead>
-                        <tr
-                          className="border-b border-gray-200 bg-blue-50"
-                          style={{ position: "sticky", top: 0, zIndex: 10 }}
-                        >
+                        <tr className="border-b border-gray-200 bg-blue-50">
                           <th className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 uppercase w-[6%]">
                             STT
                           </th>
@@ -321,25 +512,45 @@ export default function ChuongTrinhDaoTaoDetailPage() {
                           </th>
                         </tr>
                       </thead>
+                    </table>
+                  </div>
+
+                  <div className="h-[30rem] overflow-y-scroll show-scrollbar">
+                    <table className="w-full table-fixed" style={{ borderCollapse: "collapse" }}>
                       <tbody>
-                        {pagedCourses.length === 0 ? (
-                          <tr>
+                        {loading ? (
+                          <tr key="loading">
+                            <td colSpan={7} className="text-center text-gray-500 py-6">
+                              Đang tải...
+                            </td>
+                          </tr>
+                        ) : filteredCourses.length === 0 ? (
+                          <tr key="empty">
                             <td colSpan={7} className="text-center text-gray-500 py-6">
                               Chưa có học phần nào
                             </td>
                           </tr>
                         ) : (
-                          pagedCourses.map((course, idx) => (
-                            <tr key={course.id} className="border-b last:border-b-0">
-                              <td className="px-4 py-2 text-sm text-gray-700">
-                                {String((page - 1) * PAGE_SIZE + idx + 1).padStart(2, "0")}
+                          filteredCourses.map((course, idx) => (
+                            <tr
+                              key={course.id}
+                              className="border-b border-gray-200 hover:bg-gray-50 last:border-b-0"
+                            >
+                              <td className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[6%]">
+                                {String(idx + 1).padStart(2, "0")}
                               </td>
-                              <td className="px-4 py-2 text-sm text-gray-700">{course.code}</td>
-                              <td className="px-4 py-2 text-sm text-gray-700">{course.name}</td>
-                              <td className="px-4 py-2 text-sm text-gray-700">{course.credits}</td>
-                              <td className="px-4 py-2 text-sm text-gray-700">{course.compulsory || ""}</td>
-                              <td className="px-4 py-2 text-sm text-gray-700">{course.optional || ""}</td>
-                              <td className="px-4 py-2 text-right w-12">
+                              <td className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[16%]">
+                                <div className="truncate">{course.code}</div>
+                              </td>
+                              <td className="h-12 px-4 text-sm text-gray-700 w-[32%]">
+                                <div className="truncate">{course.name}</div>
+                              </td>
+                              <td className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[12%]">{course.credits}</td>
+                              <td className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[12%]">
+                                {course.compulsory || ""}
+                              </td>
+                              <td className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[12%]">{course.optional || ""}</td>
+                              <td className="h-12 px-4 text-right whitespace-nowrap w-[10%]">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button
@@ -350,9 +561,9 @@ export default function ChuongTrinhDaoTaoDetailPage() {
                                       <MoreVertical className="w-4 h-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-40">
+                                  <DropdownMenuContent align="end" className="w-32">
                                     <DropdownMenuItem
-                                      className="cursor-pointer text-sm"
+                                      className="text-sm"
                                       onClick={() => {
                                         setEditingCourse(course);
                                         setIsEditCourseDialogOpen(true);
@@ -361,7 +572,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
                                       Sửa
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
-                                      className="cursor-pointer text-sm text-red-600"
+                                      className="text-sm text-red-600 focus:text-red-600"
                                       onClick={() => {
                                         setDeletingCourse(course);
                                         setIsDeleteCourseDialogOpen(true);
@@ -378,58 +589,10 @@ export default function ChuongTrinhDaoTaoDetailPage() {
                       </tbody>
                     </table>
                   </div>
+                </div>
 
-                  <div
-                    className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50"
-                    style={{ minHeight: 56 }}
-                  >
-                    <div className="text-sm text-gray-600">
-                      Hiển thị {displayCount}/{totalRecords} dòng
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 border-gray-300"
-                        onClick={() => goToPage(1)}
-                        disabled={page === 1}
-                      >
-                        <ChevronsLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 border-gray-300"
-                        onClick={() => goToPage(page - 1)}
-                        disabled={page === 1}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <div className="flex items-center gap-1 px-3">
-                        <span className="text-sm font-medium text-gray-700">{page}</span>
-                        <span className="text-sm text-gray-400">/</span>
-                        <span className="text-sm text-gray-600">{totalPages}</span>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 border-gray-300"
-                        onClick={() => goToPage(page + 1)}
-                        disabled={page === totalPages}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 border-gray-300"
-                        onClick={() => goToPage(totalPages)}
-                        disabled={page === totalPages}
-                      >
-                        <ChevronsRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50" style={{ minHeight: 56 }}>
+                  <div className="text-sm text-gray-600">Hiển thị {displayCount}/{displayCount} dòng</div>
                 </div>
               </div>
             </TabsContent>
@@ -443,10 +606,11 @@ export default function ChuongTrinhDaoTaoDetailPage() {
           </div>
         </Tabs>
 
-        <ImportDialog
+        <ProgramSubjectsImportDialog
           open={isImportOpen}
           onOpenChange={setIsImportOpen}
-          isCourseImport
+          programName={program?.name}
+          onImportSuccess={() => setSubjectsRefreshKey((prev) => prev + 1)}
         />
 
         <CourseFormDialog
@@ -457,6 +621,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
           initialValues={{
             specialization: title,
           }}
+          appliedCourses={appliedCourseNames}
         />
 
         <CourseFormDialog
@@ -468,13 +633,14 @@ export default function ChuongTrinhDaoTaoDetailPage() {
           onSave={handleEditCourse}
           mode="edit"
           initialValues={{
-            cohort: editingCourse?.cohort ?? "",
+            programSubjectId: editingCourse?.programSubjectId,
             specialization: editingCourse?.specialization ?? "",
             code: editingCourse?.code ?? "",
             name: editingCourse?.name ?? "",
             credits: editingCourse?.credits ?? 0,
             type: editingCourse?.type ?? "bat-buoc",
           }}
+          appliedCourses={appliedCourseNames}
         />
 
         <DeleteCourseDialog

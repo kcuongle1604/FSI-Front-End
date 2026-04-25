@@ -29,12 +29,22 @@ export interface ValidationErrorResponse {
 /**
  * Student score data in matrix format
  */
+export interface ScoreCellObject {
+    score_id?: number | string
+    id?: number | string
+    score_4?: number | string | null
+    score?: number | string | null
+    value?: number | string | null
+}
+
+export type ScoreCell = number | string | null | ScoreCellObject
+
 export interface StudentScore {
     student_id: number
     full_name: string
     dob: string
     class_name: string
-    scores: Record<string, number | null> // key = subject name, value = score
+    scores: Record<string, ScoreCell> // key = subject name, value = score or score object
 }
 
 /**
@@ -45,4 +55,38 @@ export interface ScoreMatrixResponse {
     students: StudentScore[] // List of students with their scores
     total_students: number
     total_subjects: number
+}
+
+/**
+ * Request body for creating a score
+ */
+export interface ScoreCreateRequest {
+    semester_id: number
+    student_id: number
+    subject_id: string
+    score_4: string
+}
+
+/**
+ * Response from create score API
+ */
+export interface ScoreCreateResponse {
+    id?: number
+    semester_id: number
+    student_id: number
+    subject_id: string
+    score_4: string
+    created_at?: string
+    updated_at?: string
+}
+
+export interface ScoreUpdateRequest {
+    student_id?: number
+    subject_id?: string
+    score_4?: string
+}
+
+export interface ScoreDeleteRequest {
+    student_id: number
+    subject_id: string
 }

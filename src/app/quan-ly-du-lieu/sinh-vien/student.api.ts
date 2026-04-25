@@ -1,5 +1,12 @@
 import { api } from "@/lib/api"
-import type { StudentListResponse, ImportResponse, ColumnMapping, UpdateStudentRequest } from "./types"
+import type { 
+  StudentListResponse, 
+  ImportResponse, 
+  ImportAnalysisResponse,
+  ImportExecutionResponse,
+  ColumnMapping, 
+  UpdateStudentRequest 
+} from "./types"
 
 export async function getStudents(params?: {
   cohort_id?: number
@@ -30,6 +37,10 @@ export async function getClasses() {
   return api.get("/api/v1/classes")
 }
 
+export async function getCohorts() {
+  return api.get("/api/v1/cohorts")
+}
+
 export async function importStudents(
   file: File,
   dryRun: boolean,
@@ -37,12 +48,62 @@ export async function importStudents(
 ) {
   const formData = new FormData()
   formData.append("file", file)
+  formData.append("file_type", "student")
   formData.append("dry_run", dryRun.toString())
   formData.append("column_mapping", JSON.stringify(columnMapping))
 
-  return api.post<ImportResponse>("/api/v1/students/import", formData, {
+  // Return type depends on dry_run value
+  if (dryRun) {
+    return api.post<ImportAnalysisResponse>("/api/v1/students/import", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    })
+  } else {
+    return api.post<ImportExecutionResponse>("/api/v1/students/import", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    })
+  }
+}
+
+export async function importStudentCertificatesHtml(file: File) {
+  const formData = new FormData()
+  formData.append("file", file)
+  formData.append("file_type", "certificate")
+
+  return api.post("/api/v1/student-certificates/import-html", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
   })
+}
+
+export async function importStudentCertificatesCsv(file: File) {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  return api.post("/api/v1/student-certificates/import-csv", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  })
+}
+
+export async function importStudentCertificatesCsvBySemester(file: File, semesterId: number) {
+  const formData = new FormData()
+  formData.append("file", file)
+  formData.append("file_type", "english")
+  formData.append("semester_id", String(semesterId))
+
+  return api.post("/api/v1/upload-ta-scores", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  })
+}
+
+export async function getSemesters(params?: { skip?: number; limit?: number }) {
+  return api.get<any>("/api/v1/semesters", { params })
 }

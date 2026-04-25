@@ -14,7 +14,7 @@ export default function StudentListWithImport() {
   const [students, setStudents] = useState([])
 
   // Hàm này sẽ được gọi sau khi import thành công
-  const handleImportComplete = async () => {
+  const handleImportSuccess = async () => {
     // Reload danh sách sinh viên sau khi import
     await fetchStudents()
   }
@@ -40,7 +40,7 @@ export default function StudentListWithImport() {
       <ImportDialog
         open={showImportDialog}
         onOpenChange={setShowImportDialog}
-        onComplete={handleImportComplete}
+        onImportSuccess={handleImportSuccess}
       />
 
       {/* Danh sách sinh viên */}
@@ -60,7 +60,7 @@ export default function StudentListWithImport() {
  * - onOpenChange: (open: boolean) => void
  *   Callback khi đóng/mở dialog
  * 
- * - onComplete?: () => void (optional)
+ * - onImportSuccess?: () => void (optional)
  *   Callback được gọi sau khi import thành công
  *   Thường dùng để reload danh sách sinh viên
  */
@@ -74,7 +74,7 @@ export default function StudentListWithImport() {
  * 4. Click "Phân tích" -> Gọi API analyzeImportCSV (dry_run=true)
  * 5. Xem kết quả phân tích (valid/invalid rows)
  * 6. Click "Import" -> Gọi API executeImportCSV (dry_run=false)
- * 7. Hiển thị kết quả và gọi onComplete callback
+ * 7. Hiển thị kết quả và gọi onImportSuccess callback
  */
 
 /**

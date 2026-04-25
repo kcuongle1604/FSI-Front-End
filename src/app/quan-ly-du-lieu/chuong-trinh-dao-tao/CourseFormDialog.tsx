@@ -30,6 +30,7 @@ const COURSE_TYPES = [
 ] as const
 
 export type CourseFormValues = {
+  programSubjectId?: string
   specialization: string
   code: string
   name: string
@@ -40,9 +41,10 @@ export type CourseFormValues = {
 type CourseFormDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (data: CourseFormValues) => void
+  onSave: (data: CourseFormValues) => void | Promise<void>
   initialValues?: Partial<CourseFormValues>
   mode?: "create" | "edit"
+  appliedCourses?: string[]
 }
 
 export default function CourseFormDialog({
@@ -51,12 +53,15 @@ export default function CourseFormDialog({
   onSave,
   initialValues,
   mode = "create",
+  appliedCourses = [],
 }: CourseFormDialogProps) {
   const [specialization, setSpecialization] = useState("")
   const [code, setCode] = useState("")
   const [name, setName] = useState("")
   const [credits, setCredits] = useState("")
   const [courseType, setCourseType] = useState<string>("")
+  const [programSubjectId, setProgramSubjectId] = useState<string>("")
+  const [saving, setSaving] = useState(false)
 
   const [errors, setErrors] = useState<{
     specialization?: string
@@ -64,6 +69,7 @@ export default function CourseFormDialog({
     name?: string
     credits?: string
     courseType?: string
+    submit?: string
   }>({})
 
   const resetForm = () => {
@@ -72,6 +78,7 @@ export default function CourseFormDialog({
     setName("")
     setCredits("")
     setCourseType("")
+    setProgramSubjectId("")
     setErrors({})
   }
 
@@ -89,11 +96,16 @@ export default function CourseFormDialog({
           : ""
       )
       setCourseType(initialValues?.type ?? "")
+      setProgramSubjectId(
+        initialValues?.programSubjectId != null
+          ? String(initialValues.programSubjectId)
+          : ""
+      )
       setErrors({})
     }
   }, [open, initialValues])
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const newErrors: typeof errors = {}
 
     if (!specialization) newErrors.specialization = "Vui lòng chọn chuyên ngành"
@@ -110,16 +122,29 @@ export default function CourseFormDialog({
     setErrors(newErrors)
     if (Object.keys(newErrors).length > 0) return
 
-    onSave({
-      specialization,
-      code: code.trim(),
-      name: name.trim(),
-      credits: parsedCredits,
-      type: courseType as CourseFormValues["type"],
-    })
+    try {
+      setSaving(true)
+      await Promise.resolve(
+        onSave({
+          programSubjectId: programSubjectId.trim() || undefined,
+          specialization,
+          code: code.trim(),
+          name: name.trim(),
+          credits: parsedCredits,
+          type: courseType as CourseFormValues["type"],
+        })
+      )
 
-    resetForm()
-    onOpenChange(false)
+      resetForm()
+      onOpenChange(false)
+    } catch (error: any) {
+      setErrors((prev) => ({
+        ...prev,
+        submit: error?.message || "Không thể lưu học phần. Vui lòng thử lại.",
+      }))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleCancel = () => {
@@ -128,6 +153,7 @@ export default function CourseFormDialog({
   }
 
   const dialogTitle = mode === "edit" ? "Sửa học phần" : "Thêm mới học phần"
+  const appliedCoursesText = appliedCourses.length > 0 ? appliedCourses.join(", ") : ""
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -153,18 +179,30 @@ export default function CourseFormDialog({
 
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-800">
+              Khóa áp dụng
+            </Label>
+            <div
+              className="w-full h-9 px-3 flex items-center rounded-md border border-gray-300 bg-gray-100 text-gray-700 text-sm"
+            >
+              {appliedCoursesText || ""}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-800">
               Mã học phần<span className="text-red-500">*</span>
             </Label>
             <Input
               placeholder="Nhập mã học phần"
               value={code}
+              disabled={mode === "edit"}
               onChange={(e) => {
                 setCode(e.target.value)
                 if (errors.code) {
                   setErrors((prev) => ({ ...prev, code: undefined }))
                 }
               }}
-              className={`w-full ${errors.code ? "border-red-500" : "border-gray-300"}`}
+              className={`w-full ${errors.code ? "border-red-500" : "border-gray-300"} ${mode === "edit" ? "bg-gray-100 text-gray-700" : ""}`}
             />
             {errors.code && (
               <p className="text-xs text-red-500">{errors.code}</p>
@@ -178,13 +216,14 @@ export default function CourseFormDialog({
             <Input
               placeholder="Nhập tên học phần"
               value={name}
+              disabled={mode === "edit"}
               onChange={(e) => {
                 setName(e.target.value)
                 if (errors.name) {
                   setErrors((prev) => ({ ...prev, name: undefined }))
                 }
               }}
-              className={`w-full ${errors.name ? "border-red-500" : "border-gray-300"}`}
+              className={`w-full ${errors.name ? "border-red-500" : "border-gray-300"} ${mode === "edit" ? "bg-gray-100 text-gray-700" : ""}`}
             />
             {errors.name && (
               <p className="text-xs text-red-500">{errors.name}</p>
@@ -198,13 +237,14 @@ export default function CourseFormDialog({
             <Input
               placeholder="Nhập số tín chỉ"
               value={credits}
+              disabled={mode === "edit"}
               onChange={(e) => {
                 setCredits(e.target.value)
                 if (errors.credits) {
                   setErrors((prev) => ({ ...prev, credits: undefined }))
                 }
               }}
-              className={`w-full ${errors.credits ? "border-red-500" : "border-gray-300"}`}
+              className={`w-full ${errors.credits ? "border-red-500" : "border-gray-300"} ${mode === "edit" ? "bg-gray-100 text-gray-700" : ""}`}
             />
             {errors.credits && (
               <p className="text-xs text-red-500">{errors.credits}</p>
@@ -241,19 +281,25 @@ export default function CourseFormDialog({
           </div>
         </div>
 
+        {errors.submit && (
+          <p className="text-xs text-red-500">{errors.submit}</p>
+        )}
+
         <div className="flex gap-3 pt-6 justify-end">
           <Button
             variant="outline"
             onClick={handleCancel}
+            disabled={saving}
             className="px-6 bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
           >
             Hủy
           </Button>
           <Button
             onClick={handleSave}
+            disabled={saving}
             className="px-6 bg-[#167FFC] hover:bg-[#1470E3] text-white"
           >
-            Lưu
+            {saving ? "Đang lưu..." : "Lưu"}
           </Button>
         </div>
       </DialogContent>

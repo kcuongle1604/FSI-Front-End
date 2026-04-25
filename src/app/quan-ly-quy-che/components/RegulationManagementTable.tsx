@@ -7,6 +7,14 @@ export type Regulation = {
   name: string;
   batches: string[];
   specializations: string[];
+  min_total_credits?: number;
+  min_required_credits?: number;
+  min_elective_credits?: number;
+  min_gpa?: number;
+  required_certificates?: string[];
+  cohort_ids?: number[];
+  major_ids?: number[];
+  notes?: string;
 };
 
 interface RegulationManagementTableProps {

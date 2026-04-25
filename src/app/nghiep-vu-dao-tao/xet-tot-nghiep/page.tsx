@@ -1,9 +1,16 @@
 "use client"
 
-import { useState } from "react"
-import { Download } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Download, GraduationCap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import {
   Select,
   SelectContent,
@@ -11,9 +18,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Search } from "lucide-react"
 import AppLayout from "@/components/AppLayout"
 import XetTotNghiepTab from "./components/XetTotNghiepTab"
+import { api } from "@/lib/api"
 
 type XetTotNghiep = {
   id: number
@@ -22,53 +31,575 @@ type XetTotNghiep = {
   class: string
   year: string
   course: string
-  tcbb: number
-  tctc: number
-  totalCredits: number
-  gpa: number
+  tcbb: string
+  tctc: string
+  totalCredits: string
+  gpa: string
   ccdr: string
   program: string
   status: string
 }
 
-const students: XetTotNghiep[] = [
-  { id: 1, mssv: "221121521260", name: "Nguyễn Văn A", class: "48K05", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 120, tctc: 14, totalCredits: 134, gpa: 3.6, ccdr: "5/5", program: "Hoàn thành", status: "Đạt" },
-  { id: 2, mssv: "221121521261", name: "Trần Thị B", class: "48K14.1", year: "Kỳ 2 - 2024 - 2025", course: "49K", tcbb: 120, tctc: 10, totalCredits: 130, gpa: 3.6, ccdr: "5/5", program: "Chưa hoàn thành", status: "Không đạt" },
-  { id: 3, mssv: "221121521262", name: "Lê Văn C", class: "48K14.2", year: "Kỳ 1 - 2024 - 2025", course: "50K", tcbb: 120, tctc: 14, totalCredits: 134, gpa: 3.6, ccdr: "5/5", program: "Chưa hoàn thành", status: "Không đạt" },
-  { id: 4, mssv: "221121521263", name: "Phạm Thị D", class: "48K05", year: "Kỳ 2 - 2023 - 2024", course: "48K", tcbb: 120, tctc: 14, totalCredits: 134, gpa: 3.6, ccdr: "5/5", program: "Hoàn thành", status: "Đạt" },
-  { id: 5, mssv: "221121521264", name: "Ngô Văn E", class: "48K14.1", year: "Kỳ 1 - 2023 - 2024", course: "48K", tcbb: 120, tctc: 14, totalCredits: 134, gpa: 3.6, ccdr: "4/5", program: "Hoàn thành", status: "Không đạt" },
-  { id: 6, mssv: "221121521265", name: "Đỗ Thị F", class: "48K05", year: "Kỳ 2 - 2024 - 2025", course: "49K", tcbb: 120, tctc: 14, totalCredits: 134, gpa: 3.6, ccdr: "5/5", program: "Hoàn thành", status: "Đạt" },
-  { id: 7, mssv: "221121521266", name: "Vũ Văn G", class: "48K05", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 120, tctc: 14, totalCredits: 134, gpa: 3.6, ccdr: "5/5", program: "Hoàn thành", status: "Đạt" },
-  { id: 8, mssv: "221121521267", name: "Bùi Thị H", class: "48K14.2", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 120, tctc: 14, totalCredits: 134, gpa: 3.6, ccdr: "5/5", program: "Hoàn thành", status: "Đạt" },
-  { id: 9, mssv: "221121521268", name: "Nguyễn Văn I", class: "48K05", year: "Kỳ 2 - 2024 - 2025", course: "48K", tcbb: 120, tctc: 14, totalCredits: 134, gpa: 3.6, ccdr: "5/5", program: "Hoàn thành", status: "Đạt" },
-  { id: 10, mssv: "221121521269", name: "Trần Thị K", class: "48K05", year: "Kỳ 1 - 2024 - 2025", course: "48K", tcbb: 120, tctc: 10, totalCredits: 120, gpa: 3.6, ccdr: "5/5", program: "Chưa hoàn thành", status: "Đạt" },
-]
+type ClassApiItem = {
+  class_id?: number
+  id?: number
+  class_name?: string
+  name?: string
+  cohort_id?: number
+}
+
+type SemesterApiItem = {
+  semester_id?: number
+  id?: number
+  semester_name?: string
+  name?: string
+  term?: string
+  academic_year?: string
+}
+
+type CohortApiItem = {
+  cohort_id?: number
+  id?: number
+  name?: string
+  year_start?: number
+  year_end?: number
+}
+
+type GraduationClassInfo = {
+  class_id?: number
+  class_name?: string
+  cohort_id?: number
+  cohort_name?: string
+  major_id?: number
+  major_name?: string
+  requirement_id?: number
+  requirement_name?: string
+  required_credits?: number
+  elective_credits?: number
+  total_credits?: number
+  gpa?: number
+  sum_certificate?: number
+  total_certificate?: number
+  total_students?: number
+  eligible_students?: number
+  ineligible_students?: number
+}
+
+type GraduationStudentItem = {
+  stt?: number
+  student_id?: number
+  full_name?: string
+  class_name?: string
+  required_credits_earned?: number
+  elective_credits_earned?: number
+  total_credits_earned?: number
+  gpa?: number
+  sum_certificate?: number
+  certificates?: number
+  program_status?: string
+  graduation_status?: unknown
+  notes?: string | null
+}
+
+type GraduationEligibilityResponse = {
+  status?: string
+  message?: string
+  class_info?: GraduationClassInfo
+  students?: GraduationStudentItem[]
+}
+
+type GraduationSavePayload = {
+  semester_id: number
+  student_ids: number[]
+}
+
+type GraduationSaveResponse = {
+  saved?: number
+  skipped?: number
+  message?: string
+}
+
+function parseSemestersPayload(
+  payload: SemesterApiItem[] | { data?: SemesterApiItem[]; items?: SemesterApiItem[] } | null | undefined
+): SemesterApiItem[] {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  if (Array.isArray(payload?.items)) return payload.items
+  return []
+}
+
+function extractBackendMessage(error: any, fallback: string): string {
+  const detail = error?.response?.data?.detail
+  if (typeof detail === "string" && detail.trim()) return detail
+  if (Array.isArray(detail) && detail.length > 0) {
+    return detail
+      .map((item: any) => (typeof item === "string" ? item : item?.msg || JSON.stringify(item)))
+      .join(", ")
+  }
+
+  const message = error?.response?.data?.message || error?.message
+  if (typeof message === "string" && message.trim()) return message
+
+  return fallback
+}
+
+function formatProgress(earned: unknown, required: unknown, fractionDigits = 0): string {
+  const earnedNum = Number(earned)
+  const requiredNum = Number(required)
+
+  const formatValue = (value: number) =>
+    fractionDigits > 0 ? value.toFixed(fractionDigits) : String(Math.trunc(value))
+
+  const earnedText = Number.isFinite(earnedNum) ? formatValue(earnedNum) : "-"
+  const requiredText = Number.isFinite(requiredNum) ? formatValue(requiredNum) : "-"
+
+  return `${earnedText}/${requiredText}`
+}
+
+function normalizeFilterValue(value: string): string {
+  return value
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toLowerCase()
+}
+
+function isEligibleGraduationStatus(status: unknown): boolean {
+  if (typeof status === "boolean") return status
+  if (typeof status === "number") return status === 1
+
+  if (Array.isArray(status)) {
+    return status.some((item) => isEligibleGraduationStatus(item))
+  }
+
+  if (status && typeof status === "object") {
+    const nested = status as Record<string, unknown>
+    const preferredKeys = ["eligible", "is_eligible", "isEligible", "status", "graduation_status", "value", "result"]
+
+    for (const key of preferredKeys) {
+      if (Object.prototype.hasOwnProperty.call(nested, key) && isEligibleGraduationStatus(nested[key])) {
+        return true
+      }
+    }
+
+    return Object.values(nested).some((value) => isEligibleGraduationStatus(value))
+  }
+
+  const normalized = normalizeFilterValue(String(status || ""))
+  if (!normalized) return false
+
+  const positiveExact = new Set(["1", "true", "yes", "y", "x", "co", "dat", "eligible", "pass", "passed", "checked"])
+  if (positiveExact.has(normalized)) return true
+
+  const negativeExact = new Set(["0", "false", "no", "n", "khong", "khongdat", "chuadat", "ineligible", "fail", "failed", "truot"])
+  if (negativeExact.has(normalized)) return false
+
+  if (
+    normalized.includes("khongdat") ||
+    normalized.includes("chuadat") ||
+    normalized.includes("ineligible") ||
+    normalized.includes("noteligible") ||
+    normalized.includes("failed") ||
+    normalized.includes("fail") ||
+    normalized.includes("truot")
+  ) {
+    return false
+  }
+
+  return (
+    normalized.startsWith("dat") ||
+    normalized.includes("dudieukien") ||
+    normalized.includes("eligible") ||
+    normalized.includes("pass") ||
+    normalized.includes("totnghiep")
+  )
+}
+
+function toGraduationStatusLabel(status: unknown): string {
+  if (isEligibleGraduationStatus(status)) return "Đạt"
+
+  const normalized = normalizeFilterValue(String(status || ""))
+  if (!normalized) return "-"
+
+  return "Không đạt"
+}
 
 export default function XetTotNghiepPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const [students, setStudents] = useState<XetTotNghiep[]>([])
+  const [classes, setClasses] = useState<ClassApiItem[]>([])
+  const [cohorts, setCohorts] = useState<CohortApiItem[]>([])
+  const [semesters, setSemesters] = useState<SemesterApiItem[]>([])
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedYear, setSelectedYear] = useState("all")
-  const [selectedCourse, setSelectedCourse] = useState("all")
-  const [selectedClass, setSelectedClass] = useState("all")
+  const [selectedSemesterId, setSelectedSemesterId] = useState("")
+  const [selectedCourse, setSelectedCourse] = useState<string | undefined>()
+  const [selectedClassId, setSelectedClassId] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [evaluatedCombos, setEvaluatedCombos] = useState<string[]>([])
+  const [eligibleStudentIds, setEligibleStudentIds] = useState<number[]>([])
+
+  const initialKhoa = searchParams?.get("khoa") ?? ""
+  const initialLop = searchParams?.get("lop") ?? ""
+  const initialKy = searchParams?.get("ky") ?? ""
+
+  const [pendingLopQuery, setPendingLopQuery] = useState(initialLop)
+  const [pendingKyQuery, setPendingKyQuery] = useState(initialKy)
+
+  const getSemesterLabel = (semester: SemesterApiItem): string => {
+    return (
+      semester.semester_name ||
+      semester.name ||
+      [semester.term, semester.academic_year].filter(Boolean).join(" - ") ||
+      `Kỳ #${semester.semester_id ?? semester.id ?? ""}`
+    )
+  }
+
+  const getClassId = (item: ClassApiItem): number | null => {
+    const id = item.class_id ?? item.id
+    return Number.isFinite(id) ? Number(id) : null
+  }
+
+  const getClassName = (item: ClassApiItem): string => {
+    return String(item.class_name || item.name || "")
+  }
+
+  const selectedSemesterLabel = useMemo(() => {
+    const target = semesters.find((item) => String(item.semester_id ?? item.id ?? "") === selectedSemesterId)
+    return target ? getSemesterLabel(target) : ""
+  }, [selectedSemesterId, semesters])
+
+  const selectedClassLabel = useMemo(() => {
+    const target = classes.find((item) => String(item.class_id ?? item.id ?? "") === selectedClassId)
+    return target ? getClassName(target) : ""
+  }, [selectedClassId, classes])
+
+  const getCohortId = (item: CohortApiItem): number | null => {
+    const id = item.cohort_id ?? item.id
+    return Number.isFinite(id) ? Number(id) : null
+  }
+
+  const getCohortLabel = (item: CohortApiItem): string => {
+    const id = getCohortId(item)
+    return id !== null ? String(id) : ""
+  }
+
+  const cohortOptions = useMemo(() => {
+    return cohorts
+      .filter((item) => getCohortId(item) !== null)
+      .sort((a, b) => Number(getCohortId(a)) - Number(getCohortId(b)))
+  }, [cohorts])
+
+  const classOptions = useMemo(() => {
+    const filtered = !selectedCourse
+      ? classes
+      : classes.filter((item) => String(item.cohort_id ?? "") === selectedCourse)
+
+    return filtered
+      .filter((item) => getClassId(item) !== null && getClassName(item))
+      .sort((a, b) => getClassName(a).localeCompare(getClassName(b)))
+  }, [classes, selectedCourse])
+
+  useEffect(() => {
+    if (!initialKhoa) return
+    setSelectedCourse((prev) => (prev ? prev : initialKhoa))
+  }, [initialKhoa])
+
+  useEffect(() => {
+    if (!pendingLopQuery || !classOptions.length || selectedClassId) return
+
+    const target = classOptions.find((item) =>
+      normalizeFilterValue(getClassName(item)) === normalizeFilterValue(pendingLopQuery)
+    )
+
+    if (!target) return
+
+    const id = getClassId(target)
+    if (id !== null) {
+      setSelectedClassId(String(id))
+      setPendingLopQuery("")
+    }
+  }, [pendingLopQuery, classOptions, selectedClassId])
+
+  useEffect(() => {
+    const fetchFilters = async () => {
+      try {
+        const [classesRes, cohortsRes] = await Promise.all([
+          api.get<ClassApiItem[]>("/api/v1/classes"),
+          api.get<CohortApiItem[]>("/api/v1/cohorts"),
+        ])
+
+        setClasses(Array.isArray(classesRes.data) ? classesRes.data : [])
+        const cohortList = Array.isArray(cohortsRes.data) ? cohortsRes.data : []
+        setCohorts(cohortList)
+      } catch (error: any) {
+        setErrorMessage(extractBackendMessage(error, "Không tải được bộ lọc lớp/khóa"))
+      }
+    }
+
+    fetchFilters()
+  }, [])
+
+  useEffect(() => {
+    const fetchSemesters = async () => {
+      if (!selectedCourse) {
+        setSemesters([])
+        setSelectedSemesterId("")
+        return
+      }
+
+      try {
+        const semestersRes = await api.get<SemesterApiItem[] | { data?: SemesterApiItem[]; items?: SemesterApiItem[] }>(
+          `/api/v1/cohorts/${selectedCourse}/semesters`
+        )
+        const semesterList = parseSemestersPayload(semestersRes.data)
+
+        setSemesters(semesterList)
+
+        setSelectedSemesterId((prev) => {
+          if (!prev) return prev
+          const selectedStillExists = semesterList.some(
+            (item) => String(item.semester_id ?? item.id ?? "") === prev
+          )
+          return selectedStillExists ? prev : ""
+        })
+      } catch (error: any) {
+        setSemesters([])
+        setSelectedSemesterId("")
+        setErrorMessage(extractBackendMessage(error, "Không tải được danh sách kỳ học"))
+      }
+    }
+
+    fetchSemesters()
+  }, [selectedCourse])
+
+  useEffect(() => {
+    if (!pendingKyQuery || !semesters.length || selectedSemesterId) return
+
+    const target = semesters.find((item) =>
+      normalizeFilterValue(getSemesterLabel(item)) === normalizeFilterValue(pendingKyQuery)
+    )
+
+    if (!target) return
+
+    const id = itemId(target)
+    if (id) {
+      setSelectedSemesterId(id)
+      setPendingKyQuery("")
+    }
+  }, [pendingKyQuery, semesters, selectedSemesterId])
+
+  const itemId = (item: SemesterApiItem): string => String(item.semester_id ?? item.id ?? "")
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+
+    if (selectedCourse) params.set("khoa", selectedCourse)
+    else params.delete("khoa")
+
+    if (selectedClassLabel) params.set("lop", selectedClassLabel)
+    else params.delete("lop")
+
+    if (selectedSemesterLabel) params.set("ky", selectedSemesterLabel)
+    else params.delete("ky")
+
+    const next = params.toString()
+    const current = searchParams?.toString() ?? ""
+
+    if (next !== current) {
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }
+  }, [
+    selectedCourse,
+    selectedClassLabel,
+    selectedSemesterLabel,
+    pathname,
+    router,
+    searchParams,
+  ])
+
+  const hasRequiredFilters = Boolean(selectedSemesterId && selectedClassId)
+
+  useEffect(() => {
+    const fetchEligibility = async () => {
+      if (!hasRequiredFilters) {
+        setStudents([])
+        setEligibleStudentIds([])
+        setErrorMessage("")
+        setSuccessMessage("")
+        return
+      }
+
+      try {
+        setLoading(true)
+        setErrorMessage("")
+        setSuccessMessage("")
+
+        const comboKey = `${selectedClassId}__${selectedSemesterId}`
+        const params = {
+          class_id: Number(selectedClassId),
+          semester_id: Number(selectedSemesterId),
+        }
+
+        const eligibilityResponse = await api.get<GraduationEligibilityResponse>(
+          `/api/v1/graduation-eligibility/class/${selectedClassId}`,
+          { params }
+        )
+
+        const backendStatus = normalizeFilterValue(String(eligibilityResponse.data?.status || ""))
+        let dataSource = eligibilityResponse.data
+
+        if (backendStatus === "evaluated") {
+          const evaluatedMessage = String(eligibilityResponse.data?.message || "").trim()
+          if (evaluatedMessage) {
+            setSuccessMessage(evaluatedMessage)
+          }
+
+          setEvaluatedCombos((prev) => (prev.includes(comboKey) ? prev : [...prev, comboKey]))
+
+          const resultsResponse = await api.get<GraduationEligibilityResponse>(
+            `/api/v1/graduation-eligibility/class/${selectedClassId}/results`,
+            { params }
+          )
+          dataSource = resultsResponse.data
+        } else {
+          setEvaluatedCombos((prev) => prev.filter((item) => item !== comboKey))
+        }
+
+        const classInfo = dataSource?.class_info || {}
+        const studentsFromApi = Array.isArray(dataSource?.students) ? dataSource.students : []
+        const totalCertificates = Number(classInfo.sum_certificate ?? classInfo.total_certificate ?? 0)
+        const mappedStudents: XetTotNghiep[] = studentsFromApi.map((student, index) => {
+          const certificates = Number(student.sum_certificate ?? student.certificates ?? 0)
+          const normalizedStatus = toGraduationStatusLabel(student.graduation_status)
+
+          return {
+            id: Number(student.student_id ?? index + 1),
+            mssv: String(student.student_id ?? ""),
+            name: String(student.full_name || "-"),
+            class: String(student.class_name || classInfo.class_name || "-"),
+            year: selectedSemesterLabel,
+            course: String(classInfo.cohort_name || classInfo.cohort_id || "-"),
+            tcbb: formatProgress(student.required_credits_earned, classInfo.required_credits),
+            tctc: formatProgress(student.elective_credits_earned, classInfo.elective_credits),
+            totalCredits: formatProgress(student.total_credits_earned, classInfo.total_credits),
+            gpa: formatProgress(student.gpa, classInfo.gpa, 2),
+            ccdr: totalCertificates > 0 ? `${certificates}/${totalCertificates}` : String(certificates),
+            program: String(student.program_status || "-"),
+            status: normalizedStatus,
+          }
+        })
+
+        const eligibleIds = mappedStudents
+          .filter((student) => student.status === "Đạt")
+          .map((student) => Number(student.mssv))
+          .filter((id) => Number.isFinite(id) && id > 0)
+
+        setStudents(mappedStudents)
+        setEligibleStudentIds(eligibleIds)
+      } catch (error: any) {
+        setStudents([])
+        setEligibleStudentIds([])
+        setErrorMessage(extractBackendMessage(error, "Không tải được dữ liệu xét tốt nghiệp"))
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchEligibility()
+  }, [hasRequiredFilters, selectedClassId, selectedSemesterId, selectedSemesterLabel])
 
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.mssv.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student.name.toLowerCase().includes(searchQuery.toLowerCase())
     
-    const matchesYear = selectedYear === "all" || student.year === selectedYear
-    const matchesCourse = selectedCourse === "all" || student.course === selectedCourse
-    const matchesClass = selectedClass === "all" || student.class === selectedClass
+    const matchesYear = selectedSemesterId ? student.year === selectedSemesterLabel : true
+    const matchesCourse = !selectedCourse || student.course.includes(selectedCourse)
+    const matchesClass = selectedClassId ? student.class === selectedClassLabel : true
     
     return matchesSearch && matchesYear && matchesCourse && matchesClass
   })
+
+  const visibleStudents = hasRequiredFilters ? filteredStudents : []
+  const currentComboKey = hasRequiredFilters ? `${selectedClassId}__${selectedSemesterId}` : null
+  const isCurrentComboEvaluated = currentComboKey ? evaluatedCombos.includes(currentComboKey) : false
+
+  const handleConfirmEvaluate = async () => {
+    if (!selectedClassId || !selectedSemesterId) {
+      setErrorMessage("Vui lòng chọn lớp và kỳ trước khi xét tốt nghiệp")
+      setSuccessMessage("")
+      return
+    }
+
+    const semesterId = Number(selectedSemesterId)
+    const classId = Number(selectedClassId)
+
+    if (!Number.isFinite(semesterId) || !Number.isFinite(classId)) {
+      setErrorMessage("Thông tin lớp hoặc kỳ không hợp lệ")
+      setSuccessMessage("")
+      return
+    }
+
+    const studentIdsToSave = eligibleStudentIds
+
+    if (!studentIdsToSave.length) {
+      setErrorMessage("Không có sinh viên đủ điều kiện để lưu kết quả xét tốt nghiệp")
+      setSuccessMessage("")
+      setConfirmOpen(false)
+      return
+    }
+
+    try {
+      setSaving(true)
+      setErrorMessage("")
+      setSuccessMessage("")
+
+      const payload: GraduationSavePayload = {
+        semester_id: semesterId,
+        student_ids: studentIdsToSave,
+      }
+
+      const saveResponse = await api.post<GraduationSaveResponse>(
+        `/api/v1/graduation-eligibility/class/${classId}/save`,
+        payload
+      )
+      const saved = Number(saveResponse.data?.saved ?? 0)
+      const skipped = Number(saveResponse.data?.skipped ?? 0)
+      const backendMessage = String(saveResponse.data?.message ?? "").trim()
+
+      setSuccessMessage(
+        backendMessage || `Đã lưu ${saved} sinh viên, bỏ qua ${skipped} sinh viên.`
+      )
+
+      if (currentComboKey && !evaluatedCombos.includes(currentComboKey)) {
+        setEvaluatedCombos((prev) => [...prev, currentComboKey])
+      }
+      setConfirmOpen(false)
+    } catch (error: any) {
+      setSuccessMessage("")
+      setErrorMessage(extractBackendMessage(error, "Không lưu được kết quả xét tốt nghiệp"))
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <AppLayout showSearch={false}>
       <div className="h-full flex flex-col px-8 py-5 bg-slate-50/50">
         
-        {/* Header */}
+        {/* Breadcrumb Header */}
         <div className="mb-4">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Xét tốt nghiệp
+            Quản lý dữ liệu
+            <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">&gt; Xét tốt nghiệp</span>
           </h1>
         </div>
 
@@ -78,63 +609,134 @@ export default function XetTotNghiepPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               type="text"
-              placeholder="Nhập MSSV"
+              placeholder="Nhập MSSV..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 h-9 bg-white"
             />
           </div>
-          
-          {/* Filters */}
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex items-center gap-2">
+            {/* Khóa filter */}
+            <Select
+              value={selectedCourse}
+              onValueChange={(value) => {
+                setSelectedCourse(value)
+                setSelectedSemesterId("")
+                setSelectedClassId("")
+              }}
+            >
+              <SelectTrigger className="h-9 w-[120px] bg-white">
+                <SelectValue placeholder="Chọn khóa" />
+              </SelectTrigger>
+              <SelectContent>
+                {cohortOptions.map((cohort) => {
+                  const id = getCohortId(cohort)
+                  if (id === null) return null
+
+                  return (
+                    <SelectItem key={id} value={String(id)}>{getCohortLabel(cohort)}</SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+            {/* Lớp filter */}
+            <Select
+              value={selectedClassId}
+              onValueChange={(value) => {
+                if (!selectedCourse) {
+                  const found = classes.find((item) => String(item.class_id ?? item.id ?? "") === value)
+                  if (found?.cohort_id != null) {
+                    setSelectedCourse(String(found.cohort_id))
+                  }
+                }
+                setSelectedClassId(value)
+              }}
+            >
+              <SelectTrigger className="h-9 w-[140px] bg-white">
+                <SelectValue placeholder="Chọn lớp" />
+              </SelectTrigger>
+              <SelectContent>
+                {classOptions.map((item) => {
+                  const id = getClassId(item)
+                  if (id === null) return null
+                  const name = getClassName(item)
+
+                  return <SelectItem key={id} value={String(id)}>{name}</SelectItem>
+                })}
+              </SelectContent>
+            </Select>
             {/* Kỳ filter */}
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
+            <Select
+              value={selectedSemesterId}
+              onValueChange={setSelectedSemesterId}
+              disabled={!selectedCourse}
+            >
               <SelectTrigger className="h-9 w-[160px] bg-white">
                 <SelectValue placeholder="Chọn kỳ" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Kỳ 2/24-25</SelectItem>
-                <SelectItem value="Kỳ 2 - 2024 - 2025">Kỳ 2 - 2024 - 2025</SelectItem>
-                <SelectItem value="Kỳ 1 - 2024 - 2025">Kỳ 1 - 2024 - 2025</SelectItem>
-                <SelectItem value="Kỳ 2 - 2023 - 2024">Kỳ 2 - 2023 - 2024</SelectItem>
+                {semesters
+                  .filter((item) => Number.isFinite(item.semester_id ?? item.id))
+                  .map((item) => {
+                    const id = itemId(item)
+                    return (
+                      <SelectItem key={id} value={id}>{getSemesterLabel(item)}</SelectItem>
+                    )
+                  })}
               </SelectContent>
             </Select>
-
-            {/* Khóa filter */}
-            <Select value={selectedCourse} onValueChange={setSelectedCourse}>
-              <SelectTrigger className="h-9 w-[120px] bg-white">
-                <SelectValue placeholder="Khóa" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Khóa</SelectItem>
-                <SelectItem value="48K">48K</SelectItem>
-                <SelectItem value="49K">49K</SelectItem>
-                <SelectItem value="50K">50K</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Lớp filter */}
-            <Select value={selectedClass} onValueChange={setSelectedClass}>
-              <SelectTrigger className="h-9 w-[120px] bg-white">
-                <SelectValue placeholder="Lớp" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Lớp</SelectItem>
-                <SelectItem value="48K05">48K05</SelectItem>
-                <SelectItem value="48K14.1">48K14.1</SelectItem>
-                <SelectItem value="48K14.2">48K14.2</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Button className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm">
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button
+              className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm"
+              disabled={!hasRequiredFilters || visibleStudents.length === 0 || isCurrentComboEvaluated || saving}
+              onClick={() => setConfirmOpen(true)}
+            >
+              <GraduationCap className="h-4 w-4" />
+              {saving ? "Đang lưu..." : "Xét tốt nghiệp"}
+            </Button>
+            <Button
+              className="bg-white text-slate-700 border border-slate-200 hover:bg-[#06b6d4] hover:text-black h-9 gap-2 text-sm transition-colors shadow-none"
+              style={{ boxShadow: 'none' }}
+            >
               <Download className="h-4 w-4" />
               Mẫu
             </Button>
           </div>
         </div>
 
+        {loading && <p className="text-sm text-gray-600 mb-3">Đang tải dữ liệu xét tốt nghiệp...</p>}
+        {successMessage && <p className="text-sm text-emerald-700 mb-3">{successMessage}</p>}
+        {errorMessage && <p className="text-sm text-red-600 mb-3">{errorMessage}</p>}
+
         {/* Table */}
-        <XetTotNghiepTab students={filteredStudents} />
+        <XetTotNghiepTab students={visibleStudents} />
+
+        {/* Confirm Dialog */}
+        <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <DialogContent className="sm:max-w-[430px]">
+            <DialogHeader>
+              <DialogTitle>Xét tốt nghiệp</DialogTitle>
+            </DialogHeader>
+            <div className="py-2">
+              <p className="text-gray-600">
+                Bạn có chắc chắn muốn <span className="font-semibold">Xét tốt nghiệp</span> cho các sinh viên lớp <span className="font-semibold">{selectedClassLabel}</span> - <span className="font-semibold">{selectedSemesterLabel}</span> không?
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+                Hủy
+              </Button>
+              <Button
+                className="bg-[#167FFC] hover:bg-[#1470E3]"
+                onClick={handleConfirmEvaluate}
+                disabled={saving}
+              >
+                {saving ? "Đang lưu..." : "Có"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   )

@@ -3,9 +3,9 @@
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Loader2 } from "lucide-react"
 import { Student } from "../types"
 import { deleteStudent } from "../student.api"
-import { Loader2 } from "lucide-react"
 
 interface DeleteDialogProps {
   open: boolean
@@ -14,7 +14,46 @@ interface DeleteDialogProps {
   onSuccess?: () => void
 }
 
-export default function DeleteDialog({ open, onOpenChange, student }: DeleteDialogProps) {
+export default function DeleteDialog({ open, onOpenChange, student, onSuccess }: DeleteDialogProps) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  const handleDelete = async () => {
+    if (!student) return
+
+    try {
+      setLoading(true)
+      setError("")
+      await deleteStudent(student.id)
+      onOpenChange(false)
+
+      if (onSuccess) {
+        onSuccess()
+      } else {
+        window.location.reload()
+      }
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail
+      const message = err?.response?.data?.message
+
+      if (Array.isArray(detail)) {
+        const joined = detail
+          .map((item) => {
+            if (typeof item === "string") return item
+            if (item?.msg) return String(item.msg)
+            return ""
+          })
+          .filter(Boolean)
+          .join("; ")
+        setError(joined || "Không thể xóa sinh viên. Vui lòng thử lại.")
+      } else {
+        setError(detail || message || "Không thể xóa sinh viên. Vui lòng thử lại.")
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[350px]">
@@ -24,23 +63,23 @@ export default function DeleteDialog({ open, onOpenChange, student }: DeleteDial
         <div className="py-4">
           <p className="text-gray-600">Bạn có chắc chắn muốn <strong>Xóa</strong> sinh viên này khỏi hệ thống không?</p>
         </div>
-        {error && (
-          <div className="text-red-600 text-sm px-6">{error}</div>
-        )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Hủy
           </Button>
           <Button
             className="bg-[#167FFC] hover:bg-[#1470E3]"
-            onClick={async () => {
-              if (!student) return
-              await deleteStudent(student.id)
-              onOpenChange(false)
-              window.location.reload()
-            }}
+            onClick={handleDelete}
+            disabled={loading}
           >
-            Có
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Đang xóa...
+              </>
+            ) : (
+              "Có"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
