@@ -15,23 +15,23 @@ export interface User {
 }
 
 export interface UserCreateRequest {
-  fullName: string
+  username: string
   email: string
   password: string
-  role: string
-  assignedClasses?: string[]
+  role_id?: number
+  //assignedClasses?: string[]
 }
 
 export interface UserUpdateRequest {
   username?: string
   email?: string
   password?: string
-  role_id?: string
+  role_id?: number
   is_active?: boolean
 }
 
 export interface UserStatusUpdateRequest {
-  status: string
+  is_active: boolean
 }
 
 /**
@@ -44,6 +44,10 @@ export async function getUsers(params?: {
   role?: string
 }) {
   return api.get<User[]>("/api/v1/users", { params })
+}
+
+export async function getUserMe() {
+  return api.get<User>("/api/v1/users/me")
 }
 
 /**
@@ -60,6 +64,14 @@ export async function createUser(data: UserCreateRequest) {
   return api.post<User>("/api/v1/users", data)
 }
 
+export async function updateUserMe(data: UserUpdateRequest) {
+  return api.put<User>("/api/v1/users/me", data)
+}
+
+export async function updateUserMePassword(data: { current_password: string; new_password: string }) {
+  return api.post("/api/v1/users/me/password", data)
+}
+
 /**
  * Update user
  */
@@ -74,7 +86,7 @@ export async function updateUserStatus(
   userId: number,
   data: UserStatusUpdateRequest
 ) {
-  return api.put<User>(`/api/v1/users/${userId}/status`, data)
+  return api.patch<User>(`/api/v1/users/${userId}/status`, data)
 }
 
 /**

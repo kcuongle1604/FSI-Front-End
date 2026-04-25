@@ -24,7 +24,7 @@ import {
 export type Account = User
 
 // ================= MAP ROLE NAME -> ROLE_ID =================
-const mapRoleNameToId = (role: string) => {
+export function mapRoleNameToId(role: string) {
   switch (role) {
     case "Giáo vụ khoa":
       return 1
@@ -33,7 +33,7 @@ const mapRoleNameToId = (role: string) => {
     case "Giáo viên chủ nhiệm":
       return 3
     default:
-      return null
+      return undefined
   }
 }
 
@@ -125,6 +125,7 @@ export default function QuanLyNguoiDungPage() {
 
       setOpenEditDialog(false)
       fetchUsers()
+      setError(null)
     } catch (err) {
       setError("Cập nhật người dùng thất bại")
       console.error(err)
@@ -148,7 +149,7 @@ export default function QuanLyNguoiDungPage() {
     if (!selectedAccount) return
 
     try {
-      await updateUserStatus(selectedAccount.user_id, { status: newStatus })
+      await updateUserStatus(selectedAccount.user_id, { is_active: newStatus === "Hoạt động" })
 
       setUserStatuses((prev) => ({
         ...prev,
@@ -162,6 +163,8 @@ export default function QuanLyNguoiDungPage() {
             : u
         )
       )
+
+      setError(null)
     } catch (err) {
       setError("Cập nhật trạng thái thất bại")
       console.error(err)

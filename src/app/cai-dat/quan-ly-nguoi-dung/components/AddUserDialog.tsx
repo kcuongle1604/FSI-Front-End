@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { MultiSelect } from "@/components/ui/multi-select"
+import { createUser } from "@/lib/user.api"
+import { mapRoleNameToId } from "../page"
 
 const CLASSES = ["48K05", "48K14.1", "48K14.2", "48K21.1", "48K21.2"]
 
@@ -81,27 +83,16 @@ export function AddUserDialog({
     try {
       setLoading(true)
 
-      const res = await fetch("http://127.0.0.1:8000/api/v1/users/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-        },
-        body: JSON.stringify({
-          username: formData.fullName,
-          email: formData.email,
-          full_name: formData.fullName,
-          password: formData.password,
-          role: formData.role,
-          classes:
-            formData.role === "Giáo viên chủ nhiệm"
-              ? formData.assignClasses
-              : [],
-        }),
+      const res = await createUser({
+        username: formData.fullName,
+        email: formData.email,
+        password: formData.password,
+        role_id: mapRoleNameToId(formData.role),
+        //assignedClasses: formData.assignClasses,
       })
 
-      if (!res.ok) {
-        const text = await res.text()
+      if (!res.status.toString().startsWith("2")) {
+        const text = res.statusText
         throw new Error(text || "Tạo người dùng thất bại")
       }
 
@@ -263,3 +254,4 @@ export function AddUserDialog({
     </Dialog>
   )
 }
+
