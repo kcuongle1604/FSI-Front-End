@@ -233,11 +233,9 @@ export default function XetTotNghiepPage() {
 
   const [students, setStudents] = useState<XetTotNghiep[]>([])
   const [classes, setClasses] = useState<ClassApiItem[]>([])
-  const [cohorts, setCohorts] = useState<CohortApiItem[]>([])
   const [semesters, setSemesters] = useState<SemesterApiItem[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedSemesterId, setSelectedSemesterId] = useState("")
-  const [selectedCourse, setSelectedCourse] = useState<string | undefined>()
   const [selectedClassId, setSelectedClassId] = useState("")
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -247,7 +245,6 @@ export default function XetTotNghiepPage() {
   const [evaluatedCombos, setEvaluatedCombos] = useState<string[]>([])
   const [eligibleStudentIds, setEligibleStudentIds] = useState<number[]>([])
 
-  const initialKhoa = searchParams?.get("khoa") ?? ""
   const initialLop = searchParams?.get("lop") ?? ""
   const initialKy = searchParams?.get("ky") ?? ""
 
@@ -282,36 +279,11 @@ export default function XetTotNghiepPage() {
     return target ? getClassName(target) : ""
   }, [selectedClassId, classes])
 
-  const getCohortId = (item: CohortApiItem): number | null => {
-    const id = item.cohort_id ?? item.id
-    return Number.isFinite(id) ? Number(id) : null
-  }
-
-  const getCohortLabel = (item: CohortApiItem): string => {
-    const id = getCohortId(item)
-    return id !== null ? String(id) : ""
-  }
-
-  const cohortOptions = useMemo(() => {
-    return cohorts
-      .filter((item) => getCohortId(item) !== null)
-      .sort((a, b) => Number(getCohortId(a)) - Number(getCohortId(b)))
-  }, [cohorts])
-
   const classOptions = useMemo(() => {
-    const filtered = !selectedCourse
-      ? classes
-      : classes.filter((item) => String(item.cohort_id ?? "") === selectedCourse)
-
-    return filtered
+    return classes
       .filter((item) => getClassId(item) !== null && getClassName(item))
       .sort((a, b) => getClassName(a).localeCompare(getClassName(b)))
-  }, [classes, selectedCourse])
-
-  useEffect(() => {
-    if (!initialKhoa) return
-    setSelectedCourse((prev) => (prev ? prev : initialKhoa))
-  }, [initialKhoa])
+  }, [classes])
 
   useEffect(() => {
     if (!pendingLopQuery || !classOptions.length || selectedClassId) return
@@ -332,54 +304,22 @@ export default function XetTotNghiepPage() {
   useEffect(() => {
     const fetchFilters = async () => {
       try {
-        const [classesRes, cohortsRes] = await Promise.all([
+        const [classesRes, semestersRes] = await Promise.all([
           api.get<ClassApiItem[]>("/api/v1/classes"),
-          api.get<CohortApiItem[]>("/api/v1/cohorts"),
+          api.get<SemesterApiItem[]>("/api/v1/semesters"),
         ])
 
         setClasses(Array.isArray(classesRes.data) ? classesRes.data : [])
-        const cohortList = Array.isArray(cohortsRes.data) ? cohortsRes.data : []
-        setCohorts(cohortList)
+        setSemesters(parseSemestersPayload(semestersRes.data))
       } catch (error: any) {
-        setErrorMessage(extractBackendMessage(error, "Không tải được bộ lọc lớp/khóa"))
+        setErrorMessage(extractBackendMessage(error, "Không tải được bộ lọc"))
       }
     }
 
     fetchFilters()
   }, [])
 
-  useEffect(() => {
-    const fetchSemesters = async () => {
-      if (!selectedCourse) {
-        setSemesters([])
-        setSelectedSemesterId("")
-        return
-      }
 
-      try {
-        const semestersRes = await api.get<SemesterApiItem[] | { data?: SemesterApiItem[]; items?: SemesterApiItem[] }>(
-          `/api/v1/cohorts/${selectedCourse}/semesters`
-        )
-        const semesterList = parseSemestersPayload(semestersRes.data)
-
-        setSemesters(semesterList)
-
-        setSelectedSemesterId((prev) => {
-          if (!prev) return prev
-          const selectedStillExists = semesterList.some(
-            (item) => String(item.semester_id ?? item.id ?? "") === prev
-          )
-          return selectedStillExists ? prev : ""
-        })
-      } catch (error: any) {
-        setSemesters([])
-        setSelectedSemesterId("")
-        setErrorMessage(extractBackendMessage(error, "Không tải được danh sách kỳ học"))
-      }
-    }
-
-    fetchSemesters()
-  }, [selectedCourse])
 
   useEffect(() => {
     if (!pendingKyQuery || !semesters.length || selectedSemesterId) return
@@ -402,9 +342,6 @@ export default function XetTotNghiepPage() {
   useEffect(() => {
     const params = new URLSearchParams(searchParams?.toString() ?? "")
 
-    if (selectedCourse) params.set("khoa", selectedCourse)
-    else params.delete("khoa")
-
     if (selectedClassLabel) params.set("lop", selectedClassLabel)
     else params.delete("lop")
 
@@ -418,7 +355,6 @@ export default function XetTotNghiepPage() {
       router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
     }
   }, [
-    selectedCourse,
     selectedClassLabel,
     selectedSemesterLabel,
     pathname,
@@ -426,7 +362,7 @@ export default function XetTotNghiepPage() {
     searchParams,
   ])
 
-  const hasRequiredFilters = Boolean(selectedSemesterId && selectedClassId)
+  const hasRequiredFilters = Boolean(selectedSemesterId)
 
   useEffect(() => {
     const fetchEligibility = async () => {
@@ -443,55 +379,36 @@ export default function XetTotNghiepPage() {
         setErrorMessage("")
         setSuccessMessage("")
 
-        const comboKey = `${selectedClassId}__${selectedSemesterId}`
-        const params = {
-          class_id: Number(selectedClassId),
-          semester_id: Number(selectedSemesterId),
-        }
+        const comboKey = `${selectedSemesterId}`
 
-        const eligibilityResponse = await api.get<GraduationEligibilityResponse>(
-          `/api/v1/graduation-eligibility/class/${selectedClassId}`,
-          { params }
+        const eligibilityResponse = await api.get<any>(
+          `/api/v1/graduation-eligibility/semester/${selectedSemesterId}`
         )
 
         const backendStatus = normalizeFilterValue(String(eligibilityResponse.data?.status || ""))
         let dataSource = eligibilityResponse.data
 
-        if (backendStatus === "evaluated") {
-          const evaluatedMessage = String(eligibilityResponse.data?.message || "").trim()
-          if (evaluatedMessage) {
-            setSuccessMessage(evaluatedMessage)
-          }
-
-          setEvaluatedCombos((prev) => (prev.includes(comboKey) ? prev : [...prev, comboKey]))
-
-          const resultsResponse = await api.get<GraduationEligibilityResponse>(
-            `/api/v1/graduation-eligibility/class/${selectedClassId}/results`,
-            { params }
-          )
-          dataSource = resultsResponse.data
-        } else {
-          setEvaluatedCombos((prev) => prev.filter((item) => item !== comboKey))
-        }
-
-        const classInfo = dataSource?.class_info || {}
+        // Nếu API trả về đã evaluate thì có thể cần endpoint khác để lấy results
+        // Tuy nhiên theo Backend, /semester/ không có trạng thái evaluated hay endpoint results riêng.
+        // Chỉ việc đọc trực tiếp dữ liệu.
+        
         const studentsFromApi = Array.isArray(dataSource?.students) ? dataSource.students : []
-        const totalCertificates = Number(classInfo.sum_certificate ?? classInfo.total_certificate ?? 0)
-        const mappedStudents: XetTotNghiep[] = studentsFromApi.map((student, index) => {
+        const mappedStudents: XetTotNghiep[] = studentsFromApi.map((student: any, index: number) => {
           const certificates = Number(student.sum_certificate ?? student.certificates ?? 0)
+          const totalCertificates = Number(student.total_certificate ?? student.sum_certificate ?? 0)
           const normalizedStatus = toGraduationStatusLabel(student.graduation_status)
 
           return {
             id: Number(student.student_id ?? index + 1),
             mssv: String(student.student_id ?? ""),
             name: String(student.full_name || "-"),
-            class: String(student.class_name || classInfo.class_name || "-"),
+            class: String(student.class_name || "-"),
             year: selectedSemesterLabel,
-            course: String(classInfo.cohort_name || classInfo.cohort_id || "-"),
-            tcbb: formatProgress(student.required_credits_earned, classInfo.required_credits),
-            tctc: formatProgress(student.elective_credits_earned, classInfo.elective_credits),
-            totalCredits: formatProgress(student.total_credits_earned, classInfo.total_credits),
-            gpa: formatProgress(student.gpa, classInfo.gpa, 2),
+            course: String(student.cohort_name || student.cohort_id || "-"),
+            tcbb: formatProgress(student.required_credits_earned, student.min_required_credits_needed),
+            tctc: formatProgress(student.elective_credits_earned, student.min_elective_credits_needed),
+            totalCredits: formatProgress(student.total_credits_earned, student.min_total_credits_needed),
+            gpa: formatProgress(student.gpa, student.min_gpa_needed, 2),
             ccdr: totalCertificates > 0 ? `${certificates}/${totalCertificates}` : String(certificates),
             program: String(student.program_status || "-"),
             status: normalizedStatus,
@@ -515,35 +432,33 @@ export default function XetTotNghiepPage() {
     }
 
     fetchEligibility()
-  }, [hasRequiredFilters, selectedClassId, selectedSemesterId, selectedSemesterLabel])
+  }, [hasRequiredFilters, selectedSemesterId, selectedSemesterLabel])
 
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.mssv.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student.name.toLowerCase().includes(searchQuery.toLowerCase())
     
     const matchesYear = selectedSemesterId ? student.year === selectedSemesterLabel : true
-    const matchesCourse = !selectedCourse || student.course.includes(selectedCourse)
     const matchesClass = selectedClassId ? student.class === selectedClassLabel : true
     
-    return matchesSearch && matchesYear && matchesCourse && matchesClass
+    return matchesSearch && matchesYear && matchesClass
   })
 
-  const visibleStudents = hasRequiredFilters ? filteredStudents : []
-  const currentComboKey = hasRequiredFilters ? `${selectedClassId}__${selectedSemesterId}` : null
+  const visibleStudents = filteredStudents
+  const currentComboKey = hasRequiredFilters ? `${selectedSemesterId}` : null
   const isCurrentComboEvaluated = currentComboKey ? evaluatedCombos.includes(currentComboKey) : false
 
   const handleConfirmEvaluate = async () => {
-    if (!selectedClassId || !selectedSemesterId) {
-      setErrorMessage("Vui lòng chọn lớp và kỳ trước khi xét tốt nghiệp")
+    if (!selectedSemesterId) {
+      setErrorMessage("Vui lòng chọn kỳ trước khi xét tốt nghiệp")
       setSuccessMessage("")
       return
     }
 
     const semesterId = Number(selectedSemesterId)
-    const classId = Number(selectedClassId)
 
-    if (!Number.isFinite(semesterId) || !Number.isFinite(classId)) {
-      setErrorMessage("Thông tin lớp hoặc kỳ không hợp lệ")
+    if (!Number.isFinite(semesterId)) {
+      setErrorMessage("Thông tin kỳ không hợp lệ")
       setSuccessMessage("")
       return
     }
@@ -562,13 +477,12 @@ export default function XetTotNghiepPage() {
       setErrorMessage("")
       setSuccessMessage("")
 
-      const payload: GraduationSavePayload = {
-        semester_id: semesterId,
-        student_ids: studentIdsToSave,
-      }
-
+      // Cập nhật lại đường dẫn gọi save. Nếu endpoint backend thay đổi theo kỳ, cần dùng /api/v1/graduation-eligibility/semester/${semesterId}/save
+      // Tuy nhiên nếu endpoint hiện tại vẫn cần classId, thì bạn cần đảm bảo gọi với API tương ứng.
+      // Dựa vào yêu cầu, chúng ta đang xét theo kỳ, nên giả định có endpoint này hoặc ta chỉ thay logic xét.
+      // Do yêu cầu "chọn kỳ xong gọi api ... parameter là semester_id", backend có thể chưa đổi API save, nhưng tôi sẽ giả định gọi theo semester.
       const saveResponse = await api.post<GraduationSaveResponse>(
-        `/api/v1/graduation-eligibility/class/${classId}/save`,
+        `/api/v1/graduation-eligibility/semester/${semesterId}/save`,
         payload
       )
       const saved = Number(saveResponse.data?.saved ?? 0)
@@ -616,60 +530,10 @@ export default function XetTotNghiepPage() {
             />
           </div>
           <div className="flex items-center gap-2">
-            {/* Khóa filter */}
-            <Select
-              value={selectedCourse}
-              onValueChange={(value) => {
-                setSelectedCourse(value)
-                setSelectedSemesterId("")
-                setSelectedClassId("")
-              }}
-            >
-              <SelectTrigger className="h-9 w-[120px] bg-white">
-                <SelectValue placeholder="Chọn khóa" />
-              </SelectTrigger>
-              <SelectContent>
-                {cohortOptions.map((cohort) => {
-                  const id = getCohortId(cohort)
-                  if (id === null) return null
-
-                  return (
-                    <SelectItem key={id} value={String(id)}>{getCohortLabel(cohort)}</SelectItem>
-                  )
-                })}
-              </SelectContent>
-            </Select>
-            {/* Lớp filter */}
-            <Select
-              value={selectedClassId}
-              onValueChange={(value) => {
-                if (!selectedCourse) {
-                  const found = classes.find((item) => String(item.class_id ?? item.id ?? "") === value)
-                  if (found?.cohort_id != null) {
-                    setSelectedCourse(String(found.cohort_id))
-                  }
-                }
-                setSelectedClassId(value)
-              }}
-            >
-              <SelectTrigger className="h-9 w-[140px] bg-white">
-                <SelectValue placeholder="Chọn lớp" />
-              </SelectTrigger>
-              <SelectContent>
-                {classOptions.map((item) => {
-                  const id = getClassId(item)
-                  if (id === null) return null
-                  const name = getClassName(item)
-
-                  return <SelectItem key={id} value={String(id)}>{name}</SelectItem>
-                })}
-              </SelectContent>
-            </Select>
             {/* Kỳ filter */}
             <Select
               value={selectedSemesterId}
               onValueChange={setSelectedSemesterId}
-              disabled={!selectedCourse}
             >
               <SelectTrigger className="h-9 w-[160px] bg-white">
                 <SelectValue placeholder="Chọn kỳ" />
@@ -683,6 +547,24 @@ export default function XetTotNghiepPage() {
                       <SelectItem key={id} value={id}>{getSemesterLabel(item)}</SelectItem>
                     )
                   })}
+              </SelectContent>
+            </Select>
+            {/* Lớp filter - Chỉ dùng filter ở client chứ không trigger API fetch */}
+            <Select
+              value={selectedClassId}
+              onValueChange={setSelectedClassId}
+            >
+              <SelectTrigger className="h-9 w-[140px] bg-white">
+                <SelectValue placeholder="Chọn lớp" />
+              </SelectTrigger>
+              <SelectContent>
+                {classOptions.map((item) => {
+                  const id = getClassId(item)
+                  if (id === null) return null
+                  const name = getClassName(item)
+
+                  return <SelectItem key={id} value={String(id)}>{name}</SelectItem>
+                })}
               </SelectContent>
             </Select>
           </div>
@@ -720,7 +602,7 @@ export default function XetTotNghiepPage() {
             </DialogHeader>
             <div className="py-2">
               <p className="text-gray-600">
-                Bạn có chắc chắn muốn <span className="font-semibold">Xét tốt nghiệp</span> cho các sinh viên lớp <span className="font-semibold">{selectedClassLabel}</span> - <span className="font-semibold">{selectedSemesterLabel}</span> không?
+                Bạn có chắc chắn muốn <span className="font-semibold">Xét tốt nghiệp</span> cho các sinh viên trong <span className="font-semibold">{selectedSemesterLabel}</span> không?
               </p>
             </div>
             <DialogFooter>

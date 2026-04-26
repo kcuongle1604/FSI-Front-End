@@ -1,5 +1,6 @@
 export interface Certificate {
   id: number
+  studentId?: number
   mssv: string
   lop: string
   hoLot: string

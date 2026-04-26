@@ -61,7 +61,7 @@ export interface ScoreMatrixResponse {
  * Request body for creating a score
  */
 export interface ScoreCreateRequest {
-    semester_id: number
+    upload_date: string
     student_id: number
     subject_id: string
     score_4: string

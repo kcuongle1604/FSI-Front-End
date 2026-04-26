@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -11,11 +11,10 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, X } from "lucide-react"
 import type { ScoreCell, StudentScore } from "../types"
-import { createScore, getAllSubjects, getSemesters, getSemestersByCohort, updateScore } from "../score.api"
-import type { Semester, StudentProgramScoreSubject } from "../score.api"
+import { createScore, getAllSubjects, updateScore } from "../score.api"
+import type { StudentProgramScoreSubject } from "../score.api"
 import { getStudents } from "../../sinh-vien/student.api"
 import type { StudentPublic } from "../../sinh-vien/types"
 
@@ -58,6 +57,12 @@ function extractBackendMessage(error: any, fallback: string): string {
   return fallback
 }
 
+function getTodayUploadDate(): string {
+  const now = new Date()
+  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
+  return localDate.toISOString().split("T")[0]
+}
+
 export default function ScoreFormDialog({
   open,
   onOpenChange,
@@ -65,7 +70,6 @@ export default function ScoreFormDialog({
   studentOptions,
   courseOptions,
   classId,
-  classCohortId,
   onSaveSuccess,
 }: ScoreFormDialogProps) {
   const isEdit = !!student
@@ -73,11 +77,6 @@ export default function ScoreFormDialog({
   const [score, setScore] = useState("")
   const [formError, setFormError] = useState("")
   const [saving, setSaving] = useState(false)
-
-  const [semesters, setSemesters] = useState<Semester[]>([])
-  const [selectedSemesterId, setSelectedSemesterId] = useState("")
-  const [loadingSemesters, setLoadingSemesters] = useState(false)
-  const [derivedCohortId, setDerivedCohortId] = useState<number | null>(null)
 
   const [selectedStudent, setSelectedStudent] = useState<StudentScore | null>(null)
   const [studentLookupOptions, setStudentLookupOptions] = useState<StudentScore[]>([])
@@ -91,7 +90,6 @@ export default function ScoreFormDialog({
   const [subjectOptions, setSubjectOptions] = useState<SubjectOption[]>([])
   const [loadingSubjects, setLoadingSubjects] = useState(false)
   const [autoFilledScore, setAutoFilledScore] = useState(false)
-  const lastSemesterFetchKeyRef = useRef("")
 
   const selectedCourseLabel =
     subjectOptions.find((option) => option.id === selectedCourse)?.displayLabel || selectedCourse
@@ -206,39 +204,7 @@ export default function ScoreFormDialog({
     return selectedStudent?.scores || student?.scores || {}
   }
 
-  const getSemesterLabel = (semester: Semester): string => {
-    return (
-      semester.semester_name ||
-      semester.name ||
-      [semester.term, semester.academic_year].filter(Boolean).join(" - ") ||
-      semester.code ||
-      `Kỳ #${semester.id ?? semester.semester_id ?? "N/A"}`
-    )
-  }
 
-  const getSemesterId = (semester: Semester): number | null => {
-    const rawId = semester.id ?? semester.semester_id
-    if (typeof rawId !== "number" || Number.isNaN(rawId)) {
-      return null
-    }
-    return rawId
-  }
-
-  const getCohortIdFromClassName = (className: string): number | null => {
-    const normalized = className.trim()
-    if (!normalized) return null
-
-    const matched = normalized.match(/\d{2}/)
-    if (!matched) return null
-
-    const cohortId = Number(matched[0])
-    return Number.isFinite(cohortId) ? cohortId : null
-  }
-
-  const toFiniteNumber = (value: unknown): number | null => {
-    const numeric = Number(value)
-    return Number.isFinite(numeric) ? numeric : null
-  }
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -272,63 +238,7 @@ export default function ScoreFormDialog({
     fetchStudents()
   }, [open, isEdit, classId, studentOptions])
 
-  useEffect(() => {
-    const fetchKey = `${open}|${selectedStudent?.student_id ?? ""}|${classCohortId ?? ""}`
-    if (lastSemesterFetchKeyRef.current === fetchKey) {
-      return
-    }
-    lastSemesterFetchKeyRef.current = fetchKey
 
-    const fetchSemestersByStudent = async () => {
-      if (!open || !selectedStudent) {
-        setSemesters([])
-        setSelectedSemesterId("")
-        setDerivedCohortId(null)
-        return
-      }
-
-      const cohortId =
-        toFiniteNumber(classCohortId) ?? getCohortIdFromClassName(selectedStudent.class_name || "")
-      setDerivedCohortId(cohortId)
-      setSelectedSemesterId("")
-
-      try {
-        setLoadingSemesters(true)
-        const res = cohortId ? await getSemestersByCohort(cohortId) : await getSemesters({ skip: 0, limit: 100 })
-        const payload = res.data as Semester[] | { data?: Semester[]; items?: Semester[] }
-        const list = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload?.data)
-            ? payload.data
-            : Array.isArray(payload?.items)
-              ? payload.items
-              : []
-
-        const normalizedSemesters = list.filter((semester) => getSemesterId(semester) !== null)
-        setSemesters(normalizedSemesters)
-        if (isEdit && normalizedSemesters.length > 0) {
-          const firstSemesterId = getSemesterId(normalizedSemesters[0])
-          if (firstSemesterId !== null) {
-            setSelectedSemesterId(String(firstSemesterId))
-          }
-        }
-        if (normalizedSemesters.length === 0) {
-          setFormError(
-            cohortId ? `Không có kỳ học cho khóa ${cohortId}.` : "Không có kỳ học khả dụng."
-          )
-        } else {
-          setFormError("")
-        }
-      } catch (error: any) {
-        setSemesters([])
-        setFormError(extractBackendMessage(error, "Không tải được danh sách kỳ học theo khóa."))
-      } finally {
-        setLoadingSemesters(false)
-      }
-    }
-
-    fetchSemestersByStudent()
-  })
 
   useEffect(() => {
     const fetchSubjects = async () => {
@@ -440,8 +350,6 @@ export default function ScoreFormDialog({
     setAutoFilledScore(false)
 
     setScore("")
-    setSelectedSemesterId("")
-    setDerivedCohortId(null)
     setFormError("")
     setSaving(false)
   }, [student, open])
@@ -451,10 +359,6 @@ export default function ScoreFormDialog({
   }
 
   const handleSave = async () => {
-    if (!isEdit && !selectedSemesterId) {
-      setFormError("Vui lòng chọn kỳ học.")
-      return
-    }
     if (!selectedStudent) {
       setFormError("Vui lòng chọn sinh viên.")
       return
@@ -494,15 +398,8 @@ export default function ScoreFormDialog({
           score_4: normalizedScore,
         })
       } else {
-        const fallbackSemesterId = semesters.length > 0 ? getSemesterId(semesters[0]) : null
-        const semesterId = Number(selectedSemesterId || (fallbackSemesterId !== null ? String(fallbackSemesterId) : ""))
-        if (!Number.isFinite(semesterId)) {
-          setFormError("Không xác định được kỳ học để lưu điểm.")
-          return
-        }
-
         await createScore({
-          semester_id: semesterId,
+          upload_date: getTodayUploadDate(),
           student_id: selectedStudent.student_id,
           subject_id: selectedCourse,
           score_4: normalizedScore,
@@ -628,41 +525,6 @@ export default function ScoreFormDialog({
               </p>
             )}
           </div>
-
-          {!isEdit && (
-            <div className="grid gap-2">
-              <Label>
-                Kỳ học <span className="text-red-500">*</span>
-              </Label>
-              <Select value={selectedSemesterId} onValueChange={setSelectedSemesterId} disabled={!selectedStudent || loadingSemesters}>
-                <SelectTrigger className="bg-white">
-                  <SelectValue
-                    placeholder={
-                      !selectedStudent
-                        ? "Chọn sinh viên trước"
-                        : loadingSemesters
-                          ? "Đang tải kỳ học theo khóa..."
-                          : !derivedCohortId
-                            ? "Chọn kỳ học"
-                            : `Chọn kỳ học của khóa ${derivedCohortId}`
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {semesters.map((semester) => {
-                    const semesterId = getSemesterId(semester)
-                    if (semesterId === null) return null
-
-                    return (
-                      <SelectItem key={semesterId} value={String(semesterId)}>
-                        {getSemesterLabel(semester)}
-                      </SelectItem>
-                    )
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           <div className="grid gap-2 relative">
             <Label>

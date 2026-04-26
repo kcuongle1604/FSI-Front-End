@@ -31,7 +31,7 @@ export type ExemptCertificate = {
   types: string[];
   batches: string[];
   majors: string[];
-  exemptionPairs?: Array<{ cohort_id: number; major_id: number }>;
+  exemptionPairs?: Array<{ cohort_id: number; major_id: string }>;
 };
 
 const certificates: Certificate[] = [
@@ -60,7 +60,7 @@ type CertificateRelationApiItem = {
   certificate_name?: string;
   cohort_id?: number;
   cohort_name?: string;
-  major_id?: number;
+  major_id?: string;
   major_name?: string;
 };
 
@@ -136,7 +136,7 @@ export default function QuanLyChungChiPage() {
 
   const mapApiCertificate = (item: CertificateApiItem, index: number): Certificate => {
     const batchesFromCohorts = Array.isArray(item.cohorts)
-      ? item.cohorts.map((c) => c?.name || String(c?.cohort_id ?? "")).filter(Boolean)
+      ? item.cohorts.map((c) => String(c?.cohort_id ?? c?.name ?? "")).filter(Boolean)
       : [];
     const batchesFromIds = Array.isArray(item.cohort_ids)
       ? item.cohort_ids.map((id) => String(id))
@@ -175,7 +175,7 @@ export default function QuanLyChungChiPage() {
             const detailBatches = Array.from(
               new Set(
                 detailRows
-                  .map((row) => row.cohort_name?.trim() || (row.cohort_id != null ? String(row.cohort_id) : ""))
+                .map((row) => (row.cohort_id != null ? String(row.cohort_id) : row.cohort_name?.trim() || ""))
                   .filter(Boolean)
               )
             );
@@ -226,7 +226,7 @@ export default function QuanLyChungChiPage() {
             const batches = Array.from(
               new Set(
                 rows
-                  .map((row) => row.cohort_name?.trim() || (row.cohort_id != null ? String(row.cohort_id) : ""))
+                .map((row) => (row.cohort_id != null ? String(row.cohort_id) : row.cohort_name?.trim() || ""))
                   .filter(Boolean)
               )
             );
@@ -244,15 +244,15 @@ export default function QuanLyChungChiPage() {
                 rows
                   .map((row) => {
                     const cohortId = Number(row.cohort_id);
-                    const majorId = Number(row.major_id);
-                    if (!Number.isFinite(cohortId) || !Number.isFinite(majorId)) return null;
-                    return `${cohortId}-${majorId}`;
+                    const majorId = row.major_id != null ? String(row.major_id) : "";
+                    if (!Number.isFinite(cohortId) || !majorId) return null;
+                    return `${cohortId}::${majorId}`;
                   })
                   .filter((value): value is string => !!value)
               )
             ).map((value) => {
-              const [cohortId, majorId] = value.split("-").map(Number);
-              return { cohort_id: cohortId, major_id: majorId };
+              const [cohortId, majorId] = value.split("::");
+              return { cohort_id: Number(cohortId), major_id: majorId };
             });
 
             return {
@@ -342,15 +342,15 @@ export default function QuanLyChungChiPage() {
             rows
               .map((row) => {
                 const cohortId = Number(row.cohort_id);
-                const majorId = Number(row.major_id);
-                if (!Number.isFinite(cohortId) || !Number.isFinite(majorId)) return null;
-                return `${cohortId}-${majorId}`;
+                const majorId = row.major_id != null ? String(row.major_id) : "";
+                if (!Number.isFinite(cohortId) || !majorId) return null;
+                return `${cohortId}::${majorId}`;
               })
               .filter((value): value is string => Boolean(value))
           )
         ).map((value) => {
-          const [cohortId, majorId] = value.split("-").map(Number);
-          return { cohort_id: cohortId, major_id: majorId };
+          const [cohortId, majorId] = value.split("::");
+          return { cohort_id: Number(cohortId), major_id: majorId };
         });
       } catch {
         return [] as Array<{ cohort_id: number; major_id: number }>;
@@ -359,7 +359,7 @@ export default function QuanLyChungChiPage() {
 
     const deleteRelationPairs = async (
       relation: "applications" | "exemptions",
-      pairs: Array<{ cohort_id: number; major_id: number }>
+      pairs: Array<{ cohort_id: number; major_id: string }>
     ) => {
       if (pairs.length === 0) return;
 

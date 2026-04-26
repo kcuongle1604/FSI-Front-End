@@ -120,7 +120,7 @@ export async function getTrainingPrograms() {
 }
 
 export interface TrainingProgramPayload {
-  major_id: number
+  major_id: string
   description?: string
   cohort_ids: number[]
 }
@@ -141,7 +141,7 @@ export interface UpdateSubjectPayload {
 
 export interface SubjectTrainingProgramItem {
   training_program_id: number
-  major_id: number
+  major_id: string
   major_name: string
   description?: string
   cohort_ids?: number[]

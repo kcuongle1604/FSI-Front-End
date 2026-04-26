@@ -15,7 +15,7 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select"
-import { getSemesters, importStudents, importStudentCertificatesCsvBySemester, importStudentCertificatesHtml } from "../student.api"
+import { importStudents, importStudentCertificatesCsvBySemester, importStudentCertificatesHtml } from "../student.api"
 import type { ImportAnalysisResponse, ImportExecutionResponse, ImportError, ColumnMapping } from "../types"
 
 interface ImportTypeOption {
@@ -23,20 +23,7 @@ interface ImportTypeOption {
   label: string
 }
 
-type SemesterApiItem = {
-  id?: number
-  semester_id?: number
-  name?: string
-  semester_name?: string
-  term?: string
-  academic_year?: string
-  code?: string
-}
 
-type SemesterOption = {
-  value: string
-  label: string
-}
 
 interface ImportDialogProps {
   open: boolean
@@ -48,6 +35,12 @@ interface ImportDialogProps {
   certificateImportFormat?: 'html' | 'csv'
   uploadTitle?: string
   uploadDescription?: string
+}
+
+function getTodayUploadDate(): string {
+  const now = new Date()
+  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
+  return localDate.toISOString().split("T")[0]
 }
 
 const INITIAL_COLUMN_MAPPINGS: Record<string, string> = {
@@ -86,9 +79,6 @@ export default function ImportDialog({
     importTypeOptions && importTypeOptions.length > 0 ? importTypeOptions[0].value : ""
   )
   const [targetClass, setTargetClass] = useState<string>("")
-  const [semesters, setSemesters] = useState<SemesterOption[]>([])
-  const [selectedSemesterId, setSelectedSemesterId] = useState<string>("")
-  const [loadingSemesters, setLoadingSemesters] = useState(false)
 
   const [columnMappings, setColumnMappings] = useState<Record<string, string>>(INITIAL_COLUMN_MAPPINGS)
 
@@ -159,58 +149,7 @@ export default function ImportDialog({
   const hasUnmappedRequired = unmappedRequiredFields.length > 0
   const allMapped = mappingFields.every((field) => !!columnMappings[field.key])
 
-  const getSemesterId = (item: SemesterApiItem): number | null => {
-    const raw = item.id ?? item.semester_id
-    const id = Number(raw)
-    return Number.isFinite(id) ? id : null
-  }
 
-  const getSemesterLabel = (item: SemesterApiItem): string => {
-    return (
-      item.semester_name ||
-      item.name ||
-      [item.term, item.academic_year].filter(Boolean).join(" - ") ||
-      item.code ||
-      `Kỳ #${item.semester_id ?? item.id ?? ""}`
-    )
-  }
-
-  useEffect(() => {
-    if (!open || !isCertificateCsvImport) return
-
-    const fetchSemesters = async () => {
-      try {
-        setLoadingSemesters(true)
-        const res = await getSemesters({ skip: 0, limit: 100 })
-        const payload = res.data as SemesterApiItem[] | { data?: SemesterApiItem[]; items?: SemesterApiItem[] }
-        const list = Array.isArray(payload) ? payload : payload.data || payload.items || []
-        const normalized = (Array.isArray(list) ? list : [])
-          .map((item) => {
-            const id = getSemesterId(item)
-            if (id === null) return null
-            return { value: String(id), label: getSemesterLabel(item) }
-          })
-          .filter((item): item is SemesterOption => item !== null)
-
-        setSemesters(normalized)
-        setSelectedSemesterId((prev) => {
-          if (prev && normalized.some((item) => item.value === prev)) return prev
-          return ""
-        })
-
-        if (normalized.length === 0) {
-          setImportError("Không có kỳ học hợp lệ để chọn.")
-        }
-      } catch {
-        setSemesters([])
-        setImportError("Không tải được danh sách kỳ học. Vui lòng thử lại.")
-      } finally {
-        setLoadingSemesters(false)
-      }
-    }
-
-    fetchSemesters()
-  }, [open, isCertificateCsvImport])
 
   // Parse CSV headers when file is selected
   const parseCSVHeaders = async (file: File) => {
@@ -396,15 +335,11 @@ export default function ImportDialog({
       setImportError("")
 
       if (isCertificateImport) {
+        const uploadDate = getTodayUploadDate()
         if (isCertificateCsvImport) {
-          const semesterId = Number(selectedSemesterId)
-          if (!Number.isFinite(semesterId)) {
-            setImportError("Vui lòng chọn kỳ học trước khi import.")
-            return
-          }
-          await importStudentCertificatesCsvBySemester(importFile, semesterId)
+          await importStudentCertificatesCsvBySemester(importFile, uploadDate)
         } else {
-          await importStudentCertificatesHtml(importFile)
+          await importStudentCertificatesHtml(importFile, uploadDate)
         }
 
         if (onImportSuccess) {
@@ -474,7 +409,7 @@ export default function ImportDialog({
       setImportResult(null);
       setColumnMappings(INITIAL_COLUMN_MAPPINGS);
       setCsvHeaders([]);
-      setSelectedSemesterId("");
+
     }
   }
 
@@ -517,25 +452,6 @@ export default function ImportDialog({
             )}
           </div>
         ) : null}
-        {isCertificateCsvImport && (
-          <div className="mt-2 mb-3">
-            <p className="text-sm font-medium text-gray-700 mb-1">
-              Kỳ học <span className="text-red-500">*</span>
-            </p>
-            <Select value={selectedSemesterId} onValueChange={setSelectedSemesterId}>
-              <SelectTrigger className="h-9 bg-white">
-                <SelectValue placeholder={loadingSemesters ? "Đang tải danh sách kỳ..." : "Chọn kỳ học"} />
-              </SelectTrigger>
-              <SelectContent>
-                {semesters.map((semester) => (
-                  <SelectItem key={semester.value} value={semester.value}>
-                    {semester.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
         {importError && (
           <div className="flex items-center gap-2 text-red-600 text-sm mb-3">
             <AlertCircle className="h-4 w-4" /><span>{importError}</span>
@@ -593,7 +509,7 @@ export default function ImportDialog({
         <Button variant="outline" onClick={() => handleOpenChange(false)}>Hủy</Button>
         <Button
           className="bg-[#167FFC] hover:bg-[#1470E3]"
-          disabled={!importFile || !!importError || loading || (isCertificateCsvImport && (!selectedSemesterId || loadingSemesters || semesters.length === 0))}
+          disabled={!importFile || !!importError || loading}
           onClick={() => {
             if (isCertificateImport) {
               handleActualImport()

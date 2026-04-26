@@ -68,10 +68,11 @@ export async function importStudents(
   }
 }
 
-export async function importStudentCertificatesHtml(file: File) {
+export async function importStudentCertificatesHtml(file: File, uploadDate: string) {
   const formData = new FormData()
   formData.append("file", file)
   formData.append("file_type", "certificate")
+  formData.append("upload_date", uploadDate)
 
   return api.post("/api/v1/student-certificates/import-html", formData, {
     headers: {
@@ -91,11 +92,11 @@ export async function importStudentCertificatesCsv(file: File) {
   })
 }
 
-export async function importStudentCertificatesCsvBySemester(file: File, semesterId: number) {
+export async function importStudentCertificatesCsvBySemester(file: File, uploadDate: string) {
   const formData = new FormData()
   formData.append("file", file)
   formData.append("file_type", "english")
-  formData.append("semester_id", String(semesterId))
+  formData.append("upload_date", uploadDate)
 
   return api.post("/api/v1/upload-ta-scores", formData, {
     headers: {

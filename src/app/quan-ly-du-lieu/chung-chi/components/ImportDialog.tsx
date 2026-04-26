@@ -10,6 +10,7 @@ import {
 import {
   Select, SelectTrigger, SelectContent, SelectItem, SelectValue
 } from "@/components/ui/select"
+import { api } from "@/lib/api"
 
 interface ImportDialogProps {
   open: boolean
@@ -19,6 +20,7 @@ interface ImportDialogProps {
 export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importError, setImportError] = useState<string>("")
+  const [loading, setLoading] = useState(false)
   const [importStep, setImportStep] = useState<'upload' | 'mapping'>('upload')
   const [mappingTab, setMappingTab] = useState<'anh-xa-cot' | 'tong-quan-loi' | 'chi-tiet-loi'>('anh-xa-cot')
   const [selectedSheet, setSelectedSheet] = useState('Sheet1')
@@ -52,11 +54,47 @@ export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) 
   const hasUnmappedRequired = unmappedRequiredFields.length > 0
   const allMapped = Object.values(columnMappings).every(v => v !== '')
 
+  const getTodayUploadDate = () => {
+    const now = new Date()
+    const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
+    return localDate.toISOString().split("T")[0]
+  }
+
+  const importStudentCertificatesHtml = async (file: File) => {
+    const formData = new FormData()
+    formData.append("upload_date", getTodayUploadDate())
+    formData.append("file_type", "certificate")
+    formData.append("file", file)
+
+    return api.post("/api/v1/student-certificates/import-html", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    })
+  }
+
+  const handleImport = async () => {
+    if (!importFile) return
+
+    try {
+      setLoading(true)
+      setImportError("")
+      await importStudentCertificatesHtml(importFile)
+      handleOpenChange(false)
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } }; message?: string }
+      setImportError(err.response?.data?.detail || err.message || "Lá»—i khi import file. Vui lÃ²ng thá»­ láº¡i.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleOpenChange = (newOpen: boolean) => {
     onOpenChange(newOpen);
     if (!newOpen) {
       setImportFile(null);
       setImportError("");
+      setLoading(false);
       setImportStep('upload');
       setMappingTab('anh-xa-cot');
     }
@@ -83,22 +121,22 @@ export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) 
           {importFile ? (
             <>
               <p className="text-gray-800 font-medium mb-1">{importFile.name}</p>
-              <p className="text-xs text-gray-500 mb-3">Định dạng Excel (.xlsx), {(importFile.size / (1024 * 1024)).toFixed(2)}MB</p>
+              <p className="text-xs text-gray-500 mb-3">Định dạng HTML (.html), {(importFile.size / (1024 * 1024)).toFixed(2)}MB</p>
             </>
           ) : (
             <>
               <p className="text-gray-800 font-medium mb-1">Chọn một tệp hoặc kéo và thả vào đây</p>
-              <p className="text-xs text-gray-500 mb-3">Định dạng Excel (.xlsx), dung lượng tối đa 50MB</p>
+              <p className="text-xs text-gray-500 mb-3">Định dạng HTML (.html), dung lượng tối đa 50MB</p>
             </>
           )}
           <Button variant="outline" size="sm" onClick={() => {
             const input = document.createElement('input')
-            input.type = 'file'; input.accept = '.xlsx,.xls'
+            input.type = 'file'; input.accept = '.html,.htm,text/html'
             input.onchange = (e) => {
               const file = (e.target as HTMLInputElement).files?.[0]
               if (file) {
                 if (file.size > 50 * 1024 * 1024) { setImportError("File vượt quá dung lượng cho phép. Giới hạn tối đa: 50 MB."); setImportFile(null); return }
-                if (!file.name.toLowerCase().endsWith('.xlsx') && !file.name.toLowerCase().endsWith('.xls')) { setImportError("Định dạng file không hợp lệ, chỉ chấp nhận .xlsx"); setImportFile(null); return }
+                if (!file.name.toLowerCase().endsWith('.html') && !file.name.toLowerCase().endsWith('.htm')) { setImportError("Định dạng file không hợp lệ, chỉ chấp nhận .html"); setImportFile(null); return }
                 setImportError(""); setImportFile(file)
               }
             }
@@ -224,7 +262,9 @@ export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) 
       <DialogFooter>
         <Button variant="outline" onClick={() => { setImportStep('upload'); handleOpenChange(false); }}>Hủy</Button>
         <Button variant="outline" onClick={() => setImportStep('upload')}>Trở lại</Button>
-        <Button className="bg-[#167FFC] hover:bg-[#1470E3]" disabled={hasUnmappedRequired} onClick={() => { handleOpenChange(false); }}>Import</Button>
+        <Button className="bg-[#167FFC] hover:bg-[#1470E3]" disabled={hasUnmappedRequired || loading} onClick={handleImport}>
+          {loading ? "Äang import..." : "Import"}
+        </Button>
       </DialogFooter>
     </>
   )

@@ -63,7 +63,7 @@ export default function BatchManagementTable({
             <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, display: 'table-header-group' }}>
               <TableRow className="border-b border-gray-200 bg-blue-50">
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">STT</TableHead>
-                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">MÃ KHÓA</TableHead>
+                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">KHÓA</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">NĂM BẮT ĐẦU</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">NĂM KẾT THÚC</TableHead>
                 <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-12">

@@ -6,9 +6,9 @@ import { uploadScores } from './score.api'
 
 async function handleScoreUpload(file: File) {
     try {
-        const semesterId = 1 // Replace with selected semester ID from UI
+        const uploadDate = new Date().toISOString().split("T")[0] // Replace with selected date from UI
         const classId = 1 // Replace with selected class ID from UI
-        const response = await uploadScores(file, semesterId, classId)
+        const response = await uploadScores(file, uploadDate)
 
         if (response.data.error_message) {
             throw new Error(response.data.error_message)

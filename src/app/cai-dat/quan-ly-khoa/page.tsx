@@ -45,12 +45,11 @@ export default function QuanLyKhoaPage() {
       const rows = Array.isArray(res.data) ? res.data : []
 
       const mapped = rows.map((item, index) => {
-        const cohortId = Number(item.cohort_id)
-        const codeFromName = (item.name || item.cohort_name || "").trim()
-        const code = codeFromName || (Number.isFinite(cohortId) ? `${cohortId}K` : `K${index + 1}`)
+        const cohortId = item.cohort_id
+        const code = cohortId != null ? String(cohortId) : (item.name || item.cohort_name || "").trim() || "-"
 
         return {
-          id: Number.isFinite(cohortId) ? cohortId : index + 1,
+          id: cohortId != null ? Number(cohortId) : index + 1,
           code,
           startYear: item.year_start != null ? String(item.year_start) : "-",
           endYear: item.year_end != null ? String(item.year_end) : "-",
@@ -85,16 +84,19 @@ export default function QuanLyKhoaPage() {
     setOpenDeleteDialog(true)
   }
 
-  const handleAddBatch = async (data: { code?: string; startYear: string; endYear?: string }) => {
+  const handleAddBatch = async (data: { code?: string; startYear: string; endYear: string }) => {
     try {
       setBatchError("")
 
-      const payload: { year_start: number; year_end?: number } = {
+      const payload: { cohort_id?: number; name?: string; year_start: number; year_end: number } = {
         year_start: Number(data.startYear),
+        year_end: Number(data.endYear),
       }
 
-      if (data.endYear) {
-        payload.year_end = Number(data.endYear)
+      if (data.code) {
+        const parsed = parseInt(data.code, 10)
+        if (!isNaN(parsed)) payload.cohort_id = parsed
+        payload.name = data.code
       }
 
       await api.post("/api/v1/cohorts", payload)
@@ -120,7 +122,10 @@ export default function QuanLyKhoaPage() {
     try {
       setBatchError("")
 
-      const payload: { year_start: number; year_end?: number } = {
+      const cohortId = data.code ? parseInt(data.code, 10) : undefined
+      const payload: { cohort_id?: number; name?: string; year_start: number; year_end?: number } = {
+        cohort_id: cohortId,
+        name: data.code,
         year_start: Number(data.startYear),
       }
 

@@ -5,10 +5,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 import { AlertCircle, FileText, Upload, CheckCircle2, Loader2 } from "lucide-react"
-import { getClasses, getSemesters, uploadScores } from "../score.api"
+import { uploadScores } from "../score.api"
 import type { ScoreImportResponse } from "../types"
-import type { Semester } from "../score.api"
 
 function extractBackendMessage(error: any, fallback: string): string {
     const detail = error?.response?.data?.detail
@@ -37,55 +37,6 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
     const [loading, setLoading] = useState(false)
     const [importResult, setImportResult] = useState<ScoreImportResponse | null>(null)
     const [importStep, setImportStep] = useState<'upload' | 'result'>('upload')
-    const [semesters, setSemesters] = useState<Semester[]>([])
-    const [selectedSemesterId, setSelectedSemesterId] = useState<string>("")
-    const [loadingSemesters, setLoadingSemesters] = useState(false)
-    const [classes, setClasses] = useState<any[]>([])
-    const [selectedClassId, setSelectedClassId] = useState<string>("")
-    const [loadingClasses, setLoadingClasses] = useState(false)
-
-    const getSemesterLabel = (semester: Semester): string => {
-        return (
-            semester.semester_name ||
-            semester.name ||
-            [semester.term, semester.academic_year].filter(Boolean).join(" - ") ||
-            semester.code ||
-            `Kỳ #${semester.id ?? semester.semester_id ?? "N/A"}`
-        )
-    }
-
-    const getSemesterId = (semester: Semester): number | null => {
-        const rawId = semester.id ?? semester.semester_id
-        if (typeof rawId !== "number" || Number.isNaN(rawId)) {
-            return null
-        }
-        return rawId
-    }
-
-    const getClassId = (classItem: any): number | null => {
-        const rawId = classItem?.id ?? classItem?.class_id
-        if (typeof rawId === "number" && Number.isFinite(rawId)) {
-            return rawId
-        }
-
-        if (typeof rawId === "string" && rawId.trim()) {
-            const parsed = Number(rawId)
-            if (Number.isFinite(parsed)) {
-                return parsed
-            }
-        }
-
-        return null
-    }
-
-    const getClassLabel = (classItem: any): string => {
-        return (
-            classItem?.class_name ||
-            classItem?.name ||
-            classItem?.code ||
-            `Lớp #${classItem?.id ?? classItem?.class_id ?? "N/A"}`
-        )
-    }
 
     const parseSuccessFromText = (text: string): { total: number; success: number } | null => {
         const normalized = text.toLowerCase()
@@ -163,66 +114,6 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
         }
     }
 
-    useEffect(() => {
-        const fetchSemesters = async () => {
-            if (!open) return
-
-            try {
-                setLoadingSemesters(true)
-                const res = await getSemesters({ skip: 0, limit: 100 })
-                const payload = res.data as Semester[] | { data?: Semester[]; items?: Semester[] }
-                const list = Array.isArray(payload)
-                    ? payload
-                    : Array.isArray(payload?.data)
-                        ? payload.data
-                        : Array.isArray(payload?.items)
-                            ? payload.items
-                            : []
-
-                const normalizedSemesters = list.filter((semester) => getSemesterId(semester) !== null)
-                setSemesters(normalizedSemesters)
-                if (normalizedSemesters.length === 0) {
-                    setImportError("Danh sách kỳ học không hợp lệ: thiếu semester_id.")
-                } else {
-                    setImportError("")
-                }
-            } catch (error: any) {
-                setSemesters([])
-                setImportError(extractBackendMessage(error, "Không tải được danh sách kỳ học. Vui lòng thử lại."))
-            } finally {
-                setLoadingSemesters(false)
-            }
-        }
-
-        const fetchClasses = async () => {
-            if (!open) return
-
-            try {
-                setLoadingClasses(true)
-                const res = await getClasses()
-                const payload = res.data as any[] | { data?: any[]; items?: any[] }
-                const list = Array.isArray(payload)
-                    ? payload
-                    : Array.isArray(payload?.data)
-                        ? payload.data
-                        : Array.isArray(payload?.items)
-                            ? payload.items
-                            : []
-
-                const normalizedClasses = list.filter((classItem) => getClassId(classItem) !== null)
-                setClasses(normalizedClasses)
-            } catch (error: any) {
-                setClasses([])
-                setImportError(extractBackendMessage(error, "Không tải được danh sách lớp. Vui lòng thử lại."))
-            } finally {
-                setLoadingClasses(false)
-            }
-        }
-
-        fetchSemesters()
-        fetchClasses()
-    }, [open])
-
     const handleFileSelect = async (file: File) => {
         // Validate file size (50MB limit)
         if (file.size > 50 * 1024 * 1024) {
@@ -244,25 +135,13 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
     }
 
     const handleUpload = async () => {
-        if (!importFile || !selectedSemesterId || !selectedClassId) return
+        if (!importFile) return
 
         try {
             setLoading(true)
             setImportError("")
 
-            const semesterId = Number(selectedSemesterId)
-            if (!Number.isFinite(semesterId)) {
-                setImportError("Kỳ học không hợp lệ. Vui lòng chọn lại.")
-                return
-            }
-
-            const classId = Number(selectedClassId)
-            if (!Number.isFinite(classId)) {
-                setImportError("Lớp không hợp lệ. Vui lòng chọn lại.")
-                return
-            }
-
-            const response = await uploadScores(importFile, semesterId, classId)
+            const response = await uploadScores(importFile)
             const normalizedResult = buildImportResult(response.data)
             setImportResult(normalizedResult)
             setImportStep('result')
@@ -305,8 +184,6 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
             // Reset all states
             setImportFile(null)
             setImportError("")
-            setSelectedSemesterId("")
-            setSelectedClassId("")
             setImportStep('upload')
             setImportResult(null)
         }
@@ -319,52 +196,6 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
                 <DialogDescription>Chọn file CSV chứa dữ liệu điểm</DialogDescription>
             </DialogHeader>
             <div className="pt-0 pb-4">
-                <div className="mb-3 grid gap-2">
-                    <Label>
-                        Kỳ học <span className="text-red-500">*</span>
-                    </Label>
-                    <Select value={selectedSemesterId} onValueChange={setSelectedSemesterId}>
-                        <SelectTrigger className="bg-white">
-                            <SelectValue placeholder={loadingSemesters ? "Đang tải danh sách kỳ..." : "Chọn kỳ học"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {semesters.map((semester) => {
-                                const semesterId = getSemesterId(semester)
-                                if (semesterId === null) return null
-
-                                return (
-                                <SelectItem key={semesterId} value={String(semesterId)}>
-                                    {getSemesterLabel(semester)}
-                                </SelectItem>
-                                )
-                            })}
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div className="mb-3 grid gap-2">
-                    <Label>
-                        Lớp <span className="text-red-500">*</span>
-                    </Label>
-                    <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-                        <SelectTrigger className="bg-white">
-                            <SelectValue placeholder={loadingClasses ? "Đang tải danh sách lớp..." : "Chọn lớp"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {classes.map((classItem) => {
-                                const classId = getClassId(classItem)
-                                if (classId === null) return null
-
-                                return (
-                                    <SelectItem key={classId} value={String(classId)}>
-                                        {getClassLabel(classItem)}
-                                    </SelectItem>
-                                )
-                            })}
-                        </SelectContent>
-                    </Select>
-                </div>
-
                 {importError && (
                     <div className="flex items-center gap-2 text-red-600 text-sm mb-3">
                         <AlertCircle className="h-4 w-4" /><span>{importError}</span>
@@ -418,7 +249,7 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
                 <Button variant="outline" onClick={() => handleOpenChange(false)}>Hủy</Button>
                 <Button
                     className="bg-[#167FFC] hover:bg-[#1470E3]"
-                    disabled={!importFile || !selectedSemesterId || !selectedClassId || !!importError || loading || loadingSemesters || loadingClasses || semesters.length === 0 || classes.length === 0}
+                    disabled={!importFile || !!importError || loading}
                     onClick={handleUpload}
                 >
                     {loading ? (

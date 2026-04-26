@@ -23,7 +23,7 @@ import { api } from "@/lib/api"
 import { createTrainingProgram, updateTrainingProgram } from "./program.api"
 
 export type ProgramFormValues = {
-  major_id: number
+  major_id: string
   description?: string
   cohort_ids: number[]
 }
@@ -43,7 +43,7 @@ export default function ProgramFormDialog({
   initialData,
   programId,
 }: ProgramFormDialogProps) {
-  const [majorId, setMajorId] = useState<number | undefined>()
+  const [majorId, setMajorId] = useState<string | undefined>()
   const [description, setDescription] = useState("")
   const [cohortIds, setCohortIds] = useState<number[]>([])
   const [errors, setErrors] = useState<{ 
@@ -53,7 +53,7 @@ export default function ProgramFormDialog({
   }>({})
   
   // API data states
-  const [majors, setMajors] = useState<{id: number, name: string}[]>([])
+  const [majors, setMajors] = useState<{id: string, name: string}[]>([])
   const [cohorts, setCohorts] = useState<{id: number, name: string}[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -67,7 +67,7 @@ export default function ProgramFormDialog({
         const majorsRes = await api.get("/api/v1/majors")
         if (majorsRes?.data && Array.isArray(majorsRes.data)) {
           const majorsList = majorsRes.data.map((m: any) => ({
-            id: m.major_id,
+            id: String(m.major_id),
             name: m.name
           }))
           setMajors(majorsList)
@@ -85,9 +85,9 @@ export default function ProgramFormDialog({
       } catch (err) {
         // Fallback to hardcoded data if API fails
         setMajors([
-          {id: 1, name: "Quản trị hệ thống thông tin"},
-          {id: 2, name: "Tin học quản lý"},
-          {id: 3, name: "Thống kê"},
+          {id: "1", name: "Quản trị hệ thống thông tin"},
+          {id: "2", name: "Tin học quản lý"},
+          {id: "3", name: "Thống kê"},
         ])
         setCohorts([
           {id: 40, name: "K40"},
@@ -131,9 +131,9 @@ export default function ProgramFormDialog({
     let formatted = message
 
     // Replace major id with major name when backend returns: "chuyên ngành 14"
-    formatted = formatted.replace(/chuyên ngành\s+(\d+)/gi, (_, majorIdRaw: string) => {
-      const majorIdNum = Number(majorIdRaw)
-      const major = majors.find((m) => m.id === majorIdNum)
+    formatted = formatted.replace(/chuyên ngành\s+([a-zA-Z0-9_-]+)/gi, (_, majorIdRaw: string) => {
+      const majorIdStr = String(majorIdRaw)
+      const major = majors.find((m) => m.id === majorIdStr)
       if (!major?.name) return `chuyên ngành ${majorIdRaw}`
       return `chuyên ngành ${major.name}`
     })
@@ -249,9 +249,9 @@ export default function ProgramFormDialog({
               Chuyên ngành<span className="text-red-500">*</span>
             </Label>
             <Select
-              value={majorId ? String(majorId) : ""}
+              value={majorId || ""}
               onValueChange={(value) => {
-                setMajorId(Number(value))
+                setMajorId(value)
                 if (errors.majorId) {
                   setErrors((prev) => ({ ...prev, majorId: undefined }))
                 }
@@ -263,7 +263,7 @@ export default function ProgramFormDialog({
               </SelectTrigger>
               <SelectContent>
                 {majors.map((item) => (
-                  <SelectItem key={item.id} value={String(item.id)}>
+                  <SelectItem key={item.id} value={item.id}>
                     {item.name}
                   </SelectItem>
                 ))}

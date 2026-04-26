@@ -12,18 +12,16 @@ import type {
 /**
  * Upload scores from CSV file
  * @param file - CSV file containing score data
- * @param semesterId - Semester ID for imported scores
+ * @param uploadDate - Date of upload to infer semester (YYYY-MM-DD)
  * @param classId - Class ID for imported scores
  * @returns Upload job information
  */
-export async function uploadScores(file: File, semesterId: number, classId?: number) {
+export async function uploadScores(file: File) {
+    const uploadDate = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
     const formData = new FormData()
     formData.append("file", file)
     formData.append("file_type", "score")
-    formData.append("semester_id", String(semesterId))
-    if (typeof classId === "number" && Number.isFinite(classId)) {
-        formData.append("class_id", String(classId))
-    }
+    formData.append("upload_date", uploadDate)
 
     return api.post<ScoreImportResponse>("/api/v1/upload-scores", formData, {
         headers: {

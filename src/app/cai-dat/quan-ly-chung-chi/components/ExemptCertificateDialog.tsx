@@ -25,7 +25,7 @@ type CertificateCohort = {
 };
 
 type MajorByCohort = {
-  major_id: number;
+  major_id: string;
   major_name?: string;
   name?: string;
 };
@@ -33,7 +33,7 @@ type MajorByCohort = {
 type ExemptionApiItem = {
   cohort_id?: number;
   cohort_name?: string;
-  major_id?: number;
+  major_id?: string;
   major_name?: string;
   name?: string;
 };
@@ -46,7 +46,7 @@ export default function ExemptCertificateDialog({ open, onOpenChange, certificat
   const [formData, setFormData] = useState<{ certificateId: string; batches: string[] }>({ certificateId: "", batches: [] });
   const [certificateOptions, setCertificateOptions] = useState<CertificateOption[]>([]);
   const [cohortOptions, setCohortOptions] = useState<string[]>([]);
-  const [majorOptionsByCohort, setMajorOptionsByCohort] = useState<Record<string, { id: number; name: string }[]>>({});
+  const [majorOptionsByCohort, setMajorOptionsByCohort] = useState<Record<string, { id: string; name: string }[]>>({});
   const [loadingCertificates, setLoadingCertificates] = useState(false);
   const [loadingCohorts, setLoadingCohorts] = useState(false);
   const [loadingMajorsByCohort, setLoadingMajorsByCohort] = useState<Record<string, boolean>>({});
@@ -238,23 +238,21 @@ export default function ExemptCertificateDialog({ open, onOpenChange, certificat
       return selectedMajorNames
         .map((majorName) => {
           const major = majorOptions.find((m) => m.name === majorName);
-          if (major && Number.isFinite(major.id)) {
+          if (major && major.id) {
             return {
               cohort_id: cohortId,
               major_id: major.id,
             };
           }
 
-          const fallbackMajorId = Number(majorName);
-          if (!Number.isFinite(fallbackMajorId)) return null;
-
+          // fallback nếu không tìm thấy major object
           return {
             cohort_id: cohortId,
-            major_id: fallbackMajorId,
+            major_id: majorName, // dùng luôn cái name nếu không map được ID
           };
         })
-        .filter((item): item is { cohort_id: number; major_id: number } => Boolean(item));
-    }) as Array<{ cohort_id: number; major_id: number }>;
+        .filter((item): item is { cohort_id: number; major_id: string } => Boolean(item));
+    }) as Array<{ cohort_id: number; major_id: string }>;
 
     if (pairs.length === 0) {
       setErrors((prev) => ({ ...prev, submit: "Không tạo được dữ liệu miễn chứng chỉ hợp lệ" }));
@@ -264,7 +262,7 @@ export default function ExemptCertificateDialog({ open, onOpenChange, certificat
     try {
       setSubmitting(true);
       if (isEdit) {
-        const exemptions = pairs.reduce<Array<{ cohort_id: number; major_ids: number[] }>>((acc, item) => {
+        const exemptions = pairs.reduce<Array<{ cohort_id: number; major_ids: string[] }>>((acc, item) => {
           const existed = acc.find((x) => x.cohort_id === item.cohort_id);
           if (existed) {
             if (!existed.major_ids.includes(item.major_id)) existed.major_ids.push(item.major_id);
@@ -281,7 +279,7 @@ export default function ExemptCertificateDialog({ open, onOpenChange, certificat
         const selectedCertificate = certificateOptions.find((item) => String(item.certificate_id) === formData.certificateId);
         const fallbackName = Array.isArray(certificate?.types) ? certificate.types[0] : "";
 
-        await api.put(`/api/v1/certificates/${formData.certificateId}/exemption`, {
+        await api.put(`/api/v1/certificates/${formData.certificateId}/exemptions`, {
           name: selectedCertificate?.name || fallbackName || "",
           exemptions,
         });

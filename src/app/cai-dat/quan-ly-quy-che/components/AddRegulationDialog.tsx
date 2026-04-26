@@ -13,7 +13,7 @@ type CohortItem = {
 };
 
 type MajorByCohort = {
-  major_id: number;
+  major_id: string;
   major_name?: string;
   name?: string;
 };
@@ -73,7 +73,7 @@ const calculateMinTotalCredits = (requiredRaw: string, electiveRaw: string): str
 
 export default function AddRegulationDialog({ open, onOpenChange, onAdd }: AddRegulationDialogProps) {
   const [cohortOptions, setCohortOptions] = useState<string[]>([]);
-  const [majorOptionsByCohort, setMajorOptionsByCohort] = useState<Record<string, { id: number; name: string }[]>>({});
+  const [majorOptionsByCohort, setMajorOptionsByCohort] = useState<Record<string, { id: string; name: string }[]>>({});
   const [loadingCohorts, setLoadingCohorts] = useState(false);
   const [loadingMajorsByCohort, setLoadingMajorsByCohort] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState({
@@ -230,16 +230,16 @@ export default function AddRegulationDialog({ open, onOpenChange, onAdd }: AddRe
 
       return selectedMajorValues
         .map((majorValue) => {
-          const majorById = majorOptions.find((m) => String(m.id) === String(majorValue).trim());
-          const majorByName = majorOptions.find((m) => normalizeText(m.name) === normalizeText(majorValue));
-          const matchedMajor = majorById ?? majorByName;
+          const matchedMajor = majorOptions.find(
+            (m) => String(m.id) === String(majorValue).trim() || normalizeText(m.name) === normalizeText(majorValue)
+          );
 
-          const resolvedMajorId = Number(matchedMajor?.id ?? majorValue);
-          if (!Number.isFinite(resolvedMajorId)) return null;
+          const resolvedMajorId = String(matchedMajor?.id ?? majorValue).trim();
+          if (!resolvedMajorId) return null;
 
           return {
             cohort_id: cohortId,
-            major_id: String(resolvedMajorId),
+            major_id: resolvedMajorId,
           };
         })
         .filter((item): item is { cohort_id: number; major_id: string } => Boolean(item));

@@ -460,7 +460,7 @@ export default function ChuongTrinhDaoTaoPage() {
         initialData={
           editingProgram
             ? {
-                major_id: editingProgram.majorId ?? 0,
+                major_id: String(editingProgram.majorId ?? ""),
                 description: undefined,
                 cohort_ids: programCohorts.get(editingProgram.id)?.map((value) => Number(value)).filter((value) => Number.isFinite(value)) || [],
               }

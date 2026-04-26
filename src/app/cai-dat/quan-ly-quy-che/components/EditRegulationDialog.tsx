@@ -15,7 +15,7 @@ type CohortItem = {
 };
 
 type MajorByCohort = {
-  major_id: number | string;
+  major_id: string;
   major_name?: string;
   name?: string;
 };
@@ -250,9 +250,9 @@ export default function EditRegulationDialog({ open, onOpenChange, regulation, o
 
       return selectedMajorValues
         .map((majorValue) => {
-          const majorById = majorOptions.find((m) => String(m.id) === String(majorValue).trim());
-          const majorByName = majorOptions.find((m) => normalizeText(m.name) === normalizeText(majorValue));
-          const matchedMajor = majorById ?? majorByName;
+          const matchedMajor = majorOptions.find(
+            (m) => String(m.id) === String(majorValue).trim() || normalizeText(m.name) === normalizeText(majorValue)
+          );
 
           const resolvedMajorId = String(matchedMajor?.id ?? majorValue).trim();
           if (!resolvedMajorId) return null;

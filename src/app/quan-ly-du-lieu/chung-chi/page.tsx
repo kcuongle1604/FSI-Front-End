@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useMemo } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
 import { Award, History, Upload } from "lucide-react"
@@ -23,7 +23,6 @@ import {
 import {
   Edit,
   Trash2,
-  Plus,
   MoreVertical,
   Search,
   Download,
@@ -63,6 +62,12 @@ function extractBackendMessage(error: any, fallback: string): string {
   if (typeof message === "string" && message.trim()) return message
 
   return fallback
+}
+
+function getTodayUploadDate(): string {
+  const now = new Date()
+  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
+  return localDate.toISOString().split("T")[0]
 }
 
 type ClassApiItem = {
@@ -131,12 +136,31 @@ type StudentCertificateSummaryResponse = {
   total?: number
 }
 
-const DEFAULT_CERTIFICATE_HEADERS = [
-  "CC QUÂN SỰ",
-  "CC THỂ DỤC",
-  "CC NGOẠI NGỮ",
-  "CC TIN HỌC",
-]
+type CertificateOption = {
+  id: number
+  label: string
+}
+
+type StudentCertificateSyncResponse = {
+  total_students: number
+  synced: number
+  failed: number
+  created?: number
+  skipped?: number
+  success: boolean
+  message?: string
+  results?: Array<{
+    student_id: number
+    certificate_id?: number
+    detail?: string
+    success?: boolean
+    added: number[]
+    removed: number[]
+    kept: number[]
+    certificate_ids: number[]
+  }>
+  errors?: unknown[]
+}
 
 export default function ChungChiPage() {
   const router = useRouter()
@@ -160,9 +184,13 @@ export default function ChungChiPage() {
   const [cohorts, setCohorts] = useState<CohortApiItem[]>([])
   const [loadingCertificates, setLoadingCertificates] = useState(false)
   const [certificateError, setCertificateError] = useState("")
-  const [certificateColumnHeaders, setCertificateColumnHeaders] = useState<string[]>(DEFAULT_CERTIFICATE_HEADERS)
+  const [certificateColumnHeaders, setCertificateColumnHeaders] = useState<string[]>([])
   const [importHistory] = useState<ImportHistory[]>([])
   const [currentPage, setCurrentPage] = useState(1)
+  const [editedCellStatus, setEditedCellStatus] = useState<Record<string, boolean>>({})
+  const [baseCellStatus, setBaseCellStatus] = useState<Record<string, boolean>>({})
+  const [savingTableChanges, setSavingTableChanges] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState("")
 
   const classNameOf = (item: ClassApiItem): string => String(item.class_name || item.name || "").trim()
   const getClassByName = (className?: string) =>
@@ -235,10 +263,21 @@ export default function ChungChiPage() {
   const startIndex = (safeCurrentPage - 1) * PAGE_SIZE
   const visibleCertificates = filteredCertificates.slice(startIndex, startIndex + PAGE_SIZE)
   const displayCount = visibleCertificates.length
-  const certificateColumns =
-    Array.isArray(certificateColumnHeaders) && certificateColumnHeaders.length > 0
-      ? certificateColumnHeaders
-      : DEFAULT_CERTIFICATE_HEADERS
+  const certificateColumns = useMemo(() => {
+    if (selectedKhoa && selectedKhoa !== "all" && Array.isArray(certificateColumnHeaders) && certificateColumnHeaders.length > 0) {
+      return certificateColumnHeaders
+    }
+    const allDynamicKeys = new Set<string>()
+    certificates.forEach(cert => {
+      for (const key of Object.keys(cert)) {
+        if (!['id', 'studentId', 'mssv', 'lop', 'hoLot', 'ten', 'ngaySinh', 'ghiChu'].includes(key)) {
+          allDynamicKeys.add(key)
+        }
+      }
+    })
+    return Array.from(allDynamicKeys)
+  }, [certificateColumnHeaders, certificates, selectedKhoa])
+  const hasPendingTableChanges = Object.keys(editedCellStatus).length > 0
 
   useEffect(() => {
     setCurrentPage(1)
@@ -249,6 +288,20 @@ export default function ChungChiPage() {
       setCurrentPage(totalPages)
     }
   }, [currentPage, totalPages])
+
+  useEffect(() => {
+    const nextBaseStatus: Record<string, boolean> = {}
+
+    certificates.forEach((certificate) => {
+      certificateColumns.forEach((headerName, headerIndex) => {
+        const key = getCellKey(certificate.studentId ?? certificate.id, headerIndex)
+        nextBaseStatus[key] = getCertificateStatusByColumn(certificate, headerName, headerIndex)
+      })
+    })
+
+    setBaseCellStatus(nextBaseStatus)
+    setEditedCellStatus({})
+  }, [certificates, certificateColumns])
 
   const toBoolean = (value: unknown): boolean => {
     if (typeof value === "boolean") return value
@@ -268,6 +321,8 @@ export default function ChungChiPage() {
       .toLowerCase()
       .replace(/[^a-z0-9]/g, "")
   }
+
+  const getCellKey = (studentId: number | string, columnIndex: number) => `${String(studentId)}::${columnIndex}`
 
   const readNestedBoolean = (value: unknown): boolean => {
     if (toBoolean(value)) return true
@@ -335,42 +390,240 @@ export default function ChungChiPage() {
     columnName: string,
     columnIndex: number
   ): boolean => {
-    const normalized = normalizeText(columnName)
-
-    if (normalized.includes("quansu") || normalized.includes("military")) {
-      return Boolean(certificate.quanSu)
-    }
-    if (
-      normalized.includes("theduc") ||
-      normalized.includes("physical")
-    ) {
-      return Boolean(certificate.theDuc)
-    }
-    if (
-      normalized.includes("ngoaingu") ||
-      normalized.includes("english") ||
-      normalized.includes("language") ||
-      normalized.includes("toeic") ||
-      normalized.includes("ielts")
-    ) {
-      return Boolean(certificate.ngoaiNgu)
-    }
-    if (
-      normalized.includes("tinhoc") ||
-      normalized.includes("tinhhoc") ||
-      normalized.includes("computer")
-    ) {
-      return Boolean(certificate.tinhHoc)
+    const anyCert = certificate as any;
+    if (columnName in anyCert) {
+      return Boolean(anyCert[columnName]);
     }
 
-    const fallbackByIndex = [
-      Boolean(certificate.quanSu),
-      Boolean(certificate.theDuc),
-      Boolean(certificate.ngoaiNgu),
-      Boolean(certificate.tinhHoc),
+    const normalizedTarget = normalizeText(columnName)
+    
+    for (const [key, val] of Object.entries(anyCert)) {
+      if (normalizeText(key) === normalizedTarget) {
+        return Boolean(val);
+      }
+    }
+
+    return false
+  }
+
+  const getCellStatus = (certificate: Certificate, columnName: string, columnIndex: number): boolean => {
+    const key = getCellKey(certificate.studentId ?? certificate.id, columnIndex)
+
+    if (Object.prototype.hasOwnProperty.call(editedCellStatus, key)) {
+      return Boolean(editedCellStatus[key])
+    }
+
+    if (Object.prototype.hasOwnProperty.call(baseCellStatus, key)) {
+      return Boolean(baseCellStatus[key])
+    }
+
+    return getCertificateStatusByColumn(certificate, columnName, columnIndex)
+  }
+
+  const handleToggleCell = (
+    certificate: Certificate,
+    columnName: string,
+    columnIndex: number,
+    nextChecked: boolean
+  ) => {
+    const key = getCellKey(certificate.studentId ?? certificate.id, columnIndex)
+    const baseChecked =
+      Object.prototype.hasOwnProperty.call(baseCellStatus, key)
+        ? Boolean(baseCellStatus[key])
+        : getCertificateStatusByColumn(certificate, columnName, columnIndex)
+
+    setEditedCellStatus((prev) => {
+      if (nextChecked === baseChecked) {
+        const { [key]: _removed, ...rest } = prev
+        return rest
+      }
+
+      return {
+        ...prev,
+        [key]: nextChecked,
+      }
+    })
+  }
+
+  const mapHeaderToCertificateId = (headerName: string, options: CertificateOption[]): number | null => {
+    const normalizedHeader = normalizeText(headerName)
+
+    const exact = options.find((option) => normalizeText(option.label) === normalizedHeader)
+    if (exact) return exact.id
+
+    const inclusive = options.find((option) => {
+      const normalizedLabel = normalizeText(option.label)
+      return normalizedLabel.includes(normalizedHeader) || normalizedHeader.includes(normalizedLabel)
+    })
+    
+    return inclusive?.id ?? null
+  }
+
+  const fetchCertificateOptions = async (): Promise<CertificateOption[]> => {
+    const all: CertificateOption[] = []
+    const size = 100
+    let page = 1
+
+    while (true) {
+      const res = await api.get<any>("/api/v1/certificates", { params: { page, size } })
+      const payload = res.data
+      const list = Array.isArray(payload)
+        ? payload
+        : payload.items || payload.data || payload.results || []
+      const rawPageItems = Array.isArray(list) ? list : []
+
+      const mapped: CertificateOption[] = rawPageItems
+        .map((item: any) => {
+          const id = Number(item.id ?? item.certificate_id)
+          const label = String(item.name ?? item.code ?? item.certificate_name ?? "").trim()
+          if (!Number.isFinite(id) || !label) return null
+          return { id, label }
+        })
+        .filter((item: CertificateOption | null): item is CertificateOption => item !== null)
+
+      all.push(...mapped)
+
+      if (rawPageItems.length < size) {
+        break
+      }
+
+      page += 1
+    }
+
+    return Array.from(new Map(all.map((item) => [item.id, item])).values())
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const unlinkStudentCertificate = async (studentId: number, certificateId: number) => {
+    const candidates: Array<() => Promise<unknown>> = [
+      () => api.delete("/api/v1/student-certificates", { data: { student_id: studentId, certificate_id: certificateId } }),
+      () => api.delete("/api/v1/student-certificates", { data: { studentId, certificateId } }),
+      () => api.delete(`/api/v1/student-certificates/by-student/${studentId}/certificate/${certificateId}`),
+      () => api.delete(`/api/v1/student-certificates/student/${studentId}/certificate/${certificateId}`),
     ]
 
-    return fallbackByIndex[columnIndex] ?? false
+    for (const run of candidates) {
+      try {
+        await run()
+        return
+      } catch (error: any) {
+        const status = Number(error?.response?.status)
+        if ([404, 405].includes(status)) {
+          continue
+        }
+
+        throw error
+      }
+    }
+
+    throw new Error("Không thể bỏ chọn chứng chỉ do backend chưa hỗ trợ endpoint phù hợp.")
+  }
+
+  const handleSaveTableChanges = async () => {
+    if (!hasPendingTableChanges) return
+
+    try {
+      setSavingTableChanges(true)
+      setCertificateError("")
+      setSaveSuccess("")
+
+      const certificateOptions = await fetchCertificateOptions()
+      const unresolvedHeaders: string[] = []
+      const headerIdByIndex = new Map<number, number>()
+
+      certificateColumns.forEach((headerName, columnIndex) => {
+        const id = mapHeaderToCertificateId(headerName, certificateOptions)
+        if (typeof id === "number") {
+          headerIdByIndex.set(columnIndex, id)
+        }
+      })
+
+      // Tách riêng danh sách checked (thêm) và unchecked (xóa)
+      const changedStudentIds = new Set<number>()
+
+      for (const key of Object.keys(editedCellStatus)) {
+        const [rawStudentId, rawColumnIndex] = key.split("::")
+        const studentId = Number(rawStudentId)
+        const columnIndex = Number(rawColumnIndex)
+
+        if (!Number.isFinite(studentId) || !Number.isInteger(columnIndex)) {
+          continue
+        }
+
+        const certificateId = headerIdByIndex.get(columnIndex)
+        if (!certificateId) {
+          const headerName = certificateColumns[columnIndex]
+          if (headerName && !unresolvedHeaders.includes(headerName)) {
+            unresolvedHeaders.push(headerName)
+          }
+          continue
+        }
+
+        changedStudentIds.add(studentId)
+      }
+
+      if (unresolvedHeaders.length > 0) {
+        throw new Error(`Không map được certificate_id cho các cột: ${unresolvedHeaders.join(", ")}`)
+      }
+
+      // Gọi batch API cho các items cần thêm
+      const items = Array.from(changedStudentIds).map((studentId) => {
+        const row = certificates.find((certificate) => (certificate.studentId ?? certificate.id) === studentId)
+        const certificateIds = certificateColumns
+          .map((headerName, columnIndex) => {
+            const certificateId = headerIdByIndex.get(columnIndex)
+            if (!certificateId) return null
+
+            const checked = row
+              ? getCellStatus(row, headerName, columnIndex)
+              : Boolean(editedCellStatus[getCellKey(studentId, columnIndex)])
+
+            return checked ? certificateId : null
+          })
+          .filter((id): id is number => typeof id === "number")
+
+        return {
+          student_id: studentId,
+          certificate_ids: certificateIds,
+        }
+      })
+
+      if (items.length > 0) {
+        const res = await api.put<StudentCertificateSyncResponse>("/api/v1/student-certificates/students/sync", {
+          upload_date: getTodayUploadDate(),
+          items,
+        })
+
+        const results = res.data?.results ?? []
+        const allCreated = results.length > 0 && results.every((r) => r.detail === "created")
+
+        if (allCreated) {
+          setSaveSuccess(`Thêm thành công ${res.data.created} chứng chỉ.`)
+        } else {
+          // Hiển thị các lỗi từ kết quả
+          const errorDetails = results
+            .filter((r) => r.detail !== "created")
+            .map((r) => r.detail)
+            .filter(Boolean)
+            .join("; ")
+          if (errorDetails) {
+            setCertificateError(errorDetails)
+          } else {
+            setSaveSuccess(`Đã lưu. Thêm: ${res.data.created}, Bỏ qua: ${res.data.skipped}.`)
+          }
+        }
+        setSaveSuccess(res.data?.message || "Da luu thay doi thanh cong.")
+      } else {
+        setSaveSuccess("Đã lưu thay đổi thành công.")
+      }
+
+      await fetchCertificateSummary()
+      setEditedCellStatus({})
+    } catch (error: any) {
+      setCertificateError(extractBackendMessage(error, "Không thể lưu thay đổi chứng chỉ"))
+    } finally {
+      setSavingTableChanges(false)
+    }
   }
 
   const mapSummaryItem = (item: StudentCertificateSummaryItem, index: number): Certificate => {
@@ -381,21 +634,26 @@ export default function ChungChiPage() {
     const hoLot = String(item.ho_lot || item.hoLot || item.first_name || item.firstName || split.hoLot || "")
     const ten = String(item.ten || item.last_name || item.lastName || split.ten || "")
 
-    return {
+    const studentId = Number(item.student_id ?? item.id ?? index + 1)
+
+    const cert: any = {
       id: Number(item.id ?? item.student_id ?? index + 1),
+      studentId,
       mssv: String(item.mssv || item.student_code || item.studentId || item.student_id || ""),
       lop: String(item.class_name || item.className || item.lop || ""),
       hoLot,
       ten,
       ngaySinh: String(item.dob || item.date_of_birth || item.ngay_sinh || ""),
-      donTN: readBooleanByKeys(source, ["don_tn", "application_for_graduation", "donTN", "has_don_tn"], ["don", "tn", "totnghiep", "graduation"]),
-      kiemDiem: readBooleanByKeys(source, ["kiem_diem", "personal_evaluation", "kiemDiem", "has_kiem_diem"], ["kiemdiem", "evaluation"]),
-      quanSu: toBoolean(item.cc_quan_su) || readBooleanByKeys(source, ["quan_su", "military_certificate", "quanSu", "has_quan_su", "cc_quan_su"], ["quansu", "military"]),
-      theDuc: toBoolean(item.cc_the_duc) || readBooleanByKeys(source, ["the_duc", "physical_education_certificate", "theDuc", "has_the_duc", "cc_the_duc"], ["theduc", "physical"]),
-      ngoaiNgu: toBoolean(item.cc_ngoai_ngu) || readBooleanByKeys(source, ["ngoai_ngu", "foreign_language_certificate", "ngoaiNgu", "has_ngoai_ngu", "cc_ngoai_ngu"], ["ngoaingu", "foreign", "english"]),
-      tinhHoc: toBoolean(item.cc_tin_hoc) || readBooleanByKeys(source, ["tinh_hoc", "it_certificate", "tinhHoc", "has_tinh_hoc", "cc_tin_hoc", "cc_tinh_hoc"], ["tinhoc", "tinhhoc", "computer"]),
       ghiChu: String(item.ghi_chu || item.notes || ""),
     }
+
+    for (const [key, val] of Object.entries(source)) {
+      if (!['stt', 'class_name', 'ho_lot', 'ten', 'dob', 'student_id', 'ghi_chu', 'id', 'mssv', 'student_code', 'studentId', 'className', 'lop', 'full_name', 'fullName', 'hoLot', 'first_name', 'firstName', 'last_name', 'lastName', 'date_of_birth', 'ngay_sinh', 'notes'].includes(key)) {
+        cert[key] = toBoolean(val);
+      }
+    }
+
+    return cert as Certificate
   }
 
   const fetchCertificateSummary = async () => {
@@ -457,13 +715,13 @@ export default function ChungChiPage() {
   useEffect(() => {
     const fetchCertificatesByCohort = async () => {
       if (!selectedKhoa || selectedKhoa === "all") {
-        setCertificateColumnHeaders(DEFAULT_CERTIFICATE_HEADERS)
+        setCertificateColumnHeaders([])
         return
       }
 
       const cohortId = Number(selectedKhoa)
       if (!Number.isFinite(cohortId)) {
-        setCertificateColumnHeaders(DEFAULT_CERTIFICATE_HEADERS)
+        setCertificateColumnHeaders([])
         return
       }
 
@@ -486,13 +744,13 @@ export default function ChungChiPage() {
           .filter((name) => name.length > 0)
 
         if (names.length === 0) {
-          setCertificateColumnHeaders(DEFAULT_CERTIFICATE_HEADERS)
+          setCertificateColumnHeaders([])
           return
         }
 
         setCertificateColumnHeaders(names)
       } catch {
-        setCertificateColumnHeaders(DEFAULT_CERTIFICATE_HEADERS)
+        setCertificateColumnHeaders([])
       }
     }
 
@@ -534,16 +792,13 @@ export default function ChungChiPage() {
     setIsDeleteOpen(true)
   }
 
-  const handleAdd = () => {
-    setSelectedCertificate(null)
-    setIsFormOpen(true)
-  }
-
   const handleSubmitCertificate = async (payload: StudentCertificateCreatePayload) => {
     try {
       setCertificateError("")
-      debugger; // xem payload.certificate_id tại đây
-      await api.post("/api/v1/student-certificates/", payload)
+      await api.post("/api/v1/student-certificates/", {
+        upload_date: getTodayUploadDate(),
+        items: [payload],
+      })
       await fetchCertificateSummary()
     } catch (error: any) {
       const status = Number(error?.response?.status)
@@ -634,7 +889,6 @@ export default function ChungChiPage() {
               value="chung-chi"
               className="m-0 h-full outline-none flex flex-col"
             >
-              {/* Search & Actions – giống Quản lý người dùng */}
               <div className="flex items-center gap-3 mb-4">
                 <div className="relative w-[250px]">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -668,13 +922,7 @@ export default function ChungChiPage() {
                         .filter((cohort) => Number.isFinite(Number(cohort.cohort_id)))
                         .map((cohort) => {
                           const cohortId = String(cohort.cohort_id)
-                          const cohortLabel = cohort.name?.trim()
-                            ? cohort.name
-                            : `Khóa ${cohortId}${
-                              cohort.year_start && cohort.year_end
-                                ? ` (${cohort.year_start}-${cohort.year_end})`
-                                : ""
-                            }`
+                          const cohortLabel = `Khóa ${cohortId}`
 
                           return (
                             <SelectItem key={cohortId} value={cohortId}>
@@ -715,11 +963,11 @@ export default function ChungChiPage() {
 
                 <div className="flex items-center gap-2 ml-auto">
                   <Button
-                    onClick={handleAdd}
+                    onClick={handleSaveTableChanges}
                     className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm"
+                    disabled={!hasPendingTableChanges || savingTableChanges || loadingCertificates}
                   >
-                    <Plus className="h-4 w-4" />
-                    Thêm
+                    {savingTableChanges ? "Đang lưu..." : "Lưu"}
                   </Button>
                   <Button
                     variant="outline"
@@ -740,14 +988,17 @@ export default function ChungChiPage() {
                   </Button>
                 </div>
               </div>
+
               {certificateError && (
                 <p className="text-sm text-red-600 mb-3">{certificateError}</p>
+              )}
+              {saveSuccess && (
+                <p className="text-sm text-green-600 mb-3">{saveSuccess}</p>
               )}
               {loadingCertificates && (
                 <p className="text-sm text-gray-600 mb-3">Đang tải dữ liệu chứng chỉ...</p>
               )}
 
-              {/* Card bảng – giống UserManagementTable & Sinh viên */}
               <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
                 <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                   <div className="overflow-auto">
@@ -810,9 +1061,11 @@ export default function ChungChiPage() {
                                 >
                                   <div className="flex justify-center">
                                     <Checkbox
-                                      checked={getCertificateStatusByColumn(certificate, headerName, headerIndex)}
-                                      disabled
-                                      className="pointer-events-none data-[state=unchecked]:bg-transparent"
+                                      checked={getCellStatus(certificate, headerName, headerIndex)}
+                                      onCheckedChange={(checked) =>
+                                        handleToggleCell(certificate, headerName, headerIndex, checked === true)
+                                      }
+                                      className="data-[state=unchecked]:bg-transparent"
                                     />
                                   </div>
                                 </TableCell>
