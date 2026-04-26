@@ -50,8 +50,8 @@ import ImportDialog from "./components/ImportDialog"
 import ImportHistoryTab from "./components/ImportHistoryTab"
 
 // API & Types
-import { getStudents, getClasses, getCohorts } from "./student.api"
-import type { Student, ImportHistory } from "./types"
+import { getStudents, getClasses, getCohorts, getUploadHistory } from "./student.api"
+import type { Student, ImportHistory, FileImport } from "./types"
 import { sampleStudents } from "./data"
 
 function extractBackendMessage(error: any, fallback: string): string {
@@ -94,7 +94,7 @@ export default function SinhVienPage() {
   const didInitFromUrlRef = useRef(false)
 
   // giữ nguyên để dùng cho tab lịch sử import
-  const [importHistory] = useState<ImportHistory[]>([])
+  const [importHistory, setImportHistory] = useState<FileImport[]>([])
 
   const getValidTab = (tab: string | null) => {
     return tab === "lich-su-import" ? "lich-su-import" : "thong-tin-sinh-vien"
@@ -201,6 +201,36 @@ export default function SinhVienPage() {
     fetchClasses()
     fetchCohorts()
   }, [])
+
+  const fetchImportHistory = async () => {
+    try {
+      const res = await getUploadHistory(["student"])
+      const payload = res.data
+      const data = Array.isArray(payload?.data) ? payload.data : []
+
+      const mapped: FileImport[] = data.map((item: any, idx: number) => ({
+        id: item.id || idx + 1,
+        fileName: item.file_name || "",
+        status: item.status || "",
+        success: item.success_count || 0,
+        failed: item.failure_count || 0,
+        total: item.total_processed || 0,
+        createdAt: item.created_at ? new Date(item.created_at).toLocaleString("vi-VN") : "",
+        createdBy: item.created_by || "",
+      }))
+
+      setImportHistory(mapped)
+    } catch (err) {
+      console.error("Lỗi khi tải lịch sử import sinh viên:", err)
+      setImportHistory([])
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "lich-su-import") {
+      fetchImportHistory()
+    }
+  }, [activeTab])
 
   // Refetch students when filters change
   useEffect(() => {

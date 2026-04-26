@@ -48,9 +48,9 @@ import ScoreFormDialog from "./components/ScoreFormDialog"
 import DeleteScoreDialog from "./components/DeleteScoreDialog"
 import ScoreImportDialog from "./components/ScoreImportDialog"
 import ImportHistoryTab from "../sinh-vien/components/ImportHistoryTab"
-import { getScoreMatrix, getClasses } from "./score.api"
+import { getScoreMatrix, getClasses, getUploadHistory } from "./score.api"
 import { getCohorts } from "../sinh-vien/student.api"
-import type { ImportHistory } from "../sinh-vien/types"
+import type { ImportHistory, FileImport } from "../sinh-vien/types"
 import type { ScoreCell, ScoreImportResponse, StudentScore } from "./types"
 
 function extractBackendMessage(error: any, fallback: string): string {
@@ -124,7 +124,7 @@ export default function DiemPage() {
   const isSyncingFromUrlRef = useRef(false)
   const didInitFromUrlRef = useRef(false)
 
-  const [importHistory] = useState<ImportHistory[]>([])
+  const [importHistory, setImportHistory] = useState<FileImport[]>([])
 
   const getValidTab = (tab: string | null) => {
     return tab === "lich-su-import" ? "lich-su-import" : "diem"
@@ -240,6 +240,36 @@ export default function DiemPage() {
       void refreshScoreMatrix(targetClassName, targetClassId)
     }, 1200)
   }
+
+  const fetchImportHistory = async () => {
+    try {
+      const res = await getUploadHistory(["score"])
+      const payload = res.data
+      const data = Array.isArray(payload?.data) ? payload.data : []
+
+      const mapped: FileImport[] = data.map((item: any, idx: number) => ({
+        id: item.id || idx + 1,
+        fileName: item.file_name || "",
+        status: item.status || "",
+        success: item.success_count || 0,
+        failed: item.failure_count || 0,
+        total: item.total_processed || 0,
+        createdAt: item.created_at ? new Date(item.created_at).toLocaleString("vi-VN") : "",
+        createdBy: item.created_by || "",
+      }))
+
+      setImportHistory(mapped)
+    } catch (err) {
+      console.error("Lỗi khi tải lịch sử import điểm:", err)
+      setImportHistory([])
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "lich-su-import") {
+      fetchImportHistory()
+    }
+  }, [activeTab])
 
   // Fetch available classes on mount
   useEffect(() => {

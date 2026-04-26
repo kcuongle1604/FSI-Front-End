@@ -108,3 +108,10 @@ export async function importStudentCertificatesCsvBySemester(file: File, uploadD
 export async function getSemesters(params?: { skip?: number; limit?: number }) {
   return api.get<any>("/api/v1/semesters", { params })
 }
+
+export async function getUploadHistory(types: string[] = ["student"]) {
+  const params = new URLSearchParams()
+  types.forEach((t) => params.append("type", t))
+  return api.get("/api/v1/upload-history", { params })
+}
+

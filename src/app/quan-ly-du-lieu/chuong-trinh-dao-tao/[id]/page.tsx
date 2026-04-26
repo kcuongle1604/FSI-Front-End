@@ -24,7 +24,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Program } from "../page";
 import ImportHistoryTab from "../../sinh-vien/components/ImportHistoryTab";
 import ProgramSubjectsImportDialog from "../ProgramSubjectsImportDialog";
-import type { ImportHistory } from "../../sinh-vien/types";
+import type { FileImport } from "../../sinh-vien/types";
 import CourseFormDialog, { CourseFormValues } from "../CourseFormDialog";
 import DeleteCourseDialog from "../DeleteCourseDialog";
 import { addSubjectToTrainingProgram, deleteSubjectFromTrainingProgram, getProgramCohorts, getSubjectsByProgramId, getTrainingPrograms, updateTrainingProgramSubject, type Subject } from "../program.api";
@@ -148,7 +148,7 @@ export default function ChuongTrinhDaoTaoDetailPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [courses, setCourses] = useState<ProgramCourse[]>([]);
   const [loading, setLoading] = useState(false);
-  const [importHistory] = useState<ImportHistory[]>([]);
+  const [importHistory] = useState<FileImport[]>([]);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [subjectsRefreshKey, setSubjectsRefreshKey] = useState(0);
   const [isCourseDialogOpen, setIsCourseDialogOpen] = useState(false);

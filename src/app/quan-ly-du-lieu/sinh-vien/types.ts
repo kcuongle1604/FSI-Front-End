@@ -30,6 +30,17 @@ export interface ImportHistory {
   status: string
 }
 
+export interface FileImport {
+  id: number
+  fileName: string
+  status: string
+  success: number
+  failed: number
+  total: number
+  createdAt: string
+  createdBy: string
+}
+
 // Response for dry-run analysis (dry_run=true)
 export interface ImportAnalysisResponse {
   total_rows: number

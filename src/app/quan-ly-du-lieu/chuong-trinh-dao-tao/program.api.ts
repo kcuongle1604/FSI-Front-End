@@ -239,3 +239,9 @@ export async function importProgramSubjects(programName: string, file: File) {
     }
   )
 }
+
+export async function getUploadHistory(types: string[] = ["program"]) {
+  const params = new URLSearchParams()
+  types.forEach((t) => params.append("type", t))
+  return api.get("/api/v1/upload-history", { params })
+}

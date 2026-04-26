@@ -162,9 +162,11 @@ export async function getSubjectsByProgram(trainingProgramName: string) {
 }
 
 /**
- * Get list of all training programs
- * @returns List of available training programs
+ * Get upload history for scores
  */
-export async function getTrainingPrograms() {
-    return api.get("/api/v1/training-programs")
+export async function getUploadHistory(types: string[] = ["score"]) {
+    const params = new URLSearchParams()
+    types.forEach((t) => params.append("type", t))
+    return api.get("/api/v1/upload-history", { params })
 }
+

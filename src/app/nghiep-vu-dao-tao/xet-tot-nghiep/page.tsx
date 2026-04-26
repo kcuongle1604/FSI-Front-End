@@ -481,6 +481,11 @@ export default function XetTotNghiepPage() {
       // Tuy nhiên nếu endpoint hiện tại vẫn cần classId, thì bạn cần đảm bảo gọi với API tương ứng.
       // Dựa vào yêu cầu, chúng ta đang xét theo kỳ, nên giả định có endpoint này hoặc ta chỉ thay logic xét.
       // Do yêu cầu "chọn kỳ xong gọi api ... parameter là semester_id", backend có thể chưa đổi API save, nhưng tôi sẽ giả định gọi theo semester.
+      const payload = {
+        semester_id: semesterId,
+        student_ids: studentIdsToSave,
+      }
+
       const saveResponse = await api.post<GraduationSaveResponse>(
         `/api/v1/graduation-eligibility/semester/${semesterId}/save`,
         payload

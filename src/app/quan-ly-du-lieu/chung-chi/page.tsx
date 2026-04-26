@@ -45,8 +45,7 @@ import CertificateFormDialog from "./components/CertificateFormDialog"
 import DeleteCertificateDialog from "./components/DeleteCertificateDialog"
 import ImportDialog from "../sinh-vien/components/ImportDialog"
 import ImportHistoryTab from "../sinh-vien/components/ImportHistoryTab"
-import type { Certificate, StudentCertificateCreatePayload } from "./types"
-import type { ImportHistory } from "../sinh-vien/types"
+import type { Certificate, StudentCertificateCreatePayload, FileImport } from "./types"
 import { api } from "@/lib/api"
 
 function extractBackendMessage(error: any, fallback: string): string {
@@ -185,7 +184,7 @@ export default function ChungChiPage() {
   const [loadingCertificates, setLoadingCertificates] = useState(false)
   const [certificateError, setCertificateError] = useState("")
   const [certificateColumnHeaders, setCertificateColumnHeaders] = useState<string[]>([])
-  const [importHistory] = useState<ImportHistory[]>([])
+  const [importHistory, setImportHistory] = useState<FileImport[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [editedCellStatus, setEditedCellStatus] = useState<Record<string, boolean>>({})
   const [baseCellStatus, setBaseCellStatus] = useState<Record<string, boolean>>({})
@@ -706,6 +705,40 @@ export default function ChungChiPage() {
       setCohorts([])
     }
   }
+
+  const fetchImportHistory = async () => {
+    try {
+      const params = new URLSearchParams()
+      params.append("type", "certificate")
+      params.append("type", "english")
+
+      const res = await api.get("/api/v1/upload-history", { params })
+      const payload = res.data
+      const data = Array.isArray(payload?.data) ? payload.data : []
+
+      const mapped: FileImport[] = data.map((item: any, idx: number) => ({
+        id: item.id || idx + 1,
+        fileName: item.file_name || "",
+        status: item.status || "",
+        success: item.success_count || 0,
+        failed: item.failure_count || 0,
+        total: item.total_processed || 0,
+        createdAt: item.created_at ? new Date(item.created_at).toLocaleString("vi-VN") : "",
+        createdBy: item.created_by || "",
+      }))
+
+      setImportHistory(mapped)
+    } catch (error) {
+      console.error("Lỗi khi tải lịch sử import:", error)
+      setImportHistory([])
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "lich-su-import") {
+      fetchImportHistory()
+    }
+  }, [activeTab])
 
   useEffect(() => {
     fetchCertificateSummary()

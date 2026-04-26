@@ -39,10 +39,10 @@ import {
 import DeleteDialog from "../sinh-vien/components/DeleteDialog"
 import ImportHistoryTab from "../sinh-vien/components/ImportHistoryTab"
 import { getStudents } from "../sinh-vien/student.api"
-import type { Student, ImportHistory } from "../sinh-vien/types"
+import type { Student, ImportHistory, FileImport } from "../sinh-vien/types"
 import { sampleStudents, classesByCourse } from "../sinh-vien/data"
 import ProgramFormDialog, { ProgramFormValues } from "./ProgramFormDialog"
-import { deleteTrainingProgram, getTrainingPrograms, getProgramCohorts, type Cohort } from "./program.api"
+import { deleteTrainingProgram, getTrainingPrograms, getProgramCohorts, getUploadHistory, type Cohort } from "./program.api"
 
 export type Program = {
   id: number
@@ -74,7 +74,7 @@ export default function ChuongTrinhDaoTaoPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
 
-  const [importHistory] = useState<ImportHistory[]>([])
+  const [importHistory, setImportHistory] = useState<FileImport[]>([])
   const [programs, setPrograms] = useState<Program[]>([])
   const [loadingPrograms, setLoadingPrograms] = useState(false)
   const [editingProgram, setEditingProgram] = useState<Program | null>(null)
@@ -130,6 +130,36 @@ export default function ChuongTrinhDaoTaoPage() {
   useEffect(() => {
     refreshPrograms()
   }, [])
+
+  const fetchImportHistory = async () => {
+    try {
+      const res = await getUploadHistory(["program"])
+      const payload = res.data
+      const data = Array.isArray(payload?.data) ? payload.data : []
+
+      const mapped: FileImport[] = data.map((item: any, idx: number) => ({
+        id: item.id || idx + 1,
+        fileName: item.file_name || "",
+        status: item.status || "",
+        success: item.success_count || 0,
+        failed: item.failure_count || 0,
+        total: item.total_processed || 0,
+        createdAt: item.created_at ? new Date(item.created_at).toLocaleString("vi-VN") : "",
+        createdBy: item.created_by || "",
+      }))
+
+      setImportHistory(mapped)
+    } catch (err) {
+      console.error("Lỗi khi tải lịch sử import CTĐT:", err)
+      setImportHistory([])
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "lich-su-import") {
+      fetchImportHistory()
+    }
+  }, [activeTab])
 
   useEffect(() => {
     const fetchStudents = async () => {
