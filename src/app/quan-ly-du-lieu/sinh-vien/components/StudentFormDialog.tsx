@@ -160,7 +160,7 @@ export default function StudentFormDialog({ open, onOpenChange, student, onSucce
       if (isEdit && student) {
         // Update existing student
         const updateData: UpdateStudentRequest = {
-          student_id: student.id, // Must match URL path parameter
+          student_id: Number(formData.mssv), // Lấy từ input MSSV của user
           full_name: formData.hoTen,
           dob: isoDate,
           class_name: formData.lop,
@@ -168,11 +168,11 @@ export default function StudentFormDialog({ open, onOpenChange, student, onSucce
           status: true
         }
 
-        await updateStudent(student.id, updateData)
+        await updateStudent(student.id, updateData) // student.id là id cũ để làm path param
       } else {
         // Create new student
         const createData = {
-          student_id: Number(formData.mssv),
+          student_id: Number(formData.mssv), // Lấy từ input MSSV của user
           full_name: formData.hoTen,
           dob: isoDate,
           class_name: formData.lop,

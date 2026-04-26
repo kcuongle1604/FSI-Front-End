@@ -59,9 +59,11 @@ export default function StudentTab({ data, onAdd, onImport, onEdit, onDelete }: 
   const filteredStudents = useMemo(() => {
     if (!selectedCourse && !selectedClass) return []
     return data.filter(student => {
-      const matchesSearch = searchQuery === "" || student.mssv.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesCourse = !selectedCourse || student.lop.startsWith(selectedCourse)
-      const matchesClass = !selectedClass || student.lop === selectedClass
+      const studentMssv = String(student.mssv || "")
+      const studentLop = student.lop || ""
+      const matchesSearch = searchQuery === "" || studentMssv.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchesCourse = !selectedCourse || studentLop.startsWith(selectedCourse)
+      const matchesClass = !selectedClass || studentLop === selectedClass
       return matchesSearch && matchesCourse && matchesClass
     })
   }, [searchQuery, selectedCourse, selectedClass, data])
