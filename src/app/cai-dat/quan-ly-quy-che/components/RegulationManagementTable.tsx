@@ -1,4 +1,4 @@
-import { Edit, Trash2, MoreVertical, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
+import { Edit, Trash2, MoreVertical, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -12,6 +12,7 @@ import { Regulation } from "../page";
 
 interface RegulationManagementTableProps {
   regulations: Regulation[];
+  loading: boolean;
   onEditClick: (regulation: Regulation) => void;
   onDeleteClick: (regulation: Regulation) => void;
   onDetailClick?: (regulation: Regulation) => void;
@@ -23,7 +24,7 @@ import { useEffect, useState } from "react";
 
 const PAGE_SIZE = 10;
 
-const RegulationManagementTable = ({ regulations, onEditClick, onDeleteClick, onDetailClick }: RegulationManagementTableProps) => {
+const RegulationManagementTable = ({ regulations, loading = false, onEditClick, onDeleteClick, onDetailClick }: RegulationManagementTableProps) => {
   const [page, setPage] = useState(1);
   const totalRecords = regulations.length;
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
@@ -37,10 +38,11 @@ const RegulationManagementTable = ({ regulations, onEditClick, onDeleteClick, on
   }, [totalPages]);
 
   return (
-    <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex-1 overflow-auto min-h-0">
-          <Table className="w-full table-fixed" style={{ borderCollapse: 'collapse' }}>
+    <div className="flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
+      {/* Table */}
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <div className="overflow-x-auto" style={{ height: '530px' }}>
+          <Table className="w-full" style={{ borderCollapse: 'collapse' }}>
             <TableHeader>
               <TableRow className="border-b border-gray-200 bg-blue-50" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 w-[6%]">STT</TableHead>
@@ -53,54 +55,71 @@ const RegulationManagementTable = ({ regulations, onEditClick, onDeleteClick, on
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pagedRegulations.map((regulation, idx) => (
-                <TableRow key={regulation.id}>
-                  <TableCell className="px-4 py-2">{(page - 1) * PAGE_SIZE + idx + 1}</TableCell>
-                  <TableCell className="px-4 py-2">
-                    {onDetailClick ? (
-                      <button
-                        className="text-blue-700 hover:underline font-medium outline-none"
-                        onClick={() => onDetailClick(regulation)}
-                        type="button"
-                      >
-                        {regulation.name}
-                      </button>
-                    ) : (
-                      regulation.name
-                    )}
-                  </TableCell>
-                  <TableCell className="px-4 py-2">{Array.isArray(regulation.batches) && regulation.batches.length > 0 ? regulation.batches.join(", ") : <span className="italic text-gray-400">Chưa có</span>}</TableCell>
-                  <TableCell className="px-4 py-2">
-                    {Array.isArray(regulation.specializations) && regulation.specializations.length > 0 ? (
-                      <span
-                        className="block max-w-[220px] truncate cursor-pointer"
-                        title={regulation.specializations.join(", ")}
-                      >
-                        {regulation.specializations.join(", ")}
-                      </span>
-                    ) : (
-                      <span className="italic text-gray-400">Chưa có</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-32">
-                        <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => onEditClick(regulation)}>
-                          <Edit className="h-4 w-4 mr-2" /> Sửa
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer text-sm text-red-600 focus:text-red-600" onClick={() => onDeleteClick(regulation)}>
-                          <Trash2 className="h-4 w-4 mr-2" /> Xóa
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {pagedRegulations.length > 0 ? (
+                pagedRegulations.map((regulation, idx) => (
+                  <TableRow key={regulation.id}>
+                    <TableCell className="px-4 py-2">{(page - 1) * PAGE_SIZE + idx + 1}</TableCell>
+                    <TableCell className="px-4 py-2">
+                      {onDetailClick ? (
+                        <button
+                          className="text-blue-700 hover:underline font-medium outline-none"
+                          onClick={() => onDetailClick(regulation)}
+                          type="button"
+                        >
+                          {regulation.name}
+                        </button>
+                      ) : (
+                        regulation.name
+                      )}
+                    </TableCell>
+                    <TableCell className="px-4 py-2">{Array.isArray(regulation.batches) && regulation.batches.length > 0 ? regulation.batches.join(", ") : <span className="italic text-gray-400">Chưa có</span>}</TableCell>
+                    <TableCell className="px-4 py-2">
+                      {Array.isArray(regulation.specializations) && regulation.specializations.length > 0 ? (
+                        <span
+                          className="block max-w-[220px] truncate cursor-pointer"
+                          title={regulation.specializations.join(", ")}
+                        >
+                          {regulation.specializations.join(", ")}
+                        </span>
+                      ) : (
+                        <span className="italic text-gray-400">Chưa có</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-32">
+                          <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => onEditClick(regulation)}>
+                            <Edit className="h-4 w-4 mr-2" /> Sửa
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="cursor-pointer text-sm text-red-600 focus:text-red-600" onClick={() => onDeleteClick(regulation)}>
+                            <Trash2 className="h-4 w-4 mr-2" /> Xóa
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="p-0">
+                    <div className="h-120 w-full flex items-center justify-center text-gray-500 text-sm">
+                      {loading ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Đang tải dữ liệu...
+                        </span>
+                      ) : (
+                        "Không có quy chế nào"
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </div>

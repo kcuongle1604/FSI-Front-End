@@ -44,6 +44,7 @@ export default function CertificateManagementTableWithStatusDialog(props: any) {
     <>
       <CertificateManagementTable
         {...props}
+        loading={props.loading}
         certificates={certificates}
         onStatusClick={handleStatusClick}
       />

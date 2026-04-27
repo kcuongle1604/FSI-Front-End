@@ -1,10 +1,7 @@
-
-import * as React from "react"
 "use client"
 
 import { useState } from "react"
 import { ChevronDown, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react"
-import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -18,13 +15,12 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 import AppLayout from "@/components/AppLayout"
-
+import { useRouter } from "next/navigation"
 // Dữ liệu mẫu, bạn có thể thay bằng API
 const students = Array.from({ length: 40 }, (_, i) => ({
   id: i + 1,
@@ -62,13 +58,9 @@ const certificateData = [
   { id: 5, name: "Chứng chỉ tin học", status: true, note: "" },
 ]
 
-export default function TuVanHocTapDetailPage({ params }: any) {
+export default function TuVanHocTapDetailPage({ params }: { params: { id?: string } }) {
   const router = useRouter()
-  let resolvedParams = params;
-  if (typeof params?.then === "function") {
-    resolvedParams = React.use(params);
-  }
-  const studentId = resolvedParams?.id || "221121521260";
+  const studentId = params?.id || "221121521260"
   const student = Array.isArray(students)
     ? students.find(s => s.mssv === studentId) || students[0]
     : students[studentId] || students["221121521260"];

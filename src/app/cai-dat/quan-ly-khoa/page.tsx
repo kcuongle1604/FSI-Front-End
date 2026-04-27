@@ -210,11 +210,11 @@ export default function QuanLyKhoaPage() {
         </div>
 
         {batchError && <p className="text-sm text-red-600 mb-3">{batchError}</p>}
-        {loadingBatches && <p className="text-sm text-gray-600 mb-3">Đang tải danh sách khóa...</p>}
 
         {/* Table */}
         <BatchManagementTable 
           batches={filteredBatches}
+          loading={loadingBatches}
           onEditClick={handleEditClick}
           onDeleteClick={handleDeleteClick}
         />
