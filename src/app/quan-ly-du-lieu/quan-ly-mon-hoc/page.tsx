@@ -180,10 +180,10 @@ export default function QuanLyMonHocPage() {
         prev.map((item) =>
           item.id === selectedSubject.id
             ? {
-                ...item,
-                name: trimmedName,
-                credits: creditsNum,
-              }
+              ...item,
+              name: trimmedName,
+              credits: creditsNum,
+            }
             : item
         )
       )
@@ -298,11 +298,11 @@ export default function QuanLyMonHocPage() {
               </div>
 
               <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
-                <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                  <div className="overflow-x-auto">
-                    {/* Header cố định, chỉ body scroll (10 rows) */}
-                    <div>
-                      <Table className="w-full min-w-[640px] table-fixed">
+                <div className="flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
+                  {/* Table */}
+                  <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+                    <div className="overflow-x-auto" style={{ height: '530px' }}>
+                      <Table className="w-full" style={{ borderCollapse: 'collapse' }}>
                         <TableHeader>
                           <TableRow className="border-b border-gray-200 bg-blue-50">
                             <TableHead className="h-10 px-4 w-[64px] text-left text-sm font-semibold text-gray-700">
@@ -321,11 +321,6 @@ export default function QuanLyMonHocPage() {
                             </TableHead>
                           </TableRow>
                         </TableHeader>
-                      </Table>
-                    </div>
-
-                    <div className="h-[30rem] overflow-y-scroll show-scrollbar">
-                      <Table className="w-full min-w-[640px] table-fixed">
                         <TableBody>
                           {loadingSubjects ? (
                             <TableRow key="loading">

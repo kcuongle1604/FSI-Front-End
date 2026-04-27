@@ -57,7 +57,7 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
     return matchesProgram && matchesStatus
   })
 
-  const PAGE_SIZE = 15
+  const PAGE_SIZE = 10
   const totalRecords = filteredStudents.length
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
   const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages)
@@ -81,20 +81,20 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
   }
 
   return (
-    <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
+    <div className="flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
       {/* Table */}
-      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+      <div className="flex flex-col overflow-hidden min-h-0">
         <div className="overflow-auto">
           <Table className="w-full" style={{ borderCollapse: 'collapse' }}>
             <TableHeader>
               <TableRow className="border-b border-gray-200 bg-blue-50" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">STT</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">MSSV</TableHead>
-                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">HỌ & TÊN</TableHead>
-                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">LỚP</TableHead>
+                <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">Họ Và Tên</TableHead>
+                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">Lớp</TableHead>
                 <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">TCBB</TableHead>
                 <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">TCTC</TableHead>
-                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">TỔNG TC</TableHead>
+                <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">Tổng TC</TableHead>
                 <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">GPA</TableHead>
                 <TableHead className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50">CCDR</TableHead>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">
@@ -160,36 +160,44 @@ export default function XetTotNghiepTab({ students }: XetTotNghiepTabProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {pagedStudents.map((student, index) => (
-              <TableRow key={student.id} className="border-b border-gray-200 hover:bg-gray-50">
-                <TableCell className="h-12 px-4 text-center text-sm text-gray-600">
-                  {String(startIndex + index + 1).padStart(2, '0')}
-                </TableCell>
-                <TableCell className="h-12 px-4 text-sm">
-                  <button
-                    type="button"
-                    onClick={() => handleStudentClick(student.mssv)}
-                    className="text-blue-600 hover:text-blue-800 hover:underline font-normal text-sm cursor-pointer"
-                    style={{ textDecoration: 'none' }}
-                  >
-                    {student.mssv}
-                  </button>
-                </TableCell>
-                <TableCell className="h-12 px-4 text-sm text-gray-600">{student.name}</TableCell>
-                <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{student.class}</TableCell>
-                <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{student.tcbb}</TableCell>
-                <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{student.tctc}</TableCell>
-                <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{student.totalCredits}</TableCell>
-                <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{student.gpa}</TableCell>
-                <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{student.ccdr}</TableCell>
-                <TableCell className="h-12 px-4 text-sm text-gray-600">{student.program}</TableCell>
-                <TableCell className="h-12 px-4 text-sm">
-                  <span className={student.status === "Đạt" ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
-                    {student.status}
-                  </span>
+            {pagedStudents.length > 0 ? (
+              pagedStudents.map((student, index) => (
+                <TableRow key={student.id} className="border-b border-gray-200 hover:bg-gray-50">
+                  <TableCell className="h-12 px-4 text-center text-sm text-gray-600">
+                    {String(startIndex + index + 1).padStart(2, '0')}
+                  </TableCell>
+                  <TableCell className="h-12 px-4 text-sm">
+                    <button
+                      type="button"
+                      onClick={() => handleStudentClick(student.mssv)}
+                      className="text-blue-600 hover:text-blue-800 hover:underline font-normal text-sm cursor-pointer"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      {student.mssv}
+                    </button>
+                  </TableCell>
+                  <TableCell className="h-12 px-4 text-sm text-gray-600">{student.name}</TableCell>
+                  <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{student.class}</TableCell>
+                  <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{student.tcbb}</TableCell>
+                  <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{student.tctc}</TableCell>
+                  <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{student.totalCredits}</TableCell>
+                  <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{student.gpa}</TableCell>
+                  <TableCell className="h-12 px-4 text-center text-sm text-gray-600">{student.ccdr}</TableCell>
+                  <TableCell className="h-12 px-4 text-sm text-gray-600">{student.program}</TableCell>
+                  <TableCell className="h-12 px-4 text-sm">
+                    <span className={student.status === "Đạt" ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                      {student.status}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={11} className="h-120 text-center text-gray-500">
+                  Không có dữ liệu xét tốt nghiệp
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
           </Table>
         </div>

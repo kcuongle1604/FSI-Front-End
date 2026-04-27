@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, MoreVertical, Edit, Trash2 } from "lucide-react"
+import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, MoreVertical, Edit, Trash2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -19,6 +19,7 @@ import type { Account } from "../page"
 
 interface UserManagementTableProps {
   accounts: Account[]
+  loading?: boolean
   userStatuses: Record<number, string>
   onEditClick: (account: Account) => void
   onDeleteClick: (account: Account) => void
@@ -28,6 +29,7 @@ interface UserManagementTableProps {
 
 export default function UserManagementTable({
   accounts,
+  loading = false,
   userStatuses,
   onEditClick,
   onDeleteClick,
@@ -55,11 +57,11 @@ export default function UserManagementTable({
   }, [currentPage, totalPages])
 
   return (
-    <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
-      {/* Table with fixed header and footer */}
+    <div className="flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
+      {/* Table */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-        <div className="flex-1 overflow-auto min-h-0" style={{ maxHeight: 520 }}>
-          <Table className="w-full" style={{ borderCollapse: 'collapse' }}>
+        <div className="overflow-x-auto" style={{ height: '530px' }}>
+          <Table className="w-full" style={{ borderCollapse: 'collapse'}}>
             <TableHeader>
               <TableRow className="border-b border-gray-200 bg-blue-50" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">STT</TableHead>
@@ -73,56 +75,68 @@ export default function UserManagementTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visibleAccounts.map((account, index) => (
-                <TableRow key={account.user_id} className="border-b border-gray-200 hover:bg-gray-50">
-                  <TableCell className="h-12 px-4 text-sm text-gray-600">
-                    {String(startIndex + index + 1).padStart(2, '0')}
-                  </TableCell>
-                  <TableCell className="h-12 px-4 text-right pr-8">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">{account.username}</span>
-                     
+              {visibleAccounts.length > 0 ? (
+                visibleAccounts.map((account, index) => (
+                  <TableRow key={account.user_id} className="border-b border-gray-200 hover:bg-gray-50">
+                    <TableCell className="h-12 px-4 text-sm text-gray-600">
+                      {String(startIndex + index + 1).padStart(2, '0')}
+                    </TableCell>
+                    <TableCell className="h-12 px-4 text-right pr-8">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">{account.username}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="h-12 px-4 text-sm text-gray-600">{account.email}</TableCell>
+                    <TableCell className="h-12 px-4 text-sm text-gray-600">{account.role?.name}</TableCell>
+                    <TableCell className="h-12 px-4 w-[160px] whitespace-nowrap">
+                      <div
+                        className="flex items-center gap-2 cursor-pointer hover:text-[#167FFC] transition-colors w-fit"
+                        onClick={() => onStatusClick(account)}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${userStatuses[account.user_id] === "Hoạt động" ? "bg-green-500" : "bg-red-500"
+                          }`}></span>
+                        <span className="text-sm text-gray-900">{userStatuses[account.user_id]}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 hover:bg-gray-100"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-32">
+                          <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => onEditClick(account)}>
+                            <Edit className="h-4 w-4 mr-2" />Sửa
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="cursor-pointer text-sm text-red-600 focus:text-red-600" onClick={() => onDeleteClick(account)}>
+                            <Trash2 className="h-4 w-4 mr-2" />Xóa
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="p-0">
+                    <div className="h-120 w-full flex items-center justify-center text-gray-500 text-sm">
+                      {loading ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Đang tải dữ liệu...
+                        </span>
+                      ) : (
+                        "Không có người dùng nào"
+                      )}
                     </div>
-                  </TableCell>
-                  <TableCell className="h-12 px-4 text-sm text-gray-600">{account.email}</TableCell>
-                  <TableCell className="h-12 px-4 text-sm text-gray-600">{account.role?.name}</TableCell>
-                  <TableCell className="h-12 px-4 w-[160px] whitespace-nowrap">
-                    <div 
-                      className="flex items-center gap-2 cursor-pointer hover:text-[#167FFC] transition-colors w-fit"
-                      onClick={() => onStatusClick(account)}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${
-                        userStatuses[account.user_id] === "Hoạt động" ? "bg-green-500" : "bg-red-500"
-                      }`}></span>
-                      <span className="text-sm text-gray-900">{userStatuses[account.user_id]}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 hover:bg-gray-100"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-32">
-                        <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => onEditClick(account)}>
-                          <Edit className="h-4 w-4 mr-2" />Sửa
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer text-sm text-red-600 focus:text-red-600" onClick={() => onDeleteClick(account)}>
-                          <Trash2 className="h-4 w-4 mr-2" />Xóa
-                        </DropdownMenuItem>
-                        {/* <DropdownMenuItem className="cursor-pointer text-sm text-blue-600" onClick={() => onGraduateClick(account)}>
-                          <ChevronRight className="h-4 w-4 mr-2" />Xét tốt nghiệp
-                        </DropdownMenuItem> */}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </div>

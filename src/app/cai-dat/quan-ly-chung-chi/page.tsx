@@ -487,12 +487,10 @@ export default function QuanLyChungChiPage() {
               {certificateError && (
                 <p className="text-sm text-red-600 mb-3">{certificateError}</p>
               )}
-              {loadingCertificates && (
-                <p className="text-sm text-gray-600 mb-3">Đang tải danh sách chứng chỉ...</p>
-              )}
               {/* Table */}
               <CertificateManagementTableWithStatusDialog
                 certificates={filteredCertificates}
+                loading={loadingCertificates}
                 onEditClick={(c: Certificate) => { setSelectedCertificate(c); setOpenEditDialog(true); }}
                 onDeleteClick={(c: Certificate) => {
                   setSelectedExemptCertificate(undefined);
@@ -527,12 +525,10 @@ export default function QuanLyChungChiPage() {
               {exemptionError && (
                 <p className="text-sm text-red-600 mb-3">{exemptionError}</p>
               )}
-              {loadingExemptions && (
-                <p className="text-sm text-gray-600 mb-3">Đang tải danh sách miễn chứng chỉ...</p>
-              )}
               {/* Table có thêm chuyên ngành */}
               <ExemptCertificateManagementTable
                 certificates={filteredExemptCertificates}
+                loading={loadingExemptions}
                 onEditClick={(c: ExemptCertificate) => { setSelectedExemptCertificate(c); setOpenExemptEditDialog(true); }}
                 onDeleteClick={(c: ExemptCertificate) => {
                   setSelectedCertificate(undefined);

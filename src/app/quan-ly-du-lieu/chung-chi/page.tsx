@@ -30,6 +30,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsRight,
+  Loader2,
 } from "lucide-react"
 import {
   Select,
@@ -190,10 +191,19 @@ export default function ChungChiPage() {
   const [baseCellStatus, setBaseCellStatus] = useState<Record<string, boolean>>({})
   const [savingTableChanges, setSavingTableChanges] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState("")
+  const certificateTableScrollRef = useRef<HTMLDivElement | null>(null)
+  const certificateColumnScrollRef = useRef<HTMLDivElement | null>(null)
+  const isSyncingCertificateScrollRef = useRef(false)
+  const [certificateColumnScrollWidth, setCertificateColumnScrollWidth] = useState(0)
 
   const classNameOf = (item: ClassApiItem): string => String(item.class_name || item.name || "").trim()
   const getClassByName = (className?: string) =>
     classes.find((c) => classNameOf(c) === String(className || "").trim())
+  const getCertificateTableInnerScroller = () => {
+    const root = certificateTableScrollRef.current
+    if (!root) return null
+    return (root.querySelector('[data-slot="table-container"]') as HTMLDivElement | null) || root
+  }
 
   const getValidTab = (tab: string | null) => {
     if (tab === "import-mien-hoc-phan-tieng-anh") return "import-mien-hoc-phan-tieng-anh"
@@ -256,6 +266,12 @@ export default function ChungChiPage() {
 
   const PAGE_SIZE = 10
   const API_LIMIT = 100
+  const hasData = Boolean(
+    selectedKhoa &&
+      selectedKhoa !== "all" &&
+      selectedLop &&
+      selectedLop !== "all"
+  )
   const totalRecords = filteredCertificates.length
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
   const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages)
@@ -276,7 +292,9 @@ export default function ChungChiPage() {
     })
     return Array.from(allDynamicKeys)
   }, [certificateColumnHeaders, certificates, selectedKhoa])
+  const tableColumnCount = certificateColumns.length + 6
   const hasPendingTableChanges = Object.keys(editedCellStatus).length > 0
+  const shouldShowCertificateScrollbar = !loadingCertificates && certificateColumns.length > 0
 
   useEffect(() => {
     setCurrentPage(1)
@@ -287,6 +305,66 @@ export default function ChungChiPage() {
       setCurrentPage(totalPages)
     }
   }, [currentPage, totalPages])
+
+  useEffect(() => {
+    const tableScroller = getCertificateTableInnerScroller()
+    if (!tableScroller) return
+
+    const updateCertificateScrollWidth = () => {
+      // 590px = fixed left columns (STT, LOP, HO LOT, TEN, NGAY SINH)
+      const fixedWidth = 590
+      const columnContentWidth = tableScroller.scrollWidth - fixedWidth
+      const columnViewportWidth = Math.max(tableScroller.clientWidth - fixedWidth, 0)
+
+      setCertificateColumnScrollWidth(Math.max(columnContentWidth, columnViewportWidth + 2, 2))
+    }
+
+    updateCertificateScrollWidth()
+
+    const resizeObserver = new ResizeObserver(updateCertificateScrollWidth)
+    resizeObserver.observe(tableScroller)
+
+    const tableElement = tableScroller.querySelector("table")
+    if (tableElement) {
+      resizeObserver.observe(tableElement)
+    }
+
+    window.addEventListener("resize", updateCertificateScrollWidth)
+
+    return () => {
+      window.removeEventListener("resize", updateCertificateScrollWidth)
+      resizeObserver.disconnect()
+    }
+  }, [certificateColumns.length, visibleCertificates.length, loadingCertificates, selectedKhoa, selectedLop])
+
+  useEffect(() => {
+    const tableScroller = getCertificateTableInnerScroller()
+    const columnScroller = certificateColumnScrollRef.current
+    if (!tableScroller || !columnScroller) return
+
+    const syncFromTable = () => {
+      if (isSyncingCertificateScrollRef.current) return
+      isSyncingCertificateScrollRef.current = true
+      columnScroller.scrollLeft = tableScroller.scrollLeft
+      isSyncingCertificateScrollRef.current = false
+    }
+
+    const syncFromColumn = () => {
+      if (isSyncingCertificateScrollRef.current) return
+      isSyncingCertificateScrollRef.current = true
+      tableScroller.scrollLeft = columnScroller.scrollLeft
+      isSyncingCertificateScrollRef.current = false
+    }
+
+    tableScroller.addEventListener("scroll", syncFromTable)
+    columnScroller.addEventListener("scroll", syncFromColumn)
+    columnScroller.scrollLeft = tableScroller.scrollLeft
+
+    return () => {
+      tableScroller.removeEventListener("scroll", syncFromTable)
+      columnScroller.removeEventListener("scroll", syncFromColumn)
+    }
+  }, [certificateColumnScrollWidth, shouldShowCertificateScrollbar])
 
   useEffect(() => {
     const nextBaseStatus: Record<string, boolean> = {}
@@ -395,7 +473,7 @@ export default function ChungChiPage() {
     }
 
     const normalizedTarget = normalizeText(columnName)
-    
+
     for (const [key, val] of Object.entries(anyCert)) {
       if (normalizeText(key) === normalizedTarget) {
         return Boolean(val);
@@ -454,7 +532,7 @@ export default function ChungChiPage() {
       const normalizedLabel = normalizeText(option.label)
       return normalizedLabel.includes(normalizedHeader) || normalizedHeader.includes(normalizedLabel)
     })
-    
+
     return inclusive?.id ?? null
   }
 
@@ -741,13 +819,12 @@ export default function ChungChiPage() {
   }, [activeTab])
 
   useEffect(() => {
-    fetchCertificateSummary()
     fetchClassAndCohortOptions()
   }, [])
 
   useEffect(() => {
     const fetchCertificatesByCohort = async () => {
-      if (!selectedKhoa || selectedKhoa === "all") {
+      if (!hasData || !selectedKhoa || selectedKhoa === "all") {
         setCertificateColumnHeaders([])
         return
       }
@@ -788,7 +865,18 @@ export default function ChungChiPage() {
     }
 
     void fetchCertificatesByCohort()
-  }, [selectedKhoa])
+  }, [hasData, selectedKhoa])
+
+  useEffect(() => {
+    if (!hasData) {
+      setLoadingCertificates(false)
+      setCertificates([])
+      setCertificateColumnHeaders([])
+      return
+    }
+
+    void fetchCertificateSummary()
+  }, [hasData, selectedKhoa, selectedLop])
 
   useEffect(() => {
     if (!didInitFromUrlRef.current || isSyncingFromUrlRef.current) return
@@ -1028,69 +1116,71 @@ export default function ChungChiPage() {
               {saveSuccess && (
                 <p className="text-sm text-green-600 mb-3">{saveSuccess}</p>
               )}
-              {loadingCertificates && (
-                <p className="text-sm text-gray-600 mb-3">Đang tải dữ liệu chứng chỉ...</p>
-              )}
 
               <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
                 <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                  <div className="overflow-auto">
-                    <Table className="w-full min-w-[1000px]">
+                  <div ref={certificateTableScrollRef} className="overflow-y-auto overflow-x-hidden" style={{ scrollbarGutter: "stable" }}>
+                    <Table
+                      containerClassName="overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      className="w-max min-w-full"
+                    >
                       <TableHeader>
-                        <TableRow className="border-b border-gray-200 bg-blue-50">
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                        <TableRow className="border-b border-gray-200 bg-blue-50" style={{ position: "sticky", top: 0, zIndex: 10 }}>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: 0, zIndex: 25, minWidth: "60px", width: "60px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
                             STT
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "60px", zIndex: 24, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
                             LỚP
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "180px", zIndex: 23, minWidth: "170px", width: "170px", maxWidth: "170px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
                             HỌ LÓT
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "350px", zIndex: 22, minWidth: "120px", width: "120px", maxWidth: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
                             TÊN
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "470px", zIndex: 21, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
                             NGÀY SINH
                           </TableHead>
                           {certificateColumns.map((headerName, headerIndex) => (
                             <TableHead
                               key={`${headerName}-${headerIndex}`}
-                              className="h-10 px-4 text-center text-sm font-semibold text-gray-700"
+                              className="h-10 px-4 text-center text-sm font-semibold text-gray-700 whitespace-nowrap"
                             >
-                              {headerName}
+                              <div className="truncate" title={headerName}>
+                                {headerName}
+                              </div>
                             </TableHead>
                           ))}
-                          <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 w-12" />
                         </TableRow>
-                      </TableHeader>
+                    </TableHeader>
 
-                      <TableBody>
-                        {visibleCertificates.map((certificate, index) => {
+                    <TableBody>
+                      {certificateColumns.length > 0 ? (
+                        visibleCertificates.map((certificate, index) => {
                           return (
                             <TableRow
                               key={certificate.id}
                               className="border-b border-gray-200 hover:bg-gray-50"
                             >
-                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                              <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: 0, zIndex: 10, minWidth: "60px", width: "60px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
                                 {String(startIndex + index + 1).padStart(2, "0")}
                               </TableCell>
-                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                              <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "60px", zIndex: 9, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
                                 {certificate.lop}
                               </TableCell>
-                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                              <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "180px", zIndex: 8, minWidth: "170px", width: "170px", maxWidth: "170px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
                                 {certificate.hoLot}
                               </TableCell>
-                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                              <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "350px", zIndex: 7, minWidth: "120px", width: "120px", maxWidth: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
                                 {certificate.ten}
                               </TableCell>
-                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                              <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "470px", zIndex: 6, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
                                 {certificate.ngaySinh}
                               </TableCell>
                               {certificateColumns.map((headerName, headerIndex) => (
                                 <TableCell
                                   key={`${certificate.id}-${headerName}-${headerIndex}`}
-                                  className="h-12 px-4 text-sm text-gray-600 text-center"
+                                  className="h-12 px-4 text-sm text-gray-600 text-center min-w-[80px] w-[80px] max-w-[80px]"
                                 >
                                   <div className="flex justify-center">
                                     <Checkbox
@@ -1103,115 +1193,125 @@ export default function ChungChiPage() {
                                   </div>
                                 </TableCell>
                               ))}
-                              <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100">
-                                      <MoreVertical className="w-4 h-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-32">
-                                    <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => handleEdit(certificate)}>
-                                      <Edit className="h-4 w-4 mr-2" /> Sửa
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      className="cursor-pointer text-sm text-red-600 focus:text-red-600"
-                                      onClick={() => handleDelete(certificate)}
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" /> Xóa
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
                             </TableRow>
                           )
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50 sticky bottom-0 z-10">
-                  <div className="text-sm text-gray-600">
-                    Hiển thị {displayCount}/{totalRecords} dòng
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 border-gray-300"
-                      disabled={safeCurrentPage <= 1}
-                      onClick={() => setCurrentPage(1)}
-                    >
-                      <ChevronsLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 border-gray-300"
-                      disabled={safeCurrentPage <= 1}
-                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <div className="flex items-center gap-1 px-3 text-sm">
-                      <span className="font-medium text-gray-700">{safeCurrentPage}</span>
-                      <span className="text-gray-400">/</span>
-                      <span className="text-gray-600">{totalPages}</span>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 border-gray-300"
-                      disabled={safeCurrentPage >= totalPages}
-                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 border-gray-300"
-                      disabled={safeCurrentPage >= totalPages}
-                      onClick={() => setCurrentPage(totalPages)}
-                    >
-                      <ChevronsRight className="h-4 w-4" />
-                    </Button>
-                  </div>
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={tableColumnCount} className="p-0">
+                            <div className="h-120 w-full flex items-center justify-center text-gray-500 text-sm">
+                              {loadingCertificates ? (
+                                <span className="inline-flex items-center gap-2">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Đang tải dữ liệu...
+                                </span>
+                              ) : !hasData ? (
+                                "Vui lòng chọn khóa/lớp để xem chứng chỉ"
+                              ) : (
+                                "Không có dữ liệu"
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
-            </TabsContent>
 
-            <TabsContent
-              value="import-mien-hoc-phan-tieng-anh"
-              className="m-0 h-full outline-none"
-            >
-              <div className="bg-white rounded-lg border border-slate-200 p-6 max-w-2xl">
-                <h2 className="text-lg font-semibold text-slate-900 mb-2">
-                  Import chứng chỉ miễn học phần tiếng Anh
-                </h2>
-                <p className="text-sm text-slate-600 mb-4">
-                  Tải lên file CSV chứa dữ liệu chứng chỉ để cập nhật trạng thái miễn học phần tiếng Anh cho sinh viên.
-                </p>
-                <Button
-                  className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm"
-                  onClick={() => setIsEnglishExemptionImportOpen(true)}
-                >
-                  <Upload className="h-4 w-4" />
-                  Chọn file và import
-                </Button>
+              {shouldShowCertificateScrollbar && (
+                <div className="ml-[590px] mb-[10px]">
+                  <div
+                    ref={certificateColumnScrollRef}
+                    className="overflow-x-scroll overflow-y-hidden"
+                    style={{ scrollbarWidth: "auto", scrollbarColor: "#A5A9B0 #F6F8FB" }}
+                  >
+                    <div style={{ width: certificateColumnScrollWidth, height: 2 }} />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50 sticky bottom-0 z-10">
+                <div className="text-sm text-gray-600">
+                  Hiển thị {displayCount}/{totalRecords} dòng
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-gray-300"
+                    disabled={safeCurrentPage <= 1}
+                    onClick={() => setCurrentPage(1)}
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-gray-300"
+                    disabled={safeCurrentPage <= 1}
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div className="flex items-center gap-1 px-3 text-sm">
+                    <span className="font-medium text-gray-700">{safeCurrentPage}</span>
+                    <span className="text-gray-400">/</span>
+                    <span className="text-gray-600">{totalPages}</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-gray-300"
+                    disabled={safeCurrentPage >= totalPages}
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-gray-300"
+                    disabled={safeCurrentPage >= totalPages}
+                    onClick={() => setCurrentPage(totalPages)}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-            </TabsContent>
-
-            <TabsContent
-              value="lich-su-import"
-              className="m-0 h-full outline-none flex flex-col min-h-0"
-            >
-              <ImportHistoryTab history={importHistory} />
-            </TabsContent>
           </div>
-        </Tabs>
+        </TabsContent>
+
+        <TabsContent
+          value="import-mien-hoc-phan-tieng-anh"
+          className="m-0 h-full outline-none"
+        >
+          <div className="bg-white rounded-lg border border-slate-200 p-6 max-w-2xl">
+            <h2 className="text-lg font-semibold text-slate-900 mb-2">
+              Import chứng chỉ miễn học phần tiếng Anh
+            </h2>
+            <p className="text-sm text-slate-600 mb-4">
+              Tải lên file CSV chứa dữ liệu chứng chỉ để cập nhật trạng thái miễn học phần tiếng Anh cho sinh viên.
+            </p>
+            <Button
+              className="bg-[#167FFC] hover:bg-[#1470E3] text-white h-9 gap-2 text-sm"
+              onClick={() => setIsEnglishExemptionImportOpen(true)}
+            >
+              <Upload className="h-4 w-4" />
+              Chọn file và import
+            </Button>
+          </div>
+        </TabsContent>
+
+        <TabsContent
+          value="lich-su-import"
+          className="m-0 h-full outline-none flex flex-col min-h-0"
+        >
+          <ImportHistoryTab history={importHistory} />
+        </TabsContent>
       </div>
+    </Tabs>
+      </div >
 
       <CertificateFormDialog
         open={isFormOpen}
@@ -1252,6 +1352,6 @@ export default function ChungChiPage() {
         uploadTitle="Import chứng chỉ miễn học phần tiếng Anh"
         uploadDescription="Chọn file CSV chứa dữ liệu chứng chỉ miễn học phần tiếng Anh"
       />
-    </AppLayout>
+    </AppLayout >
   )
 }
