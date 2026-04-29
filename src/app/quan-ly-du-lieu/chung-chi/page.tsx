@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, useMemo } from "react"
+import { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
 import { Award, History, Upload } from "lucide-react"
@@ -84,10 +84,9 @@ type CohortApiItem = {
   year_end?: number
 }
 
-type CohortCertificateApiItem = {
+type ClassRequirementApiItem = {
   certificate_id?: number
   name?: string
-  note?: string
 }
 
 type StudentCertificateSummaryItem = {
@@ -185,6 +184,8 @@ export default function ChungChiPage() {
   const [loadingCertificates, setLoadingCertificates] = useState(false)
   const [certificateError, setCertificateError] = useState("")
   const [certificateColumnHeaders, setCertificateColumnHeaders] = useState<string[]>([])
+  const [certificateOptions, setCertificateOptions] = useState<CertificateOption[]>([])
+  const [certificateOptionsLoaded, setCertificateOptionsLoaded] = useState(false)
   const [importHistory, setImportHistory] = useState<FileImport[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [editedCellStatus, setEditedCellStatus] = useState<Record<string, boolean>>({})
@@ -279,9 +280,10 @@ export default function ChungChiPage() {
   const visibleCertificates = filteredCertificates.slice(startIndex, startIndex + PAGE_SIZE)
   const displayCount = visibleCertificates.length
   const certificateColumns = useMemo(() => {
-    if (selectedKhoa && selectedKhoa !== "all" && Array.isArray(certificateColumnHeaders) && certificateColumnHeaders.length > 0) {
+    if (selectedLop && selectedLop !== "all" && Array.isArray(certificateColumnHeaders) && certificateColumnHeaders.length > 0) {
       return certificateColumnHeaders
     }
+
     const allDynamicKeys = new Set<string>()
     certificates.forEach(cert => {
       for (const key of Object.keys(cert)) {
@@ -290,8 +292,28 @@ export default function ChungChiPage() {
         }
       }
     })
-    return Array.from(allDynamicKeys)
+    const dataKeys = Array.from(allDynamicKeys)
+    const numericKeys = dataKeys.filter((key) => Number.isFinite(Number(key)))
+    if (numericKeys.length > 0) {
+      return numericKeys.sort((a, b) => Number(a) - Number(b))
+    }
+    return dataKeys
   }, [certificateColumnHeaders, certificates, selectedKhoa])
+  const certificateLabelById = useMemo(() => {
+    return new Map(certificateOptions.map((option) => [option.id, option.label]))
+  }, [certificateOptions])
+  const getColumnLabel = (columnName: string): string => {
+    const numericId = Number(columnName)
+    if (Number.isFinite(numericId)) {
+      if (selectedKhoa && selectedKhoa !== "all" && (!selectedLop || selectedLop === "all")) {
+        return ""
+      }
+      if (!certificateOptionsLoaded) return ""
+      return certificateLabelById.get(numericId) ?? String(numericId)
+    }
+
+    return columnName
+  }
   const tableColumnCount = certificateColumns.length + 6
   const hasPendingTableChanges = Object.keys(editedCellStatus).length > 0
   const shouldShowCertificateScrollbar = !loadingCertificates && certificateColumns.length > 0
@@ -523,6 +545,9 @@ export default function ChungChiPage() {
   }
 
   const mapHeaderToCertificateId = (headerName: string, options: CertificateOption[]): number | null => {
+    const numericId = Number(headerName)
+    if (Number.isFinite(numericId)) return numericId
+
     const normalizedHeader = normalizeText(headerName)
 
     const exact = options.find((option) => normalizeText(option.label) === normalizedHeader)
@@ -570,31 +595,22 @@ export default function ChungChiPage() {
     return Array.from(new Map(all.map((item) => [item.id, item])).values())
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const unlinkStudentCertificate = async (studentId: number, certificateId: number) => {
-    const candidates: Array<() => Promise<unknown>> = [
-      () => api.delete("/api/v1/student-certificates", { data: { student_id: studentId, certificate_id: certificateId } }),
-      () => api.delete("/api/v1/student-certificates", { data: { studentId, certificateId } }),
-      () => api.delete(`/api/v1/student-certificates/by-student/${studentId}/certificate/${certificateId}`),
-      () => api.delete(`/api/v1/student-certificates/student/${studentId}/certificate/${certificateId}`),
-    ]
-
-    for (const run of candidates) {
+  useEffect(() => {
+    const loadCertificateOptions = async () => {
       try {
-        await run()
-        return
-      } catch (error: any) {
-        const status = Number(error?.response?.status)
-        if ([404, 405].includes(status)) {
-          continue
-        }
-
-        throw error
+        const options = await fetchCertificateOptions()
+        setCertificateOptions(options)
+        setCertificateOptionsLoaded(true)
+      } catch {
+        setCertificateOptions([])
+        setCertificateOptionsLoaded(true)
       }
     }
 
-    throw new Error("Không thể bỏ chọn chứng chỉ do backend chưa hỗ trợ endpoint phù hợp.")
-  }
+    loadCertificateOptions()
+  }, [])
+
+
 
   const handleSaveTableChanges = async () => {
     if (!hasPendingTableChanges) return
@@ -605,6 +621,8 @@ export default function ChungChiPage() {
       setSaveSuccess("")
 
       const certificateOptions = await fetchCertificateOptions()
+      setCertificateOptions(certificateOptions)
+      setCertificateOptionsLoaded(true)
       const unresolvedHeaders: string[] = []
       const headerIdByIndex = new Map<number, number>()
 
@@ -823,22 +841,19 @@ export default function ChungChiPage() {
   }, [])
 
   useEffect(() => {
-    const fetchCertificatesByCohort = async () => {
-      if (!hasData || !selectedKhoa || selectedKhoa === "all") {
+    const fetchCertificatesByClass = async () => {
+      if (!selectedLop || selectedLop === "all") {
         setCertificateColumnHeaders([])
+        setCertificateOptions([])
+        setCertificateOptionsLoaded(true)
         return
       }
 
-      const cohortId = Number(selectedKhoa)
-      if (!Number.isFinite(cohortId)) {
-        setCertificateColumnHeaders([])
-        return
-      }
-
+      setCertificateOptionsLoaded(false)
       try {
-        const res = await api.get<
-          CohortCertificateApiItem[] | { data?: CohortCertificateApiItem[]; items?: CohortCertificateApiItem[] }
-        >(`/api/v1/cohorts/${cohortId}/certificates`)
+        const res = await api.get<ClassRequirementApiItem[] | { data?: ClassRequirementApiItem[]; items?: ClassRequirementApiItem[] }>(
+          `/api/v1/student-certificates/class-requirements/${encodeURIComponent(selectedLop)}`
+        )
 
         const payload = res.data
         const list = Array.isArray(payload)
@@ -849,34 +864,27 @@ export default function ChungChiPage() {
               ? payload.items
               : []
 
-        const names = list
-          .map((item) => String(item?.name || "").trim())
-          .filter((name) => name.length > 0)
+        const options = list
+          .map((item) => {
+            const id = Number(item?.certificate_id)
+            const label = String(item?.name || "").trim()
+            if (!Number.isFinite(id) || !label) return null
+            return { id, label }
+          })
+          .filter((item): item is CertificateOption => item !== null)
 
-        if (names.length === 0) {
-          setCertificateColumnHeaders([])
-          return
-        }
-
-        setCertificateColumnHeaders(names)
+        setCertificateOptions(options)
+        setCertificateColumnHeaders(options.map((option) => String(option.id)))
+        setCertificateOptionsLoaded(true)
       } catch {
         setCertificateColumnHeaders([])
+        setCertificateOptions([])
+        setCertificateOptionsLoaded(true)
       }
     }
 
-    void fetchCertificatesByCohort()
-  }, [hasData, selectedKhoa])
-
-  useEffect(() => {
-    if (!hasData) {
-      setLoadingCertificates(false)
-      setCertificates([])
-      setCertificateColumnHeaders([])
-      return
-    }
-
-    void fetchCertificateSummary()
-  }, [hasData, selectedKhoa, selectedLop])
+    void fetchCertificatesByClass()
+  }, [selectedLop])
 
   useEffect(() => {
     if (!didInitFromUrlRef.current || isSyncingFromUrlRef.current) return
@@ -934,25 +942,18 @@ export default function ChungChiPage() {
     }
   }
 
-  const handleDeleteCertificate = async () => {
+  const handleDeleteCertificate = useCallback(async () => {
     if (!selectedCertificate) return
 
-    const certificateId = Number(selectedCertificate.id)
-    if (!Number.isFinite(certificateId)) {
-      setCertificateError("Không xác định được certificate_id để xóa")
-      return
-    }
-
+    setCertificateError("")
     try {
-      setCertificateError("")
-      await api.delete(`/api/v1/certificates/${certificateId}`)
-
+      await api.delete(`/api/v1/certificates/${selectedCertificate.id}`)
       await fetchCertificateSummary()
       setSelectedCertificate(null)
     } catch (error: any) {
-      setCertificateError(extractBackendMessage(error, "Không thể xóa chứng chỉ"))
+      setCertificateError(extractBackendMessage(error, ""))
     }
-  }
+  }, [selectedCertificate])
 
   return (
     <AppLayout showSearch={false}>
@@ -1146,6 +1147,7 @@ export default function ChungChiPage() {
                               key={`${headerName}-${headerIndex}`}
                               className="h-10 px-4 text-center text-sm font-semibold text-gray-700 whitespace-nowrap"
                             >
+                              {getColumnLabel(headerName)}
                               <div className="truncate" title={headerName}>
                                 {headerName}
                               </div>

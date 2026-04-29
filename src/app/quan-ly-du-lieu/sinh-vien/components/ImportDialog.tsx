@@ -18,6 +18,12 @@ import {
 import { importStudents, importStudentCertificatesCsvBySemester, importStudentCertificatesHtml } from "../student.api"
 import type { ImportAnalysisResponse, ImportExecutionResponse, ImportError, ColumnMapping } from "../types"
 
+type ImportResultPayload = ImportExecutionResponse & {
+  created_by_id?: number
+  type?: string
+  error_message?: string
+}
+
 interface ImportTypeOption {
   value: string
   label: string
@@ -85,8 +91,27 @@ export default function ImportDialog({
   // API integration states
   const [loading, setLoading] = useState(false)
   const [dryRunResult, setDryRunResult] = useState<ImportAnalysisResponse | null>(null)
-  const [importResult, setImportResult] = useState<ImportExecutionResponse | null>(null)
+  const [importResult, setImportResult] = useState<ImportResultPayload | null>(null)
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
+
+  const normalizeImportResult = (payload: any): ImportResultPayload => {
+    const fallbackStatus = String(payload?.status ?? "").trim()
+    const fallbackMessage = fallbackStatus ? `Trạng thái: ${fallbackStatus}` : "Import hoàn tất"
+
+    return {
+      id: Number(payload?.id ?? 0),
+      file_name: String(payload?.file_name ?? importFile?.name ?? ""),
+      status: fallbackStatus,
+      total_processed: Number(payload?.total_processed ?? 0),
+      success_count: Number(payload?.success_count ?? 0),
+      failure_count: Number(payload?.failure_count ?? 0),
+      created_at: String(payload?.created_at ?? ""),
+      message: String(payload?.message ?? fallbackMessage),
+      created_by_id: payload?.created_by_id != null ? Number(payload.created_by_id) : undefined,
+      type: payload?.type != null ? String(payload.type) : undefined,
+      error_message: payload?.error_message != null ? String(payload.error_message) : undefined,
+    }
+  }
 
   const isAggregateScoreImport = importType === 'diem-tong-hop'
   const isEnglishScoreImport = importType === 'diem-tieng-anh'
@@ -336,17 +361,17 @@ export default function ImportDialog({
 
       if (isCertificateImport) {
         const uploadDate = getTodayUploadDate()
-        if (isCertificateCsvImport) {
-          await importStudentCertificatesCsvBySemester(importFile, uploadDate)
-        } else {
-          await importStudentCertificatesHtml(importFile, uploadDate)
-        }
+        const response = isCertificateCsvImport
+          ? await importStudentCertificatesCsvBySemester(importFile, uploadDate)
+          : await importStudentCertificatesHtml(importFile, uploadDate)
+
+        const payload = (response as any)?.data ?? response
+        setImportResult(normalizeImportResult(payload))
+        setImportStep('result')
 
         if (onImportSuccess) {
           onImportSuccess()
         }
-
-        handleOpenChange(false)
         return
       }
 
@@ -354,7 +379,7 @@ export default function ImportDialog({
 
       const response = await importStudents(importFile, false, apiColumnMapping) as { data: ImportExecutionResponse }
       
-      setImportResult(response.data)
+      setImportResult(normalizeImportResult(response.data))
       setImportStep('result')
 
       // Call success callback to refresh the student list
@@ -389,9 +414,7 @@ export default function ImportDialog({
       }
       
       setImportError(errorMessage)
-      if (!isCertificateImport) {
-        setImportStep('result')
-      }
+      setImportStep('result')
     } finally {
       setLoading(false)
     }
@@ -813,6 +836,11 @@ export default function ImportDialog({
               <p className="text-xs text-gray-400">
                 Trạng thái: {importResult.status}
               </p>
+              {importResult.error_message && (
+                <p className="text-sm text-red-600">
+                  {importResult.error_message}
+                </p>
+              )}
             </div>
           </div>
         )}

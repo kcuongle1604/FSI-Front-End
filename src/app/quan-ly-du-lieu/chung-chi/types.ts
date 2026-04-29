@@ -26,6 +26,19 @@ export interface FileImport {
   createdBy: string
 }
 
+export interface CertificateImportResponse {
+  id: number
+  file_name: string
+  created_by_id: number
+  type: string
+  status: string
+  total_processed: number
+  success_count: number
+  failure_count: number
+  error_message: string
+  created_at: string
+}
+
 export type CertificateFormData = Omit<Certificate, 'id'>
 
 export interface StudentCertificateCreatePayload {

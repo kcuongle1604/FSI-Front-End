@@ -45,6 +45,7 @@ export default function QuanLyChuyenNganhPage() {
   const [openEditDialog, setOpenEditDialog] = useState(false)
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false)
   const [selectedSpecialization, setSelectedSpecialization] = useState<Specialization | undefined>()
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState("")
 
   const fetchMajors = async () => {
     try {
@@ -104,6 +105,7 @@ export default function QuanLyChuyenNganhPage() {
 
   const handleDeleteClick = (spec: Specialization) => {
     setSelectedSpecialization(spec)
+    setDeleteErrorMessage("")
     setOpenDeleteDialog(true)
   }
 
@@ -176,12 +178,12 @@ export default function QuanLyChuyenNganhPage() {
 
   const handleConfirmDelete = async () => {
     if (!selectedSpecialization?.apiId) {
-      setSpecializationError("Không xác định được chuyên ngành cần xóa")
+      setDeleteErrorMessage("Không xác định được chuyên ngành cần xóa")
       return false
     }
 
     try {
-      setSpecializationError("")
+      setDeleteErrorMessage("")
 
       const majorId = selectedSpecialization.apiId.trim()
 
@@ -214,19 +216,17 @@ export default function QuanLyChuyenNganhPage() {
 
       await fetchMajors()
       setSelectedSpecialization(undefined)
+      setDeleteErrorMessage("")
       return true
     } catch (error: any) {
       console.error("Delete major failed", error)
-      const statusCode = error?.response?.status
       const responseData = error?.response?.data
       const backendMessage =
         typeof responseData === "string"
           ? responseData
-          : responseData?.detail || responseData?.message || JSON.stringify(responseData)
+          : responseData?.detail || responseData?.message || ""
 
-      setSpecializationError(
-        `Xóa chuyên ngành ID=${selectedSpecialization.apiId || selectedSpecialization.id} thất bại (${statusCode || "unknown"}). ${backendMessage || "Vui lòng thử lại."}`
-      )
+      setDeleteErrorMessage(backendMessage || "Xóa chuyên ngành thất bại. Vui lòng thử lại.")
       return false
     }
   }
@@ -299,9 +299,15 @@ export default function QuanLyChuyenNganhPage() {
       {/* Delete Specialization Dialog */}
       <DeleteSpecializationDialog 
         open={openDeleteDialog}
-        onOpenChange={setOpenDeleteDialog}
+        onOpenChange={(isOpen) => {
+          setOpenDeleteDialog(isOpen)
+          if (!isOpen) {
+            setDeleteErrorMessage("")
+          }
+        }}
         specialization={selectedSpecialization}
         onConfirm={handleConfirmDelete}
+        errorMessage={deleteErrorMessage}
       />
     </AppLayout>
   )
