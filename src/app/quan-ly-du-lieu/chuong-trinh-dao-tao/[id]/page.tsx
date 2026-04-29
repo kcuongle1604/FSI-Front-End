@@ -18,6 +18,7 @@ import {
   MoreVertical,
   BookOpen,
   History,
+  Loader2,
 } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -27,6 +28,14 @@ import ProgramSubjectsImportDialog from "../ProgramSubjectsImportDialog";
 import type { FileImport } from "../../sinh-vien/types";
 import CourseFormDialog, { CourseFormValues } from "../CourseFormDialog";
 import DeleteCourseDialog from "../DeleteCourseDialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { addSubjectToTrainingProgram, deleteSubjectFromTrainingProgram, getProgramCohorts, getSubjectsByProgramId, getTrainingPrograms, updateTrainingProgramSubject, type Subject } from "../program.api";
 
 type ProgramCourse = {
@@ -481,76 +490,58 @@ export default function ChuongTrinhDaoTaoDetailPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden">
-                {/* Header cố định, chỉ body scroll: 10 rows (h-12 = 3rem) => 30rem */}
-                <div className="overflow-x-auto">
-                  {/* Chừa chỗ bên phải để khớp với scrollbar của body */}
-                  <div>
-                    <table className="w-full table-fixed" style={{ borderCollapse: "collapse" }}>
-                      <thead>
-                        <tr className="border-b border-gray-200 bg-blue-50">
-                          <th className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 uppercase w-[6%]">
+                <div className="flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
+                  {/* Table */}
+                  <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+                    <div className="overflow-x-auto" style={{ height: '530px' }}>
+                      <Table className="w-full" style={{ borderCollapse: 'collapse' }}>
+                      <TableHeader>
+                        <TableRow className="border-b border-gray-200 bg-blue-50">
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 uppercase w-[6%]">
                             STT
-                          </th>
-                          <th className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 uppercase w-[16%]">
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 uppercase w-[16%]">
                             MÃ HỌC PHẦN
-                          </th>
-                          <th className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 uppercase w-[32%]">
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 uppercase w-[32%]">
                             TÊN HỌC PHẦN
-                          </th>
-                          <th className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 uppercase w-[12%]">
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 uppercase w-[12%]">
                             SỐ TÍN CHỈ
-                          </th>
-                          <th className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 uppercase w-[12%]">
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 uppercase w-[12%]">
                             BẮT BUỘC
-                          </th>
-                          <th className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 uppercase w-[12%]">
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50 uppercase w-[12%]">
                             TỰ CHỌN
-                          </th>
-                          <th className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-[10%]">
+                          </TableHead>
+                          <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 bg-blue-50 w-[10%]">
                             <span className="sr-only">Actions</span>
-                          </th>
-                        </tr>
-                      </thead>
-                    </table>
-                  </div>
-
-                  <div className="h-[30rem] overflow-y-scroll show-scrollbar">
-                    <table className="w-full table-fixed" style={{ borderCollapse: "collapse" }}>
-                      <tbody>
-                        {loading ? (
-                          <tr key="loading">
-                            <td colSpan={7} className="text-center text-gray-500 py-6">
-                              Đang tải...
-                            </td>
-                          </tr>
-                        ) : filteredCourses.length === 0 ? (
-                          <tr key="empty">
-                            <td colSpan={7} className="text-center text-gray-500 py-6">
-                              Chưa có học phần nào
-                            </td>
-                          </tr>
-                        ) : (
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredCourses.length > 0 ? (
                           filteredCourses.map((course, idx) => (
-                            <tr
+                            <TableRow
                               key={course.id}
                               className="border-b border-gray-200 hover:bg-gray-50 last:border-b-0"
                             >
-                              <td className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[6%]">
+                              <TableHead className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[6%]">
                                 {String(idx + 1).padStart(2, "0")}
-                              </td>
-                              <td className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[16%]">
+                              </TableHead>
+                              <TableHead className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[16%]">
                                 <div className="truncate">{course.code}</div>
-                              </td>
-                              <td className="h-12 px-4 text-sm text-gray-700 w-[32%]">
+                              </TableHead>
+                              <TableHead className="h-12 px-4 text-sm text-gray-700 w-[32%]">
                                 <div className="truncate">{course.name}</div>
-                              </td>
-                              <td className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[12%]">{course.credits}</td>
-                              <td className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[12%]">
-                                {course.compulsory || ""}
-                              </td>
-                              <td className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[12%]">{course.optional || ""}</td>
-                              <td className="h-12 px-4 text-right whitespace-nowrap w-[10%]">
+                              </TableHead>
+                              <TableHead className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[12%]">{course.credits || "-"}</TableHead>
+                              <TableHead className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[12%]">
+                                {course.compulsory || "-"}
+                              </TableHead>
+                              <TableHead className="h-12 px-4 text-sm text-gray-700 whitespace-nowrap w-[12%]">{course.optional || "-"}</TableHead>
+                              <TableHead className="h-12 px-4 text-right whitespace-nowrap w-[10%]">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button
@@ -582,12 +573,27 @@ export default function ChuongTrinhDaoTaoDetailPage() {
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
-                              </td>
-                            </tr>
+                              </TableHead>
+                            </TableRow>
                           ))
+                        ) : (
+                          <TableRow key="empty">
+                            <TableHead colSpan={7} className="p-0">
+                              <div className="h-120 w-full flex items-center justify-center text-gray-500 text-sm">
+                                {loading ? (
+                                  <span className="inline-flex items-center gap-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Đang tải dữ liệu...
+                                  </span>
+                                ) : (
+                                  "Không có dữ liệu"
+                                )}
+                              </div>
+                            </TableHead>
+                          </TableRow>
                         )}
-                      </tbody>
-                    </table>
+                      </TableBody>
+                    </Table>
                   </div>
                 </div>
 

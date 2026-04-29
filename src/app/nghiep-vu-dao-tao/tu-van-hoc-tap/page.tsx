@@ -69,6 +69,7 @@ export default function TuVanHocTapPage() {
 
   // Luôn hiển thị dữ liệu nếu chưa chọn bộ lọc
   const visibleStudents = filteredStudents
+  const hasSelectedScope = selectedCourse && selectedCourse !== "all" && selectedClass && selectedClass !== "all"
 
   return (
     <AppLayout showSearch={false}>
@@ -148,7 +149,10 @@ export default function TuVanHocTapPage() {
           </div>
         </div>
         {/* Table */}
-        <TuVanHocTapTab students={selectedCourse && selectedCourse !== "all" && selectedClass && selectedClass !== "all" ? visibleStudents : []} />
+        <TuVanHocTapTab
+          students={hasSelectedScope ? visibleStudents : []}
+          emptyMessage={hasSelectedScope ? "Không có kết quả phù hợp" : "Vui lòng chọn lớp để xem điểm"}
+        />
       </div>
     </AppLayout>
   )

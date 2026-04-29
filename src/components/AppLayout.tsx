@@ -123,7 +123,7 @@ export default function AppLayout({ children, title, actions, showSearch = false
   return (
     <div className="flex bg-white min-h-screen overflow-hidden">
       {/* Sidebar Menu */}
-      <aside className="w-64 border-r border-gray-200 flex flex-col min-h-screen" style={{ backgroundColor: '#D5DDED' }}>
+      <aside className="w-64 border-r border-gray-200 flex flex-col min-h-screen" style={{ backgroundColor: '#BFDBFE' }}>
         {/* Logo */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -214,18 +214,24 @@ export default function AppLayout({ children, title, actions, showSearch = false
               align="end" 
               className="w-56 shadow-lg border" 
               side="top" 
-              sideOffset={-50}
+              sideOffset={8}
             >
               <DropdownMenuItem 
                 className="clickable-element cursor-pointer" 
-                onClick={handleSettings}
+                onSelect={(e) => {
+                  e.stopPropagation()
+                  handleSettings()
+                }}
               >
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Cài đặt người dùng</span>
               </DropdownMenuItem>
               <DropdownMenuItem 
                 className="clickable-element cursor-pointer text-red-600" 
-                onClick={handleLogout}
+                onSelect={(e) => {
+                  e.stopPropagation()
+                  handleLogout()
+                }}
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Đăng xuất</span>

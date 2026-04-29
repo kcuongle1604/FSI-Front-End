@@ -271,11 +271,11 @@ export default function QuanLyChuyenNganhPage() {
         </div>
 
         {specializationError && <p className="text-sm text-red-600 mb-3">{specializationError}</p>}
-        {loadingSpecializations && <p className="text-sm text-gray-600 mb-3">Đang tải danh sách chuyên ngành...</p>}
 
         {/* Table */}
         <SpecializationManagementTable 
           specializations={filteredSpecializations}
+          loading={loadingSpecializations}
           onEditClick={handleEditClick}
           onDeleteClick={handleDeleteClick}
         />

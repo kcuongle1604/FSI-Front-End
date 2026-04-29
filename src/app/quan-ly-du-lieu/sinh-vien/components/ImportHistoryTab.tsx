@@ -72,13 +72,15 @@ export default function ImportHistoryTab({ history }: ImportHistoryTabProps) {
           </div>
 
           {/* Body có thể cuộn, giới hạn 10 dòng (h-12 * 10 = 30rem) */}
-          <div className="h-[30rem] overflow-y-scroll show-scrollbar">
+          <div className="h-[30rem] overflow-y show-scrollbar">
             <table className="w-full table-fixed" style={{ borderCollapse: "collapse" }}>
               <tbody>
                 {filteredHistory.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center text-gray-500 py-6">
-                      Chưa có lịch sử import
+                    <td colSpan={8} className="h-120 p-0">
+                      <div className="h-full w-full flex items-center justify-center text-gray-500 text-sm">
+                        Chưa có lịch sử import
+                      </div>
                     </td>
                   </tr>
                 ) : (

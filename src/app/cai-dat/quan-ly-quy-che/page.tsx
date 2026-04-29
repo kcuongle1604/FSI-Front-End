@@ -204,10 +204,10 @@ export default function QuanLyQuyChePage() {
           </div>
         </div>
         {regulationError && <p className="text-sm text-red-600 mb-3">{regulationError}</p>}
-        {loadingRegulations && <p className="text-sm text-gray-600 mb-3">Đang tải danh sách quy chế...</p>}
         {/* Table */}
         <RegulationManagementTable
           regulations={filteredRegulations}
+          loading={loadingRegulations}
           onEditClick={(r: Regulation) => { setSelectedRegulation(r); setOpenEditDialog(true); }}
           onDeleteClick={(r: Regulation) => { setSelectedRegulation(r); setOpenDeleteDialog(true); }}
           onDetailClick={(r: Regulation) => {

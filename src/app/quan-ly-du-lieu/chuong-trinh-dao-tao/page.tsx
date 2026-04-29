@@ -33,6 +33,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsRight,
+  Loader2,
 } from "lucide-react"
 
 // Dùng lại toàn bộ component & dữ liệu của Sinh viên
@@ -332,8 +333,8 @@ export default function ChuongTrinhDaoTaoPage() {
 
               {/* Card bảng – giống UserManagementTable & Sinh viên */}
               <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
-                <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                  <div className="overflow-auto">
+                <div className="flex-1 flex flex-col overflow-hidden min-h-0 w-full pr-0">
+                  <div className="overflow-auto pr-0">
                     <Table className="w-full min-w-[500px]">
                       <TableHeader>
                         <TableRow className="border-b border-gray-200 bg-blue-50">
@@ -352,19 +353,7 @@ export default function ChuongTrinhDaoTaoPage() {
                       </TableHeader>
 
                       <TableBody>
-                        {loadingPrograms ? (
-                          <TableRow key="loading">
-                            <TableCell colSpan={4} className="text-center text-gray-500 py-6">
-                              Đang tải...
-                            </TableCell>
-                          </TableRow>
-                        ) : filteredPrograms.length === 0 ? (
-                          <TableRow key="empty">
-                            <TableCell colSpan={4} className="text-center text-gray-500 py-6">
-                              Chưa có chương trình đào tạo nào
-                            </TableCell>
-                          </TableRow>
-                        ) : (
+                        {filteredPrograms.length > 0 ? (
                           filteredPrograms.map((program, index) => (
                             <TableRow
                               key={`program-${program.id}-${index}`}
@@ -419,6 +408,21 @@ export default function ChuongTrinhDaoTaoPage() {
                               </TableCell>
                             </TableRow>
                           ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="h-120 p-0">
+                              <div className="h-full w-full flex items-center justify-center text-gray-500 text-sm">
+                                {loadingPrograms ? (
+                                  <span className="inline-flex items-center gap-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Đang tải dữ liệu chương trình đào tạo...
+                                  </span>
+                                ) : (
+                                  "Không có chương trình đào tạo nào"
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
                         )}
                       </TableBody>
                     </Table>
