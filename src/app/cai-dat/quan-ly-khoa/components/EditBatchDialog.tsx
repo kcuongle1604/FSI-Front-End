@@ -22,7 +22,7 @@ interface EditBatchDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   batch?: Batch
-  onUpdate: (data: { code?: string; startYear: string; endYear?: string }) => Promise<boolean> | boolean
+  onUpdate: (data: { code?: string; startYear: string; endYear: string }) => Promise<boolean> | boolean
 }
 
 type FormData = {
@@ -79,11 +79,13 @@ export function EditBatchDialog({ open, onOpenChange, batch, onUpdate }: EditBat
       newErrors.startYear = "Năm bắt đầu phải gồm 4 chữ số"
     }
 
-    if (formData.endYear && formData.endYear.length !== 4) {
+    if (!formData.endYear.trim()) {
+      newErrors.endYear = "Năm kết thúc không được để trống"
+    } else if (formData.endYear.length !== 4) {
       newErrors.endYear = "Năm kết thúc phải gồm 4 chữ số"
     }
 
-    if (!newErrors.startYear && !newErrors.endYear && formData.endYear) {
+    if (!newErrors.startYear && !newErrors.endYear) {
       const start = parseInt(formData.startYear, 10)
       const end = parseInt(formData.endYear, 10)
       if (!Number.isNaN(start) && !Number.isNaN(end) && end <= start) {
@@ -100,7 +102,7 @@ export function EditBatchDialog({ open, onOpenChange, batch, onUpdate }: EditBat
       const updated = await onUpdate({
         code: formData.code.trim() || undefined,
         startYear: formData.startYear,
-        endYear: formData.endYear.trim() || undefined,
+        endYear: formData.endYear,
       })
 
       if (updated) {
@@ -137,6 +139,7 @@ export function EditBatchDialog({ open, onOpenChange, batch, onUpdate }: EditBat
               value={formData.code}
               onChange={handleInputChange}
               className="h-9"
+              disabled
             />
             {errors.code && (
               <p className="text-sm text-red-500">{errors.code}</p>
@@ -161,7 +164,7 @@ export function EditBatchDialog({ open, onOpenChange, batch, onUpdate }: EditBat
 
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-700">
-              Năm kết thúc
+              Năm kết thúc <span className="text-red-500">*</span>
             </Label>
             <Input
               name="endYear"

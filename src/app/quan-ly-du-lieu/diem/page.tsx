@@ -48,7 +48,7 @@ import ScoreFormDialog from "./components/ScoreFormDialog"
 import DeleteScoreDialog from "./components/DeleteScoreDialog"
 import ScoreImportDialog from "./components/ScoreImportDialog"
 import ImportHistoryTab from "../sinh-vien/components/ImportHistoryTab"
-import { getScoreMatrix, getClasses, getUploadHistory } from "./score.api"
+import { getScoreMatrix, getClasses, getUploadHistory, getProgramSubjectsByClass } from "./score.api"
 import { getCohorts } from "../sinh-vien/student.api"
 import type { ImportHistory, FileImport } from "../sinh-vien/types"
 import type { ScoreCell, ScoreImportResponse, StudentScore } from "./types"
@@ -97,6 +97,32 @@ function normalizeScoreKey(value: string): string {
     .replace(/[^a-z0-9]+/g, "")
 }
 
+function getScoreValueBySubject(
+  student: StudentScore,
+  subject: { id: string; label: string }
+): ScoreCell | null {
+  if (!student?.scores) return null
+  if (Object.prototype.hasOwnProperty.call(student.scores, subject.id)) {
+    return student.scores[subject.id]
+  }
+
+  const subjectKey = `subject__${subject.id}`
+  if (Object.prototype.hasOwnProperty.call(student.scores, subjectKey)) {
+    return student.scores[subjectKey]
+  }
+
+  const normalizedTarget = normalizeScoreKey(subject.label)
+  if (!normalizedTarget) return null
+
+  for (const [key, value] of Object.entries(student.scores)) {
+    if (normalizeScoreKey(key) === normalizedTarget) {
+      return value
+    }
+  }
+
+  return null
+}
+
 export default function DiemPage() {
   const router = useRouter()
   const pathname = usePathname()
@@ -109,7 +135,7 @@ export default function DiemPage() {
 
   // Score matrix data
   const [scoreData, setScoreData] = useState<StudentScore[]>([])
-  const [subjects, setSubjects] = useState<string[]>([])
+  const [subjects, setSubjects] = useState<Array<{ id: string; label: string }>>([])
   const [classes, setClasses] = useState<any[]>([]) // Using any[] to match student API response
   const [cohorts, setCohorts] = useState<any[]>([])
   const [selectedKhoa, setSelectedKhoa] = useState<string | undefined>()
@@ -210,7 +236,6 @@ export default function DiemPage() {
       )
       if (requestId === latestRefreshRequestRef.current) {
         setScoreData(res.data.students)
-        setSubjects(res.data.subjects)
       }
     } catch (err: any) {
       if (requestId === latestRefreshRequestRef.current) {
@@ -270,6 +295,42 @@ export default function DiemPage() {
       fetchImportHistory()
     }
   }, [activeTab])
+
+  useEffect(() => {
+    const loadProgramSubjects = async () => {
+      if (!selectedClassId) {
+        setSubjects([])
+        return
+      }
+
+      try {
+        const res = await getProgramSubjectsByClass(selectedClassId)
+        const payload = res.data
+        const list = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload?.items)
+              ? payload.items
+              : []
+
+        const mapped = list
+          .map((item: any) => {
+            const id = item?.subject_id ?? item?.id ?? item?.code
+            const label = String(item?.course_display_name || item?.subject_name || item?.name || item?.code || "").trim()
+            if (id === null || id === undefined || !label) return null
+            return { id: String(id).trim(), label }
+          })
+          .filter((item): item is { id: string; label: string } => item !== null)
+
+        setSubjects(mapped)
+      } catch {
+        setSubjects([])
+      }
+    }
+
+    void loadProgramSubjects()
+  }, [selectedClassId])
 
   // Fetch available classes on mount
   useEffect(() => {
@@ -628,11 +689,11 @@ export default function DiemPage() {
                           </TableHead>
                           {subjects.map((subject) => (
                             <TableHead
-                              key={subject}
+                              key={subject.id}
                               className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50 whitespace-nowrap min-w-[80px] w-[100px] max-w-[100px]"
                             >
-                              <div className="truncate" title={subject.toUpperCase()}>
-                                {subject.toUpperCase()}
+                              <div className="truncate" title={subject.label.toUpperCase()}>
+                                {subject.label.toUpperCase()}
                               </div>
                             </TableHead>
                           ))}
@@ -675,10 +736,10 @@ export default function DiemPage() {
                                   {student.dob}
                                 </TableCell>
                                 {subjects.map((subject) => {
-                                  const displayValue = formatScoreCell(student.scores[subject])
+                                  const displayValue = formatScoreCell(getScoreValueBySubject(student, subject))
                                   return (
                                     <TableCell
-                                      key={subject}
+                                      key={subject.id}
                                       className="h-12 px-4 text-sm text-gray-600 text-center min-w-[80px] w-[80px] max-w-[80px]"
                                     >
                                       <div className="truncate" title={displayValue}>
@@ -805,7 +866,7 @@ export default function DiemPage() {
         onOpenChange={setIsFormOpen}
         student={selectedStudent}
         studentOptions={scoreData}
-        courseOptions={subjects}
+        courseOptions={subjects.map((subject) => subject.label)}
         classId={selectedClassId}
         classCohortId={selectedClassCohortId}
         onSaveSuccess={(payload) => {
@@ -827,7 +888,7 @@ export default function DiemPage() {
         open={isDeleteOpen}
         onOpenChange={setIsDeleteOpen}
         student={selectedStudent}
-        courseOptions={subjects}
+        courseOptions={subjects.map((subject) => subject.label)}
         classId={selectedClassId}
         onDeleteSuccess={(payload) => {
           applyOptimisticScoreDelete(payload)

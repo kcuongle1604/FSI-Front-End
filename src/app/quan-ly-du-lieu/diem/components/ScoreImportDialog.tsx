@@ -292,7 +292,7 @@ export default function ScoreImportDialog({ open, onOpenChange, onImportSuccess 
                             </div>
                             <div className="grid grid-cols-3 gap-4 max-w-md mx-auto mt-4">
                                 <div className="bg-blue-50 p-3 rounded-lg">
-                                    <p className="text-sm text-gray-600">Tổng số</p>
+                                    <p className="text-sm text-gray-600">Xử lý</p>
                                     <p className="text-2xl font-bold text-blue-600">{importResult.total_processed}</p>
                                 </div>
                                 <div className="bg-green-50 p-3 rounded-lg">

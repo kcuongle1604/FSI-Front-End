@@ -21,9 +21,10 @@ type DeleteSpecializationDialogProps = {
   onOpenChange: (open: boolean) => void
   specialization?: Specialization
   onConfirm?: () => Promise<boolean> | boolean
+  errorMessage?: string
 }
 
-export function DeleteSpecializationDialog({ open, onOpenChange, specialization, onConfirm }: DeleteSpecializationDialogProps) {
+export function DeleteSpecializationDialog({ open, onOpenChange, specialization, onConfirm, errorMessage }: DeleteSpecializationDialogProps) {
   const handleConfirm = async () => {
     let deleted = true
     if (onConfirm) {
@@ -49,6 +50,10 @@ export function DeleteSpecializationDialog({ open, onOpenChange, specialization,
           <p className="text-sm text-gray-700">
             Bạn có chắc chắn muốn <span className="font-semibold">xóa chuyên ngành {specialization?.name}</span> khỏi hệ thống không?
           </p>
+
+          {errorMessage && (
+            <p className="text-sm text-red-600">{errorMessage}</p>
+          )}
 
           {/* Action Buttons */}
           <div className="flex gap-3 justify-end">

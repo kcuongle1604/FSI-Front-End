@@ -11,6 +11,7 @@ import {
   Select, SelectTrigger, SelectContent, SelectItem, SelectValue
 } from "@/components/ui/select"
 import { api } from "@/lib/api"
+import type { CertificateImportResponse } from "../types"
 
 interface ImportDialogProps {
   open: boolean
@@ -21,9 +22,10 @@ export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) 
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importError, setImportError] = useState<string>("")
   const [loading, setLoading] = useState(false)
-  const [importStep, setImportStep] = useState<'upload' | 'mapping'>('upload')
+  const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'result'>('upload')
   const [mappingTab, setMappingTab] = useState<'anh-xa-cot' | 'tong-quan-loi' | 'chi-tiet-loi'>('anh-xa-cot')
   const [selectedSheet, setSelectedSheet] = useState('Sheet1')
+  const [importResult, setImportResult] = useState<CertificateImportResponse | null>(null)
 
   const [columnMappings, setColumnMappings] = useState<Record<string, string>>({
     mssv: 'MSSV', hoTen: 'Họ và tên', lop: 'Lớp', donTN: '', kiemDiem: '', quanSu: '', theDuc: '', ngoaiNgu: '', tinhHoc: '', ghiChu: ''
@@ -73,17 +75,34 @@ export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) 
     })
   }
 
+  const buildImportResult = (payload: any): CertificateImportResponse => ({
+    id: Number(payload?.id ?? 0),
+    file_name: String(payload?.file_name ?? importFile?.name ?? ""),
+    created_by_id: Number(payload?.created_by_id ?? 0),
+    type: String(payload?.type ?? ""),
+    status: String(payload?.status ?? ""),
+    total_processed: Number(payload?.total_processed ?? 0),
+    success_count: Number(payload?.success_count ?? 0),
+    failure_count: Number(payload?.failure_count ?? 0),
+    error_message: String(payload?.error_message ?? ""),
+    created_at: String(payload?.created_at ?? ""),
+  })
+
   const handleImport = async () => {
     if (!importFile) return
 
     try {
       setLoading(true)
       setImportError("")
-      await importStudentCertificatesHtml(importFile)
-      handleOpenChange(false)
+      const response = await importStudentCertificatesHtml(importFile)
+      const payload = response?.data ?? response
+      setImportResult(buildImportResult(payload))
+      setImportStep('result')
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } }; message?: string }
-      setImportError(err.response?.data?.detail || err.message || "Lá»—i khi import file. Vui lÃ²ng thá»­ láº¡i.")
+      setImportError(err.response?.data?.detail || err.message || "Lỗi khi import file. Vui lòng thử lại.")
+      setImportResult(null)
+      setImportStep('result')
     } finally {
       setLoading(false)
     }
@@ -97,6 +116,7 @@ export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) 
       setLoading(false);
       setImportStep('upload');
       setMappingTab('anh-xa-cot');
+      setImportResult(null);
     }
   }
 
@@ -269,10 +289,70 @@ export default function ImportDialog({ open, onOpenChange }: ImportDialogProps) 
     </>
   )
 
+  const resultStepContent = (
+    <>
+      <DialogHeader>
+        <DialogTitle>Kết quả Import</DialogTitle>
+      </DialogHeader>
+      <div className="py-6">
+        {importResult && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-center">
+              {importResult.failure_count === 0 ? (
+                <CheckCircle2 className="h-16 w-16 text-green-500" />
+              ) : (
+                <AlertCircle className="h-16 w-16 text-amber-500" />
+              )}
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-lg font-semibold">Trạng thái: {importResult.status || "-"}</p>
+              <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto mt-4">
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-600">Thành công</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {importResult.success_count}
+                  </p>
+                </div>
+                <div className="bg-red-50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-600">Thất bại</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {importResult.failure_count}
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Tổng số xử lý: {importResult.total_processed}
+              </p>
+              {importResult.error_message && (
+                <p className="text-sm text-red-600 mt-2">{importResult.error_message}</p>
+              )}
+            </div>
+          </div>
+        )}
+        {importError && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-center">
+              <AlertCircle className="h-16 w-16 text-red-500" />
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-lg font-semibold text-red-600">Lỗi khi import</p>
+              <p className="text-sm text-gray-600">{importError}</p>
+            </div>
+          </div>
+        )}
+      </div>
+      <DialogFooter>
+        <Button className="bg-[#167FFC] hover:bg-[#1470E3]" onClick={() => handleOpenChange(false)}>Đóng</Button>
+      </DialogFooter>
+    </>
+  )
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        {importStep === 'upload' ? uploadStepContent : mappingStepContent}
+        {importStep === 'upload' && uploadStepContent}
+        {importStep === 'mapping' && mappingStepContent}
+        {importStep === 'result' && resultStepContent}
       </DialogContent>
     </Dialog>
   )
