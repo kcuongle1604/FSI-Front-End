@@ -190,6 +190,8 @@ export default function ChungChiPage() {
   const [baseCellStatus, setBaseCellStatus] = useState<Record<string, boolean>>({})
   const [savingTableChanges, setSavingTableChanges] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState("")
+  const [certificateOptions, setCertificateOptions] = useState<CertificateOption[]>([])
+  const [certificateOptionsLoaded, setCertificateOptionsLoaded] = useState(false)
 
   const classNameOf = (item: ClassApiItem): string => String(item.class_name || item.name || "").trim()
   const getClassByName = (className?: string) =>
@@ -220,6 +222,59 @@ export default function ChungChiPage() {
     }, 0)
   }, [searchParams])
 
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+
+  useEffect(() => {
+    // Only fetch if a specific class is selected (not undefined and not 'all')
+    if (!selectedLop || selectedLop === "all") {
+      setCertificates([])
+      return
+    }
+
+    const fetchCertificateSummary = async () => {
+      try {
+        setLoadingCertificates(true)
+        setCertificateError("")
+
+        const allItems: StudentCertificateSummaryItem[] = []
+        let skip = 0
+
+        while (true) {
+          const res = await api.get<StudentCertificateSummaryResponse>("/api/v1/student-certificates/summary", {
+            params: {
+              skip,
+              limit: API_LIMIT,
+              lop: selectedLop,
+            },
+          })
+
+          const pageItems = Array.isArray(res.data?.data) ? res.data.data : []
+          console.log(`[DEBUG] Page ${skip/API_LIMIT + 1} raw items:`, pageItems.slice(0, 2))
+          allItems.push(...pageItems)
+
+          if (pageItems.length < API_LIMIT) {
+            break
+          }
+
+          skip += API_LIMIT
+        }
+
+        const mappedCertificates = allItems.map(mapSummaryItem)
+        console.log("[DEBUG] First mapped certificate:", mappedCertificates[0])
+        console.log("[DEBUG] Certificate Columns:", certificateColumns)
+        
+        setCertificates(mappedCertificates)
+      } catch (error: any) {
+        setCertificateError(extractBackendMessage(error, "Không thể tải dữ liệu chứng chỉ"))
+        setCertificates([])
+      } finally {
+        setLoadingCertificates(false)
+      }
+    }
+
+    fetchCertificateSummary()
+  }, [selectedLop, refreshTrigger])
+
   const availableClasses =
     !selectedKhoa || selectedKhoa === "all"
       ? classes.map(classNameOf).filter(Boolean)
@@ -235,14 +290,11 @@ export default function ChungChiPage() {
       return false
     }
 
-    if (selectedKhoa && selectedKhoa !== "all") {
-      const selectedClass = getClassByName(certificate.lop)
-      if (!selectedClass || String(selectedClass.cohort_id) !== selectedKhoa) {
-        return false
-      }
-    }
-
-    if (selectedLop && selectedLop !== "all" && certificate.lop !== selectedLop) {
+    // Double check on frontend to ensure only the selected class is shown
+    const selectedLopName = String(selectedLop).trim()
+    const certificateClassName = String(certificate.lop || "").trim()
+    
+    if (certificateClassName !== selectedLopName) {
       return false
     }
 
@@ -263,7 +315,7 @@ export default function ChungChiPage() {
   const visibleCertificates = filteredCertificates.slice(startIndex, startIndex + PAGE_SIZE)
   const displayCount = visibleCertificates.length
   const certificateColumns = useMemo(() => {
-    if (selectedKhoa && selectedKhoa !== "all" && Array.isArray(certificateColumnHeaders) && certificateColumnHeaders.length > 0) {
+    if (selectedLop && selectedLop !== "all") {
       return certificateColumnHeaders
     }
     const allDynamicKeys = new Set<string>()
@@ -274,8 +326,40 @@ export default function ChungChiPage() {
         }
       }
     })
-    return Array.from(allDynamicKeys)
-  }, [certificateColumnHeaders, certificates, selectedKhoa])
+    const dataKeys = Array.from(allDynamicKeys)
+    const numericKeys = dataKeys.filter((key) => Number.isFinite(Number(key)))
+    if (numericKeys.length > 0) {
+      return numericKeys.sort((a, b) => Number(a) - Number(b))
+    }
+    return dataKeys
+  }, [certificateColumnHeaders, certificates, selectedKhoa, selectedLop])
+
+  const certificateLabelById = useMemo(() => {
+    return new Map(certificateOptions.map((option: CertificateOption) => [option.id, option.label]))
+  }, [certificateOptions])
+
+  const normalizeCertificateLabel = (label: string, id: number): string => {
+    const trimmed = label.trim()
+    if (!trimmed) return ""
+
+    const suffixPattern = new RegExp(`\\s*${id}\\s*$`)
+    const withoutIdSuffix = trimmed.replace(suffixPattern, "").trim()
+    return withoutIdSuffix || trimmed
+  }
+  const getColumnLabel = (columnName: string): string => {
+    const numericId = Number(columnName)
+    if (Number.isFinite(numericId)) {
+      if (selectedKhoa && selectedKhoa !== "all" && (!selectedLop || selectedLop === "all")) {
+        return ""
+      }
+      if (!certificateOptionsLoaded) return ""
+      const label = (certificateLabelById.get(numericId) as string) ?? ""
+      return normalizeCertificateLabel(label, numericId)
+    }
+
+    return columnName
+  }
+  const tableColumnCount = certificateColumns.length + 6
   const hasPendingTableChanges = Object.keys(editedCellStatus).length > 0
 
   useEffect(() => {
@@ -300,7 +384,7 @@ export default function ChungChiPage() {
 
     setBaseCellStatus(nextBaseStatus)
     setEditedCellStatus({})
-  }, [certificates, certificateColumns])
+  }, [certificates, certificateColumns, certificateOptions, certificateOptionsLoaded])
 
   const toBoolean = (value: unknown): boolean => {
     if (typeof value === "boolean") return value
@@ -390,19 +474,56 @@ export default function ChungChiPage() {
     columnIndex: number
   ): boolean => {
     const anyCert = certificate as any;
-    if (columnName in anyCert) {
-      return Boolean(anyCert[columnName]);
+    
+    // 0. Logging for first row only to avoid noise
+    const isFirstRow = certificate.studentId === certificates[0]?.studentId;
+    if (isFirstRow) {
+       console.log(`[DEBUG] Checking status for ${certificate.hoLot} ${certificate.ten} | Column: ${columnName}`);
     }
 
-    const normalizedTarget = normalizeText(columnName)
+    // 1. First, check if we can map this column label back to a numeric ID
+    const mappedId = mapHeaderToCertificateId(columnName, certificateOptions)
     
-    for (const [key, val] of Object.entries(anyCert)) {
-      if (normalizeText(key) === normalizedTarget) {
-        return Boolean(val);
+    // 2. Check by ID if available (either columnName is ID or it's mapped)
+    const possibleIds = [Number(columnName), mappedId].filter((id): id is number => id !== null && !isNaN(id))
+    
+    if (possibleIds.length > 0) {
+      if (Array.isArray(anyCert.certificate_ids)) {
+        if (possibleIds.some(id => anyCert.certificate_ids.includes(id))) {
+          if (isFirstRow) console.log(`  -> Found in certificate_ids: ${anyCert.certificate_ids}`);
+          return true;
+        }
+      }
+      
+      // Also check for keys like "cert_123"
+      for (const id of possibleIds) {
+        const keyVariants = [String(id), `cert_${id}`, `certificate_${id}`];
+        for (const variant of keyVariants) {
+          if (variant in anyCert && toBoolean(anyCert[variant])) {
+            if (isFirstRow) console.log(`  -> Found in variant key: ${variant}`);
+            return true;
+          }
+        }
       }
     }
 
-    return false
+    // 3. Exact match for property name (e.g., "cc_ngoai_ngu", "don_tn", or the label itself)
+    if (columnName in anyCert && toBoolean(anyCert[columnName])) {
+      if (isFirstRow) console.log(`  -> Found via exact key match: ${columnName}`);
+      return true;
+    }
+
+    // 4. Normalized match for fuzzy finding (e.g., "Tin học" vs "tin_hoc")
+    const normalizedTarget = normalizeText(columnName);
+    for (const [key, val] of Object.entries(anyCert)) {
+      if (normalizeText(key) === normalizedTarget && toBoolean(val)) {
+        if (isFirstRow) console.log(`  -> Found via normalized key match: ${key}`);
+        return true;
+      }
+    }
+
+    if (isFirstRow) console.log("  -> Not found (false)");
+    return false;
   }
 
   const getCellStatus = (certificate: Certificate, columnName: string, columnIndex: number): boolean => {
@@ -616,7 +737,9 @@ export default function ChungChiPage() {
         setSaveSuccess("Đã lưu thay đổi thành công.")
       }
 
-      await fetchCertificateSummary()
+      if (selectedLop) {
+        setRefreshTrigger(prev => prev + 1)
+      }
       setEditedCellStatus({})
     } catch (error: any) {
       setCertificateError(extractBackendMessage(error, "Không thể lưu thay đổi chứng chỉ"))
@@ -626,7 +749,7 @@ export default function ChungChiPage() {
   }
 
   const mapSummaryItem = (item: StudentCertificateSummaryItem, index: number): Certificate => {
-    const source = item as unknown as Record<string, unknown>
+    const raw = item as any
     const fullName = String(item.full_name || item.fullName || "").trim()
     const split = splitName(fullName)
 
@@ -635,76 +758,85 @@ export default function ChungChiPage() {
 
     const studentId = Number(item.student_id ?? item.id ?? index + 1)
 
+    // Extract certificate IDs from various possible shapes
+    let certificate_ids: number[] = []
+    if (Array.isArray(raw.certificate_ids)) {
+      certificate_ids = raw.certificate_ids.map((id: any) => Number(id)).filter((n: number) => !isNaN(n))
+    } else if (Array.isArray(raw.certificates)) {
+      certificate_ids = raw.certificates.map((c: any) => Number(c.id || c.certificate_id)).filter((n: number) => !isNaN(n))
+    }
+
     const cert: any = {
       id: Number(item.id ?? item.student_id ?? index + 1),
       studentId,
       mssv: String(item.mssv || item.student_code || item.studentId || item.student_id || ""),
-      lop: String(item.class_name || item.className || item.lop || ""),
+      lop: String(item.class_name || item.className || item.lop || "").trim(),
       hoLot,
       ten,
       ngaySinh: String(item.dob || item.date_of_birth || item.ngay_sinh || ""),
       ghiChu: String(item.ghi_chu || item.notes || ""),
+      certificate_ids,
     }
 
-    for (const [key, val] of Object.entries(source)) {
-      if (!['stt', 'class_name', 'ho_lot', 'ten', 'dob', 'student_id', 'ghi_chu', 'id', 'mssv', 'student_code', 'studentId', 'className', 'lop', 'full_name', 'fullName', 'hoLot', 'first_name', 'firstName', 'last_name', 'lastName', 'date_of_birth', 'ngay_sinh', 'notes'].includes(key)) {
-        cert[key] = toBoolean(val);
+    // Map all properties from item to cert to catch any named matching (boolean flags)
+    Object.keys(raw).forEach(key => {
+      const skipKeys = ['id', 'student_id', 'studentId', 'mssv', 'student_code', 'lop', 'class_name', 'className', 'ho_lot', 'hoLot', 'ten', 'first_name', 'firstName', 'last_name', 'lastName', 'dob', 'date_of_birth', 'ngay_sinh', 'ghi_chu', 'notes', 'certificate_ids', 'certificates']
+      if (!skipKeys.includes(key)) {
+        cert[key] = toBoolean(raw[key]);
       }
-    }
+    })
+
+    // Also look for certificate IDs inside keys if they are stored as cert_123: true
+    Object.entries(raw).forEach(([key, val]) => {
+      const match = key.match(/^(?:cert_|certificate_)?(\d+)$/)
+      if (match && toBoolean(val)) {
+        const id = Number(match[1])
+        if (!certificate_ids.includes(id)) {
+          certificate_ids.push(id)
+        }
+      }
+    })
 
     return cert as Certificate
   }
 
   const fetchCertificateSummary = async () => {
-    try {
-      setLoadingCertificates(true)
-      setCertificateError("")
+    // Moved inside useEffect below
+  }
 
-      const allItems: StudentCertificateSummaryItem[] = []
-      let skip = 0
+  useEffect(() => {
+    // Only fetch classes and cohorts once on mount
+    const fetchClassAndCohortOptions = async () => {
+      try {
+        const [classesRes, cohortsRes] = await Promise.all([
+          api.get<ClassApiItem[]>("/api/v1/classes"),
+          api.get<CohortApiItem[]>("/api/v1/cohorts"),
+        ])
 
-      while (true) {
-        const res = await api.get<StudentCertificateSummaryResponse>("/api/v1/student-certificates/summary", {
-          params: {
-            skip,
-            limit: API_LIMIT,
-          },
-        })
-
-        const pageItems = Array.isArray(res.data?.data) ? res.data.data : []
-        allItems.push(...pageItems)
-
-        if (pageItems.length < API_LIMIT) {
-          break
-        }
-
-        skip += API_LIMIT
+        setClasses(Array.isArray(classesRes.data) ? classesRes.data : [])
+        setCohorts(Array.isArray(cohortsRes.data) ? cohortsRes.data : [])
+      } catch (error: any) {
+        setCertificateError(extractBackendMessage(error, "Không thể tải danh sách lớp và khóa."))
+        setClasses([])
+        setCohorts([])
       }
-
-      setCertificates(allItems.map(mapSummaryItem))
-    } catch (error: any) {
-      setCertificateError(extractBackendMessage(error, "Không thể tải dữ liệu chứng chỉ"))
-      setCertificates([])
-    } finally {
-      setLoadingCertificates(false)
     }
-  }
 
-  const fetchClassAndCohortOptions = async () => {
-    try {
-      const [classesRes, cohortsRes] = await Promise.all([
-        api.get<ClassApiItem[]>("/api/v1/classes"),
-        api.get<CohortApiItem[]>("/api/v1/cohorts"),
-      ])
+    fetchClassAndCohortOptions()
+  }, [])
 
-      setClasses(Array.isArray(classesRes.data) ? classesRes.data : [])
-      setCohorts(Array.isArray(cohortsRes.data) ? cohortsRes.data : [])
-    } catch (error: any) {
-      setCertificateError(extractBackendMessage(error, "Không thể tải danh sách lớp và khóa."))
-      setClasses([])
-      setCohorts([])
+  useEffect(() => {
+    const initOptions = async () => {
+      try {
+        const options = await fetchCertificateOptions()
+        setCertificateOptions(options)
+        setCertificateOptionsLoaded(true)
+      } catch (err) {
+        console.error("Failed to load certificate options", err)
+      }
     }
-  }
+    initOptions()
+  }, [])
 
   const fetchImportHistory = async () => {
     try {
@@ -740,10 +872,8 @@ export default function ChungChiPage() {
     }
   }, [activeTab])
 
-  useEffect(() => {
-    fetchCertificateSummary()
-    fetchClassAndCohortOptions()
-  }, [])
+  const fetchClassAndCohortOptions = () => {} // Placeholder removed as it's now an internal function in useEffect above
+
 
   useEffect(() => {
     const fetchCertificatesByCohort = async () => {
@@ -832,7 +962,10 @@ export default function ChungChiPage() {
         upload_date: getTodayUploadDate(),
         items: [payload],
       })
-      await fetchCertificateSummary()
+      
+      if (selectedLop) {
+        setRefreshTrigger(prev => prev + 1)
+      }
     } catch (error: any) {
       const status = Number(error?.response?.status)
       if (status === 404) {
@@ -856,10 +989,11 @@ export default function ChungChiPage() {
     }
 
     try {
-      setCertificateError("")
-      await api.delete(`/api/v1/certificates/${certificateId}`)
-
-      await fetchCertificateSummary()
+      await api.delete(`/api/v1/certificates/${selectedCertificate.id}`)
+      
+      if (selectedLop) {
+        setRefreshTrigger(prev => prev + 1)
+      }
       setSelectedCertificate(null)
     } catch (error: any) {
       setCertificateError(extractBackendMessage(error, "Không thể xóa chứng chỉ"))
@@ -1058,7 +1192,7 @@ export default function ChungChiPage() {
                               key={`${headerName}-${headerIndex}`}
                               className="h-10 px-4 text-center text-sm font-semibold text-gray-700"
                             >
-                              {headerName}
+                              {getColumnLabel(headerName)}
                             </TableHead>
                           ))}
                           <TableHead className="h-10 px-4 text-right text-sm font-semibold text-gray-700 w-12" />
@@ -1239,14 +1373,14 @@ export default function ChungChiPage() {
       <ImportDialog
         open={isImportOpen}
         onOpenChange={setIsImportOpen}
-        onImportSuccess={fetchCertificateSummary}
+        onImportSuccess={() => setRefreshTrigger(prev => prev + 1)}
         isCertificateImport
         classOptions={uniqueAvailableClasses.map((lop) => ({ value: lop, label: lop }))}
       />
       <ImportDialog
         open={isEnglishExemptionImportOpen}
         onOpenChange={setIsEnglishExemptionImportOpen}
-        onImportSuccess={fetchCertificateSummary}
+        onImportSuccess={() => setRefreshTrigger(prev => prev + 1)}
         isCertificateImport
         certificateImportFormat="csv"
         uploadTitle="Import chứng chỉ miễn học phần tiếng Anh"
