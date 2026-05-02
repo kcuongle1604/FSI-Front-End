@@ -219,10 +219,10 @@ export default function QuanLyLopHocPage() {
 
         {/* Table */}
         {loadError && <p className="mb-3 text-sm text-red-600">{loadError}</p>}
-        {loading && <p className="mb-3 text-sm text-gray-600">Đang tải danh sách lớp học...</p>}
 
         <ClassManagementTable 
           classes={filteredClasses}
+          loading={loading}
           onEditClick={handleEditClick}
           onDeleteClick={handleDeleteClick}
         />

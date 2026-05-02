@@ -26,6 +26,7 @@ import {
   Trash2,
   Plus,
   MoreVertical,
+  Loader2,
   Search,
   Upload,
   Download,
@@ -52,7 +53,6 @@ import ImportHistoryTab from "./components/ImportHistoryTab"
 // API & Types
 import { getStudents, getClasses, getCohorts, getUploadHistory } from "./student.api"
 import type { Student, ImportHistory, FileImport } from "./types"
-import { sampleStudents } from "./data"
 
 function extractBackendMessage(error: any, fallback: string): string {
   const detail = error?.response?.data?.detail
@@ -162,13 +162,11 @@ export default function SinhVienPage() {
 
         setStudents(mapped)
       } else {
-        // fallback: hiển thị 5 bản ghi mẫu
-        setStudents(sampleStudents.slice(0, 5))
+        setStudents([])
       }
     } catch (err: any) {
       setLoadError(extractBackendMessage(err, "Không tải được danh sách sinh viên."))
-      // fallback khi API lỗi: hiển thị 5 bản ghi mẫu
-      setStudents(sampleStudents.slice(0, 5))
+      setStudents([])
     } finally {
       setLoading(false)
     }
@@ -283,6 +281,7 @@ export default function SinhVienPage() {
   const startIndex = (safeCurrentPage - 1) * PAGE_SIZE
   const pagedStudents = filteredStudents.slice(startIndex, startIndex + PAGE_SIZE)
   const displayCount = pagedStudents.length
+  const isEmptyState = !loading && filteredStudents.length === 0
 
   useEffect(() => {
     setCurrentPage(1)
@@ -494,8 +493,7 @@ export default function SinhVienPage() {
 
               {/* Card bảng – vừa đủ 10 dòng mỗi trang */}
               <div className="flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden">
-                {/* Viewport table: header (h-10 = 2.5rem) + 10 rows (h-12 = 3rem) => 32.5rem */}
-                <div className="overflow-auto h-[32.5rem]">
+                <div className="overflow-auto">
                     <Table className="w-full" style={{ borderCollapse: "collapse" }}>
                       <TableHeader>
                         <TableRow
@@ -525,51 +523,70 @@ export default function SinhVienPage() {
                       </TableHeader>
 
                       <TableBody>
-                        {pagedStudents.map((student, index) => (
-                          <TableRow
-                            key={student.id}
-                            className="border-b border-gray-200 hover:bg-gray-50"
-                          >
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {String(startIndex + index + 1).padStart(2, "0")}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.mssv}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.hoTen}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.lop}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.ngaySinh}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 text-sm text-gray-600">
-                              {student.ghiChu || "-"}
-                            </TableCell>
-                            <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100">
-                                    <MoreVertical className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-32">
-                                  <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => handleEdit(student)}>
-                                    <Edit className="h-4 w-4 mr-2" /> Sửa
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="cursor-pointer text-sm text-red-600 focus:text-red-600"
-                                    onClick={() => handleDelete(student)}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" /> Xóa
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                        {loading ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="h-[32.5rem] px-4 text-center align-middle">
+                              <div className="flex h-full min-h-[20rem] items-center justify-center gap-3 text-gray-500">
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                                <span>Đang tải danh sách sinh viên...</span>
+                              </div>
                             </TableCell>
                           </TableRow>
-                        ))}
+                        ) : isEmptyState ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="h-[32.5rem] px-4 text-center align-middle">
+                              <div className="flex h-full min-h-[20rem] items-center justify-center text-gray-500">
+                                Không có sinh viên nào
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          pagedStudents.map((student, index) => (
+                            <TableRow
+                              key={student.id}
+                              className="border-b border-gray-200 hover:bg-gray-50"
+                            >
+                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                                {String(startIndex + index + 1).padStart(2, "0")}
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                                {student.mssv}
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                                {student.hoTen}
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                                {student.lop}
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                                {student.ngaySinh}
+                              </TableCell>
+                              <TableCell className="h-12 px-4 text-sm text-gray-600">
+                                {student.ghiChu || "-"}
+                              </TableCell>
+                              <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100">
+                                      <MoreVertical className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-32">
+                                    <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => handleEdit(student)}>
+                                      <Edit className="h-4 w-4 mr-2" /> Sửa
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="cursor-pointer text-sm text-red-600 focus:text-red-600"
+                                      onClick={() => handleDelete(student)}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" /> Xóa
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
                       </TableBody>
                     </Table>
                 </div>

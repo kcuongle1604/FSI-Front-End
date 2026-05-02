@@ -238,7 +238,7 @@ export default function XetTotNghiepDetailPage() {
             <div className="grid grid-cols-2 gap-8">
               <div className="space-y-3">
                 <div className="flex gap-4">
-                  <span className="font-semibold text-blue-700 min-w-fit">Họ và Tên:</span>
+                  <span className="font-semibold text-blue-700 min-w-fit">Họ Và Tên:</span>
                   <span className="text-lg font-bold text-gray-900">{displayStudent.name}</span>
                 </div>
                 <div className="flex gap-4">

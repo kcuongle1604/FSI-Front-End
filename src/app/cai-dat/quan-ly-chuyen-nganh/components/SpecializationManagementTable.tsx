@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, MoreVertical, Edit, Trash2 } from "lucide-react"
+import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, MoreVertical, Edit, Trash2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -26,12 +26,14 @@ type Specialization = {
 
 interface SpecializationManagementTableProps {
   specializations: Specialization[]
+  loading?: boolean
   onEditClick: (spec: Specialization) => void
   onDeleteClick: (spec: Specialization) => void
 }
 
 export default function SpecializationManagementTable({
   specializations,
+  loading = false,
   onEditClick,
   onDeleteClick
 }: SpecializationManagementTableProps) {
@@ -56,11 +58,11 @@ export default function SpecializationManagementTable({
   }, [currentPage, totalPages])
 
   return (
-    <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
+    <div className="flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
       {/* Table */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-        <div className="overflow-x-auto">
-          <Table className="w-full" style={{ borderCollapse: 'collapse' }}>
+        <div className="overflow-x-auto" style={{ height: '530px' }}>
+          <Table className="w-full" style={{ borderCollapse: 'collapse'}}>
             <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, display: 'table-header-group' }}>
               <TableRow className="border-b border-gray-200 bg-blue-50">
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">STT</TableHead>
@@ -72,36 +74,53 @@ export default function SpecializationManagementTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visibleSpecializations.map((spec, index) => (
-                <TableRow key={spec.id} className="border-b border-gray-200 hover:bg-gray-50">
-                  <TableCell className="h-12 px-4 text-sm text-gray-600">
-                    {String(startIndex + index + 1).padStart(2, '0')}
-                  </TableCell>
-                  <TableCell className="h-12 px-4 text-sm text-gray-600">{spec.code || "-"}</TableCell>
-                  <TableCell className="h-12 px-4 text-sm text-gray-600">{spec.name}</TableCell>
-                  <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 hover:bg-gray-100"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-32">
-                        <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => onEditClick(spec)}>
-                          <Edit className="h-4 w-4 mr-2" />Sửa
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer text-sm text-red-600 focus:text-red-600" onClick={() => onDeleteClick(spec)}>
-                          <Trash2 className="h-4 w-4 mr-2" />Xóa
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {visibleSpecializations.length > 0 ? (
+                visibleSpecializations.map((spec, index) => (
+                  <TableRow key={spec.id} className="border-b border-gray-200 hover:bg-gray-50">
+                    <TableCell className="h-12 px-4 text-sm text-gray-600">
+                      {String(startIndex + index + 1).padStart(2, '0')}
+                    </TableCell>
+                    <TableCell className="h-12 px-4 text-sm text-gray-600">{spec.code || "-"}</TableCell>
+                    <TableCell className="h-12 px-4 text-sm text-gray-600">{spec.name}</TableCell>
+                    <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 hover:bg-gray-100"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-32">
+                          <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => onEditClick(spec)}>
+                            <Edit className="h-4 w-4 mr-2" />Sửa
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="cursor-pointer text-sm text-red-600 focus:text-red-600" onClick={() => onDeleteClick(spec)}>
+                            <Trash2 className="h-4 w-4 mr-2" />Xóa
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="p-0">
+                    <div className="h-120 w-full flex items-center justify-center text-gray-500 text-sm">
+                      {loading ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Đang tải dữ liệu...
+                        </span>
+                      ) : (
+                        "Không có chuyên ngành nào"
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </div>

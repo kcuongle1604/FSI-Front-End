@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Certificate } from "../page";
@@ -14,14 +14,17 @@ type DeleteCertificateDialogProps = {
 export default function DeleteCertificateDialog({ open, onOpenChange, certificate, onConfirm }: DeleteCertificateDialogProps) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const inFlightRef = useRef(false);
 
   const handleConfirm = async () => {
+    if (submitting || inFlightRef.current) return;
     if (!onConfirm) {
       onOpenChange(false);
       return;
     }
 
     try {
+      inFlightRef.current = true;
       setSubmitting(true);
       setSubmitError("");
       const result = await onConfirm();
@@ -32,6 +35,7 @@ export default function DeleteCertificateDialog({ open, onOpenChange, certificat
       const message = typeof error?.message === "string" ? error.message : "Không thể xóa dữ liệu. Vui lòng thử lại.";
       setSubmitError(message);
     } finally {
+      inFlightRef.current = false;
       setSubmitting(false);
     }
   };

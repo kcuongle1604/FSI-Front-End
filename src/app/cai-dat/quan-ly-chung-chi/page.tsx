@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import AppLayout from "@/components/AppLayout";
 import { api } from "@/lib/api";
-import axios from "axios";
 import CertificateManagementTableWithStatusDialog from "./CertificateManagementTableWithStatusDialog";
 import ExemptCertificateManagementTable from "./components/ExemptCertificateManagementTable";
 import AddCertificateDialog from "./components/AddCertificateDialog";
@@ -333,89 +332,15 @@ export default function QuanLyChungChiPage() {
 
     const certificateId = selectedCertificate.id;
 
-    const getKnownRelationPairs = async (relation: "applications" | "exemptions") => {
-      try {
-        const relationRes = await api.get<CertificateRelationResponse>(`/api/v1/certificates/${certificateId}/${relation}`);
-        const rows = getRelationRows(relationRes.data);
-        return Array.from(
-          new Set(
-            rows
-              .map((row) => {
-                const cohortId = Number(row.cohort_id);
-                const majorId = row.major_id != null ? String(row.major_id) : "";
-                if (!Number.isFinite(cohortId) || !majorId) return null;
-                return `${cohortId}::${majorId}`;
-              })
-              .filter((value): value is string => Boolean(value))
-          )
-        ).map((value) => {
-          const [cohortId, majorId] = value.split("::");
-          return { cohort_id: Number(cohortId), major_id: majorId };
-        });
-      } catch {
-        return [] as Array<{ cohort_id: number; major_id: number }>;
-      }
-    };
-
-    const deleteRelationPairs = async (
-      relation: "applications" | "exemptions",
-      pairs: Array<{ cohort_id: number; major_id: string }>
-    ) => {
-      if (pairs.length === 0) return;
-
-      await Promise.all(
-        pairs.map((pair) =>
-          api.delete(`/api/v1/certificates/${certificateId}/${relation}`, {
-            data: {
-              certificate_id: certificateId,
-              cohort_id: pair.cohort_id,
-              major_id: pair.major_id,
-            },
-          })
-        )
-      );
-    };
-
-    const deleteStudentCertificateLinks = async () => {
-      const candidates: Array<() => Promise<unknown>> = [
-        () => api.delete(`/api/v1/student-certificates/by-certificate/${certificateId}`),
-        () => api.delete(`/api/v1/student-certificates/${certificateId}`),
-        () => api.delete(`/api/v1/student-certificates`, { data: { certificate_id: certificateId } }),
-      ];
-
-      for (const run of candidates) {
-        try {
-          await run();
-          return;
-        } catch (error: any) {
-          const status = Number(error?.response?.status);
-          if ([404, 405].includes(status)) {
-            continue;
-          }
-
-          throw error;
-        }
-      }
-    };
-
     try {
-      const [applicationPairs, exemptionPairs] = await Promise.all([
-        getKnownRelationPairs("applications"),
-        getKnownRelationPairs("exemptions"),
-      ]);
-
-      await deleteRelationPairs("applications", applicationPairs);
-      await deleteRelationPairs("exemptions", exemptionPairs);
-      await deleteStudentCertificateLinks();
       await api.delete(`/api/v1/certificates/${certificateId}`);
     } catch (error) {
-      const backendMessage = axios.isAxiosError(error)
-        ? (typeof error.response?.data === "string"
-          ? error.response.data
-          : (error.response?.data?.message || error.response?.data?.detail || error.message))
-        : "";
+      const payload = (error as any)?.response?.data;
+      const backendMessage = typeof payload === "string"
+        ? payload
+        : (payload?.message || payload?.detail || (error as any)?.message);
 
-      throw new Error(backendMessage || "Không thể xóa chứng chỉ hoàn toàn");
+      throw new Error(backendMessage || "Không thể xóa chứng chỉ");
     }
 
     setOpenDeleteDialog(false);
@@ -487,12 +412,10 @@ export default function QuanLyChungChiPage() {
               {certificateError && (
                 <p className="text-sm text-red-600 mb-3">{certificateError}</p>
               )}
-              {loadingCertificates && (
-                <p className="text-sm text-gray-600 mb-3">Đang tải danh sách chứng chỉ...</p>
-              )}
               {/* Table */}
               <CertificateManagementTableWithStatusDialog
                 certificates={filteredCertificates}
+                loading={loadingCertificates}
                 onEditClick={(c: Certificate) => { setSelectedCertificate(c); setOpenEditDialog(true); }}
                 onDeleteClick={(c: Certificate) => {
                   setSelectedExemptCertificate(undefined);
@@ -527,12 +450,10 @@ export default function QuanLyChungChiPage() {
               {exemptionError && (
                 <p className="text-sm text-red-600 mb-3">{exemptionError}</p>
               )}
-              {loadingExemptions && (
-                <p className="text-sm text-gray-600 mb-3">Đang tải danh sách miễn chứng chỉ...</p>
-              )}
               {/* Table có thêm chuyên ngành */}
               <ExemptCertificateManagementTable
                 certificates={filteredExemptCertificates}
+                loading={loadingExemptions}
                 onEditClick={(c: ExemptCertificate) => { setSelectedExemptCertificate(c); setOpenExemptEditDialog(true); }}
                 onDeleteClick={(c: ExemptCertificate) => {
                   setSelectedCertificate(undefined);

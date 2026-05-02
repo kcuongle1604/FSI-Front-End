@@ -29,6 +29,7 @@ import {
   Search,
   Upload,
   Download,
+  Loader2,
   ChevronsLeft,
   ChevronLeft,
   ChevronRight,
@@ -48,7 +49,7 @@ import ScoreFormDialog from "./components/ScoreFormDialog"
 import DeleteScoreDialog from "./components/DeleteScoreDialog"
 import ScoreImportDialog from "./components/ScoreImportDialog"
 import ImportHistoryTab from "../sinh-vien/components/ImportHistoryTab"
-import { getScoreMatrix, getClasses, getUploadHistory } from "./score.api"
+import { getScoreMatrix, getClasses, getUploadHistory, getProgramSubjectsByClass } from "./score.api"
 import { getCohorts } from "../sinh-vien/student.api"
 import type { ImportHistory, FileImport } from "../sinh-vien/types"
 import type { ScoreCell, ScoreImportResponse, StudentScore } from "./types"
@@ -97,6 +98,32 @@ function normalizeScoreKey(value: string): string {
     .replace(/[^a-z0-9]+/g, "")
 }
 
+function getScoreValueBySubject(
+  student: StudentScore,
+  subject: { id: string; label: string }
+): ScoreCell | null {
+  if (!student?.scores) return null
+  if (Object.prototype.hasOwnProperty.call(student.scores, subject.id)) {
+    return student.scores[subject.id]
+  }
+
+  const subjectKey = `subject__${subject.id}`
+  if (Object.prototype.hasOwnProperty.call(student.scores, subjectKey)) {
+    return student.scores[subjectKey]
+  }
+
+  const normalizedTarget = normalizeScoreKey(subject.label)
+  if (!normalizedTarget) return null
+
+  for (const [key, value] of Object.entries(student.scores)) {
+    if (normalizeScoreKey(key) === normalizedTarget) {
+      return value
+    }
+  }
+
+  return null
+}
+
 export default function DiemPage() {
   const router = useRouter()
   const pathname = usePathname()
@@ -109,7 +136,7 @@ export default function DiemPage() {
 
   // Score matrix data
   const [scoreData, setScoreData] = useState<StudentScore[]>([])
-  const [subjects, setSubjects] = useState<string[]>([])
+  const [subjects, setSubjects] = useState<Array<{ id: string; label: string }>>([])
   const [classes, setClasses] = useState<any[]>([]) // Using any[] to match student API response
   const [cohorts, setCohorts] = useState<any[]>([])
   const [selectedKhoa, setSelectedKhoa] = useState<string | undefined>()
@@ -125,6 +152,16 @@ export default function DiemPage() {
   const didInitFromUrlRef = useRef(false)
 
   const [importHistory, setImportHistory] = useState<FileImport[]>([])
+  const tableScrollRef = useRef<HTMLDivElement | null>(null)
+  const subjectScrollRef = useRef<HTMLDivElement | null>(null)
+  const isSyncingSubjectScrollRef = useRef(false)
+  const [subjectScrollWidth, setSubjectScrollWidth] = useState(0)
+
+  const getTableInnerScroller = () => {
+    const root = tableScrollRef.current
+    if (!root) return null
+    return (root.querySelector('[data-slot="table-container"]') as HTMLDivElement | null) || root
+  }
 
   const getValidTab = (tab: string | null) => {
     return tab === "lich-su-import" ? "lich-su-import" : "diem"
@@ -210,7 +247,6 @@ export default function DiemPage() {
       )
       if (requestId === latestRefreshRequestRef.current) {
         setScoreData(res.data.students)
-        setSubjects(res.data.subjects)
       }
     } catch (err: any) {
       if (requestId === latestRefreshRequestRef.current) {
@@ -271,6 +307,42 @@ export default function DiemPage() {
     }
   }, [activeTab])
 
+  useEffect(() => {
+    const loadProgramSubjects = async () => {
+      if (!selectedClassId) {
+        setSubjects([])
+        return
+      }
+
+      try {
+        const res = await getProgramSubjectsByClass(selectedClassId)
+        const payload = res.data
+        const list = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload?.items)
+              ? payload.items
+              : []
+
+        const mapped = list
+          .map((item: any) => {
+            const id = item?.subject_id ?? item?.id ?? item?.code
+            const label = String(item?.course_display_name || item?.subject_name || item?.name || item?.code || "").trim()
+            if (id === null || id === undefined || !label) return null
+            return { id: String(id).trim(), label }
+          })
+          .filter((item): item is { id: string; label: string } => item !== null)
+
+        setSubjects(mapped)
+      } catch {
+        setSubjects([])
+      }
+    }
+
+    void loadProgramSubjects()
+  }, [selectedClassId])
+
   // Fetch available classes on mount
   useEffect(() => {
     const fetchClasses = async () => {
@@ -319,6 +391,7 @@ export default function DiemPage() {
   const startIndex = (safeCurrentPage - 1) * PAGE_SIZE
   const visibleStudents = filteredScoreData.slice(startIndex, startIndex + PAGE_SIZE)
   const displayCount = visibleStudents.length
+  const shouldShowSubjectScrollbar = !loading && subjects.length > 0
 
   useEffect(() => {
     setCurrentPage(1)
@@ -444,6 +517,68 @@ export default function DiemPage() {
       })
     )
   }
+
+  useEffect(() => {
+    const tableScroller = getTableInnerScroller()
+    if (!tableScroller) return
+
+    const updateSubjectScrollWidth = () => {
+      // 590px = fixed left columns (STT, LOP, HO LOT, TEN, NGAY SINH)
+      // 56px = fixed right action column
+      const fixedWidth = 590 + 56
+      const subjectContentWidth = tableScroller.scrollWidth - fixedWidth
+      const subjectViewportWidth = Math.max(tableScroller.clientWidth - fixedWidth, 0)
+
+      // Keep a tiny overflow to ensure desktop users can always see and drag the bar.
+      setSubjectScrollWidth(Math.max(subjectContentWidth, subjectViewportWidth + 2, 2))
+    }
+
+    updateSubjectScrollWidth()
+
+    const resizeObserver = new ResizeObserver(updateSubjectScrollWidth)
+    resizeObserver.observe(tableScroller)
+
+    const tableElement = tableScroller.querySelector("table")
+    if (tableElement) {
+      resizeObserver.observe(tableElement)
+    }
+
+    window.addEventListener("resize", updateSubjectScrollWidth)
+
+    return () => {
+      window.removeEventListener("resize", updateSubjectScrollWidth)
+      resizeObserver.disconnect()
+    }
+  }, [subjects.length, visibleStudents.length, loading, selectedClass])
+
+  useEffect(() => {
+    const tableScroller = getTableInnerScroller()
+    const subjectScroller = subjectScrollRef.current
+    if (!tableScroller || !subjectScroller) return
+
+    const syncFromTable = () => {
+      if (isSyncingSubjectScrollRef.current) return
+      isSyncingSubjectScrollRef.current = true
+      subjectScroller.scrollLeft = tableScroller.scrollLeft
+      isSyncingSubjectScrollRef.current = false
+    }
+
+    const syncFromSubject = () => {
+      if (isSyncingSubjectScrollRef.current) return
+      isSyncingSubjectScrollRef.current = true
+      tableScroller.scrollLeft = subjectScroller.scrollLeft
+      isSyncingSubjectScrollRef.current = false
+    }
+
+    tableScroller.addEventListener("scroll", syncFromTable)
+    subjectScroller.addEventListener("scroll", syncFromSubject)
+    subjectScroller.scrollLeft = tableScroller.scrollLeft
+
+    return () => {
+      tableScroller.removeEventListener("scroll", syncFromTable)
+      subjectScroller.removeEventListener("scroll", syncFromSubject)
+    }
+  }, [subjectScrollWidth])
 
   return (
     <AppLayout showSearch={false}>
@@ -604,35 +739,39 @@ export default function DiemPage() {
               {/* Score Table */}
               <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
                 <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                  <div className="overflow-auto">
-                    <Table className="w-full" style={{ borderCollapse: "collapse" }}>
+                  <div ref={tableScrollRef} className="overflow-y-auto overflow-x-hidden" style={{ scrollbarGutter: "stable" }}>
+                    <Table
+                      containerClassName="overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      className="w-max min-w-full"
+                      style={{ borderCollapse: "collapse" }}
+                    >
                       <TableHeader>
                         <TableRow
                           className="border-b border-gray-200 bg-blue-50"
                           style={{ position: "sticky", top: 0, zIndex: 10 }}
                         >
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: 0, zIndex: 20, minWidth: "60px", width: "60px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: 0, zIndex: 25, minWidth: "60px", width: "60px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
                             STT
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "60px", zIndex: 20, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "60px", zIndex: 24, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
                             LỚP
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "180px", zIndex: 20, minWidth: "150px", width: "150px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "180px", zIndex: 23, minWidth: "170px", width: "170px", maxWidth: "170px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
                             HỌ LÓT
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "330px", zIndex: 20, minWidth: "100px", width: "100px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "350px", zIndex: 22, minWidth: "120px", width: "120px", maxWidth: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
                             TÊN
                           </TableHead>
-                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "430px", zIndex: 20, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
+                          <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50" style={{ position: "sticky", left: "470px", zIndex: 21, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.1)" }}>
                             NGÀY SINH
                           </TableHead>
                           {subjects.map((subject) => (
                             <TableHead
-                              key={subject}
+                              key={subject.id}
                               className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50 whitespace-nowrap min-w-[80px] w-[100px] max-w-[100px]"
                             >
-                              <div className="truncate" title={subject.toUpperCase()}>
-                                {subject.toUpperCase()}
+                              <div className="truncate" title={subject.label.toUpperCase()}>
+                                {subject.label.toUpperCase()}
                               </div>
                             </TableHead>
                           ))}
@@ -659,26 +798,26 @@ export default function DiemPage() {
                                 key={student.student_id}
                                 className="border-b border-gray-200 hover:bg-gray-50"
                               >
-                                <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: 0, zIndex: 5, minWidth: "60px", width: "60px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
+                                <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: 0, zIndex: 10, minWidth: "60px", width: "60px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
                                   {String(startIndex + index + 1).padStart(2, "0")}
                                 </TableCell>
-                                <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "60px", zIndex: 5, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
+                                <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "60px", zIndex: 9, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
                                   {student.class_name}
                                 </TableCell>
-                                <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "180px", zIndex: 5, minWidth: "150px", width: "150px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
+                                <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "180px", zIndex: 8, minWidth: "170px", width: "170px", maxWidth: "170px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
                                   {hoLot}
                                 </TableCell>
-                                <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "330px", zIndex: 5, minWidth: "100px", width: "100px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
+                                <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "350px", zIndex: 7, minWidth: "120px", width: "120px", maxWidth: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
                                   {ten}
                                 </TableCell>
-                                <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "430px", zIndex: 5, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
+                                <TableCell className="h-12 px-4 text-sm text-gray-600 bg-white" style={{ position: "sticky", left: "470px", zIndex: 6, minWidth: "120px", width: "120px", boxShadow: "2px 0 4px rgba(0,0,0,0.05)" }}>
                                   {student.dob}
                                 </TableCell>
                                 {subjects.map((subject) => {
-                                  const displayValue = formatScoreCell(student.scores[subject])
+                                  const displayValue = formatScoreCell(getScoreValueBySubject(student, subject))
                                   return (
                                     <TableCell
-                                      key={subject}
+                                      key={subject.id}
                                       className="h-12 px-4 text-sm text-gray-600 text-center min-w-[80px] w-[80px] max-w-[80px]"
                                     >
                                       <div className="truncate" title={displayValue}>
@@ -724,13 +863,20 @@ export default function DiemPage() {
                           <TableRow>
                             <TableCell
                               colSpan={6 + subjects.length}
-                              className="h-32 text-center text-gray-500"
+                              className="h-120 p-0"
                             >
-                              {loading
-                                ? "Đang tải..."
-                                : !hasData
-                                  ? "Vui lòng chọn  lớp để xem điểm"
-                                  : "Không có dữ liệu"}
+                              <div className="h-full w-full flex items-center justify-center text-gray-500 text-sm">
+                                {loading ? (
+                                  <span className="inline-flex items-center gap-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Đang tải dữ liệu...
+                                  </span>
+                                ) : !hasData ? (
+                                  "Vui lòng chọn lớp để xem điểm"
+                                ) : (
+                                  "Không có dữ liệu"
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         )}
@@ -738,6 +884,18 @@ export default function DiemPage() {
                     </Table>
                   </div>
                 </div>
+
+                {shouldShowSubjectScrollbar && (
+                  <div className="ml-[590px] mr-[56px] mb-[10px]" >
+                    <div
+                      ref={subjectScrollRef}
+                      className="overflow-x-scroll overflow-y-hidden"
+                      style={{ scrollbarWidth: "auto", scrollbarColor: "#A5A9B0 #F6F8FB" }}
+                    >
+                      <div style={{ width: subjectScrollWidth, height: 2 }} />
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50 sticky bottom-0 z-10">
                   <div className="text-sm text-gray-600">
@@ -805,7 +963,7 @@ export default function DiemPage() {
         onOpenChange={setIsFormOpen}
         student={selectedStudent}
         studentOptions={scoreData}
-        courseOptions={subjects}
+        courseOptions={subjects.map((subject) => subject.label)}
         classId={selectedClassId}
         classCohortId={selectedClassCohortId}
         onSaveSuccess={(payload) => {
@@ -827,7 +985,7 @@ export default function DiemPage() {
         open={isDeleteOpen}
         onOpenChange={setIsDeleteOpen}
         student={selectedStudent}
-        courseOptions={subjects}
+        courseOptions={subjects.map((subject) => subject.label)}
         classId={selectedClassId}
         onDeleteSuccess={(payload) => {
           applyOptimisticScoreDelete(payload)

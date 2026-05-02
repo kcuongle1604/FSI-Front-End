@@ -1,4 +1,4 @@
-import { Edit, Trash2, MoreVertical, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
+import { Edit, Trash2, MoreVertical, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -12,6 +12,7 @@ import { Certificate } from "../page";
 
 interface CertificateManagementTableProps {
   certificates: Certificate[];
+  loading?: boolean;
   onEditClick: (certificate: Certificate) => void;
   onDeleteClick: (certificate: Certificate) => void;
   onStatusClick?: (certificate: Certificate) => void;
@@ -23,7 +24,7 @@ import { useEffect, useState } from "react";
 
 const PAGE_SIZE = 10;
 
-const CertificateManagementTable = ({ certificates, onEditClick, onDeleteClick, onStatusClick }: CertificateManagementTableProps) => {
+const CertificateManagementTable = ({ certificates, loading = false, onEditClick, onDeleteClick, onStatusClick }: CertificateManagementTableProps) => {
   const [page, setPage] = useState(1);
   const totalRecords = certificates.length;
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
@@ -37,10 +38,11 @@ const CertificateManagementTable = ({ certificates, onEditClick, onDeleteClick, 
   }, [totalPages]);
 
   return (
-    <div className="flex flex-col flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex-1 overflow-auto min-h-0">
-          <Table className="w-full" style={{ borderCollapse: 'collapse' }}>
+    <div className="flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
+      {/* Table */}
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <div className="overflow-x-auto" style={{ height: '530px' }}>
+          <Table className="w-full" style={{ borderCollapse: 'collapse'}}>
             <TableHeader>
               <TableRow className="border-b border-gray-200 bg-blue-50" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">STT</TableHead>
@@ -53,42 +55,59 @@ const CertificateManagementTable = ({ certificates, onEditClick, onDeleteClick, 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pagedCertificates.map((certificate, idx) => (
-                <TableRow key={certificate.id}>
-                  <TableCell className="px-4 py-2">{(page - 1) * PAGE_SIZE + idx + 1}</TableCell>
-                  <TableCell className="px-4 py-2">{certificate.name}</TableCell>
-                  <TableCell className="px-4 py-2">{certificate.batches && certificate.batches.length > 0 ? certificate.batches.join(', ') : <span className="italic text-gray-400">Chưa có</span>}</TableCell>
-                  <TableCell className="px-4 py-2">
-                    <div
-                      className="flex items-center gap-2 w-fit cursor-pointer select-none"
-                      onClick={onStatusClick ? () => onStatusClick(certificate) : undefined}
-                      title="Thay đổi trạng thái"
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${certificate.status === 'Đang áp dụng' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                      <span className={certificate.status === 'Đang áp dụng' ? 'text-gray-900' : 'text-gray-500'}>
-                        {certificate.status === 'Đang áp dụng' ? 'Đang áp dụng' : 'Ngừng áp dụng'}
-                      </span>
+              {pagedCertificates.length > 0 ? (
+                pagedCertificates.map((certificate, idx) => (
+                  <TableRow key={certificate.id}>
+                    <TableCell className="px-4 py-2">{(page - 1) * PAGE_SIZE + idx + 1}</TableCell>
+                    <TableCell className="px-4 py-2">{certificate.name}</TableCell>
+                    <TableCell className="px-4 py-2">{certificate.batches && certificate.batches.length > 0 ? certificate.batches.join(', ') : <span className="italic text-gray-400">Chưa có</span>}</TableCell>
+                    <TableCell className="px-4 py-2">
+                      <div
+                        className="flex items-center gap-2 w-fit cursor-pointer select-none"
+                        onClick={onStatusClick ? () => onStatusClick(certificate) : undefined}
+                        title="Thay đổi trạng thái"
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${certificate.status === 'Đang áp dụng' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                        <span className={certificate.status === 'Đang áp dụng' ? 'text-gray-900' : 'text-gray-500'}>
+                          {certificate.status === 'Đang áp dụng' ? 'Đang áp dụng' : 'Ngừng áp dụng'}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-32">
+                          <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => onEditClick(certificate)}>
+                            <Edit className="h-4 w-4 mr-2" /> Sửa
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="cursor-pointer text-sm text-red-600 focus:text-red-600" onClick={() => onDeleteClick(certificate)}>
+                            <Trash2 className="h-4 w-4 mr-2" /> Xóa
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="p-0">
+                    <div className="h-120 w-full flex items-center justify-center text-gray-500 text-sm">
+                      {loading ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Đang tải dữ liệu...
+                        </span>
+                      ) : (
+                        "Không có chứng chỉ nào"
+                      )}
                     </div>
                   </TableCell>
-                  <TableCell className="h-12 px-4 min-w-[96px] text-sm text-gray-600 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-32">
-                        <DropdownMenuItem className="cursor-pointer text-sm" onClick={() => onEditClick(certificate)}>
-                          <Edit className="h-4 w-4 mr-2" /> Sửa
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer text-sm text-red-600 focus:text-red-600" onClick={() => onDeleteClick(certificate)}>
-                          <Trash2 className="h-4 w-4 mr-2" /> Xóa
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </div>

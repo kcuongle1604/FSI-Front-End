@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Search } from "lucide-react"
+import { Loader2, Plus, Search } from "lucide-react"
 import AppLayout from "@/components/AppLayout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -173,23 +173,23 @@ export default function QuanLyNguoiDungPage() {
 
   // ================= UI =================
   return (
-  <AppLayout showSearch={false}>
-  <div className="h-full flex flex-col px-8 py-5 bg-slate-50/50">
-    {/* Header */}
-    <div className="mb-4">
-      <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-        Cài đặt
-        <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">
-          &gt; Quản lý người dùng
-        </span>
-      </h1>
-    </div>
+    <AppLayout showSearch={false}>
+      <div className="h-full flex flex-col px-8 py-5 bg-slate-50/50">
+        {/* Header */}
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Cài đặt
+            <span className="ml-2 text-xl font-semibold text-slate-900 align-baseline">
+              &gt; Quản lý người dùng
+            </span>
+          </h1>
+        </div>
 
-    {error && (
-      <div className="mb-4 p-3 bg-red-50 text-red-700 rounded">
-        {error}
-      </div>
-    )}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded">
+            {error}
+          </div>
+        )}
 
         <div className="flex items-center gap-3 mb-4">
           <div className="relative w-[250px]">
@@ -213,20 +213,14 @@ export default function QuanLyNguoiDungPage() {
             </Button>
           </div>
         </div>
-
-        {loading ? (
-          <div className="flex-1 flex items-center justify-center bg-white rounded border">
-            Đang tải dữ liệu...
-          </div>
-        ) : (
-          <UserManagementTable
-            accounts={filteredAccounts}
-            userStatuses={userStatuses}
-            onEditClick={handleEditClick}
-            onDeleteClick={handleDeleteClick}
-            onStatusClick={handleStatusClick}
-          />
-        )}
+        <UserManagementTable
+          accounts={filteredAccounts}
+          loading={loading}
+          userStatuses={userStatuses}
+          onEditClick={handleEditClick}
+          onDeleteClick={handleDeleteClick}
+          onStatusClick={handleStatusClick}
+        />
       </div>
 
       {/* ADD */}
