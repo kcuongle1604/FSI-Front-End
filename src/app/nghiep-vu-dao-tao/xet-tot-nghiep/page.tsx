@@ -94,6 +94,7 @@ type GraduationStudentItem = {
   elective_credits_earned?: number
   total_credits_earned?: number
   gpa?: number
+  sum_certificate_earned?: number
   sum_certificate?: number
   certificates?: number
   program_status?: string
@@ -241,6 +242,7 @@ export default function XetTotNghiepPage() {
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
+  const [evaluatedMessage, setEvaluatedMessage] = useState("")
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [evaluatedCombos, setEvaluatedCombos] = useState<string[]>([])
   const [eligibleStudentIds, setEligibleStudentIds] = useState<number[]>([])
@@ -371,6 +373,7 @@ export default function XetTotNghiepPage() {
         setEligibleStudentIds([])
         setErrorMessage("")
         setSuccessMessage("")
+        setEvaluatedMessage("")
         return
       }
 
@@ -378,6 +381,7 @@ export default function XetTotNghiepPage() {
         setLoading(true)
         setErrorMessage("")
         setSuccessMessage("")
+        setEvaluatedMessage("")
 
         const comboKey = `${selectedSemesterId}`
 
@@ -394,8 +398,6 @@ export default function XetTotNghiepPage() {
         
         const studentsFromApi = Array.isArray(dataSource?.students) ? dataSource.students : []
         const mappedStudents: XetTotNghiep[] = studentsFromApi.map((student: any, index: number) => {
-          const certificates = Number(student.sum_certificate ?? student.certificates ?? 0)
-          const totalCertificates = Number(student.total_certificate ?? student.sum_certificate ?? 0)
           const normalizedStatus = toGraduationStatusLabel(student.graduation_status)
 
           return {
@@ -409,7 +411,7 @@ export default function XetTotNghiepPage() {
             tctc: formatProgress(student.elective_credits_earned, student.min_elective_credits_needed),
             totalCredits: formatProgress(student.total_credits_earned, student.min_total_credits_needed),
             gpa: formatProgress(student.gpa, student.min_gpa_needed, 2),
-            ccdr: totalCertificates > 0 ? `${certificates}/${totalCertificates}` : String(certificates),
+            ccdr: formatProgress(student.sum_certificate_earned, student.sum_certificate),
             program: String(student.program_status || "-"),
             status: normalizedStatus,
           }
@@ -422,6 +424,13 @@ export default function XetTotNghiepPage() {
 
         setStudents(mappedStudents)
         setEligibleStudentIds(eligibleIds)
+
+        if (backendStatus === "evaluated") {
+          setEvaluatedMessage("Kỳ này đã xét tốt nghiệp")
+          if (comboKey && !evaluatedCombos.includes(comboKey)) {
+            setEvaluatedCombos((prev) => [...prev, comboKey])
+          }
+        }
       } catch (error: any) {
         setStudents([])
         setEligibleStudentIds([])
@@ -432,7 +441,7 @@ export default function XetTotNghiepPage() {
     }
 
     fetchEligibility()
-  }, [hasRequiredFilters, selectedSemesterId, selectedSemesterLabel])
+  }, [hasRequiredFilters, selectedSemesterId, selectedSemesterLabel, evaluatedCombos])
 
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.mssv.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -593,6 +602,7 @@ export default function XetTotNghiepPage() {
         </div>
 
         {loading && <p className="text-sm text-gray-600 mb-3">Đang tải dữ liệu xét tốt nghiệp...</p>}
+        {evaluatedMessage && <p className="text-sm text-amber-700 mb-3">{evaluatedMessage}</p>}
         {successMessage && <p className="text-sm text-emerald-700 mb-3">{successMessage}</p>}
         {errorMessage && <p className="text-sm text-red-600 mb-3">{errorMessage}</p>}
 

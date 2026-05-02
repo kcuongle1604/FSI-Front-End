@@ -73,6 +73,23 @@ type CertificateRelationResponse =
     exemptions?: CertificateRelationApiItem[];
   };
 
+type ExemptionMajorApiItem = {
+  major_id?: string;
+  major_name?: string;
+};
+
+type ExemptionCohortApiItem = {
+  cohort_id?: number;
+  cohort_name?: string;
+  majors?: ExemptionMajorApiItem[];
+};
+
+type CertificateExemptionApiItem = {
+  certificate_id?: number;
+  certificate_name?: string;
+  exempted_cohorts?: ExemptionCohortApiItem[];
+};
+
 export default function QuanLyChungChiPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [certificates, setCertificates] = useState<Certificate[]>([]);
@@ -122,6 +139,22 @@ export default function QuanLyChungChiPage() {
     return [];
   };
 
+  const getExemptionList = (
+    payload:
+      | CertificateExemptionApiItem[]
+      | CertificateExemptionApiItem
+      | { data?: CertificateExemptionApiItem[]; items?: CertificateExemptionApiItem[]; results?: CertificateExemptionApiItem[] }
+      | null
+      | undefined
+  ): CertificateExemptionApiItem[] => {
+    if (!payload) return [];
+    if (Array.isArray(payload)) return payload;
+    if ("data" in payload && Array.isArray(payload.data)) return payload.data;
+    if ("items" in payload && Array.isArray(payload.items)) return payload.items;
+    if ("results" in payload && Array.isArray(payload.results)) return payload.results;
+    return [payload as CertificateExemptionApiItem];
+  };
+
   const fetchCertificateList = async () => {
     const res = await api.get<CertificateListResponse>("/api/v1/certificates", {
       params: {
@@ -161,38 +194,9 @@ export default function QuanLyChungChiPage() {
       setCertificateError("");
       const list = await fetchCertificateList();
 
-      const mappedResults = await Promise.allSettled(
-        (list || []).map(async (item, index) => {
-          const mappedItem = mapApiCertificate(item, index);
-          const certificateId = item.certificate_id ?? item.id;
-
-          if (!certificateId) return mappedItem;
-
-          try {
-            const applicationsRes = await api.get<CertificateRelationResponse>(`/api/v1/certificates/${certificateId}/applications`);
-            const detailRows = getRelationRows(applicationsRes.data);
-            const detailBatches = Array.from(
-              new Set(
-                detailRows
-                .map((row) => (row.cohort_id != null ? String(row.cohort_id) : row.cohort_name?.trim() || ""))
-                  .filter(Boolean)
-              )
-            );
-
-            return {
-              ...mappedItem,
-              batches: detailBatches.length > 0 ? detailBatches : mappedItem.batches,
-            };
-          } catch {
-            return mappedItem;
-          }
-        })
-      );
-
-      const mapped = mappedResults.map((result, index) => {
-        if (result.status === "fulfilled") return result.value;
-        return mapApiCertificate((list || [])[index], index);
-      });
+      const mapped = (list || [])
+        .map((item, index) => mapApiCertificate(item, index))
+        .sort((a, b) => a.id - b.id);
 
       setCertificates(mapped);
     } catch (err) {
@@ -208,69 +212,135 @@ export default function QuanLyChungChiPage() {
     try {
       setLoadingExemptions(true);
       setExemptionError("");
-      const list = await fetchCertificateList();
-      const exemptionResults = await Promise.allSettled(
-        (list || []).map(async (item, index) => {
-          const certificateId = Number(item.certificate_id ?? item.id);
-          if (!Number.isFinite(certificateId)) return null;
 
-          const certificateName = String(item.name || "").trim() || `#${certificateId}`;
+      const res = await api.get<
+        | CertificateExemptionApiItem[]
+        | CertificateExemptionApiItem
+        | { data?: CertificateExemptionApiItem[]; items?: CertificateExemptionApiItem[]; results?: CertificateExemptionApiItem[] }
+        | CertificateRelationApiItem[]
+      >(
+        "/api/v1/certificates/exemptions"
+      );
+      const raw = res.data;
+      const relationRows = Array.isArray(raw) && raw.length > 0 && "cohort_id" in raw[0]
+        ? (raw as CertificateRelationApiItem[])
+        : [];
+      const list = relationRows.length > 0 ? [] : getExemptionList(raw as any);
 
-          try {
-            const res = await api.get<CertificateRelationResponse>(`/api/v1/certificates/${certificateId}/exemptions`);
-            const rows = getRelationRows(res.data);
-
-            if (rows.length === 0) return null;
-
-            const batches = Array.from(
-              new Set(
-                rows
-                .map((row) => (row.cohort_id != null ? String(row.cohort_id) : row.cohort_name?.trim() || ""))
-                  .filter(Boolean)
-              )
-            );
-
-            const majors = Array.from(
-              new Set(
-                rows
-                  .map((row) => row.major_name?.trim() || (row.major_id != null ? String(row.major_id) : ""))
-                  .filter(Boolean)
-              )
-            );
-
-            const exemptionPairs = Array.from(
-              new Set(
-                rows
-                  .map((row) => {
-                    const cohortId = Number(row.cohort_id);
-                    const majorId = row.major_id != null ? String(row.major_id) : "";
-                    if (!Number.isFinite(cohortId) || !majorId) return null;
-                    return `${cohortId}::${majorId}`;
-                  })
-                  .filter((value): value is string => !!value)
-              )
-            ).map((value) => {
-              const [cohortId, majorId] = value.split("::");
-              return { cohort_id: Number(cohortId), major_id: majorId };
+      const mappedFromRelations = relationRows.length > 0
+        ? (() => {
+            const grouped = new Map<number, CertificateRelationApiItem[]>();
+            relationRows.forEach((row) => {
+              const certId = Number(row.certificate_id);
+              if (!Number.isFinite(certId)) return;
+              if (!grouped.has(certId)) grouped.set(certId, []);
+              grouped.get(certId)!.push(row);
             });
 
-            return {
-              id: certificateId || index + 1,
-              types: [certificateName],
-              batches,
-              majors,
-              exemptionPairs,
-            } as ExemptCertificate;
-          } catch {
-            return null;
-          }
-        })
-      );
+            return Array.from(grouped.entries()).map(([certId, rows], index) => {
+              const certificateName = String(rows[0]?.certificate_name || "").trim() || `#${certId || index + 1}`;
+              const batches = Array.from(
+                new Set(
+                  rows
+                    .map((row) => (row.cohort_id != null ? String(row.cohort_id) : row.cohort_name?.trim() || ""))
+                    .filter(Boolean)
+                )
+              );
+              const majors = Array.from(
+                new Set(
+                  rows
+                    .map((row) => row.major_name?.trim() || (row.major_id != null ? String(row.major_id) : ""))
+                    .filter(Boolean)
+                )
+              );
+              const exemptionPairs = Array.from(
+                new Set(
+                  rows
+                    .map((row) => {
+                      const cohortId = Number(row.cohort_id);
+                      const majorId = row.major_id != null ? String(row.major_id) : "";
+                      if (!Number.isFinite(cohortId) || !majorId) return null;
+                      return `${cohortId}::${majorId}`;
+                    })
+                    .filter((value): value is string => !!value)
+                )
+              ).map((value) => {
+                const [cohortId, majorId] = value.split("::");
+                return { cohort_id: Number(cohortId), major_id: majorId };
+              });
 
-      const mapped = exemptionResults
-        .filter((result): result is PromiseFulfilledResult<ExemptCertificate | null> => result.status === "fulfilled")
-        .map((result) => result.value)
-        .filter((item): item is ExemptCertificate => item != null);
+              return {
+                id: certId,
+                types: [certificateName],
+                batches,
+                majors,
+                exemptionPairs,
+              } as ExemptCertificate;
+            });
+          })()
+        : [];
+
+      const mapped = (relationRows.length > 0 ? mappedFromRelations : list)
+        .map((item: ExemptCertificate | CertificateExemptionApiItem, index: number) => {
+          if (relationRows.length > 0) return item as ExemptCertificate;
+          const certificateId = Number((item as CertificateExemptionApiItem).certificate_id);
+          const certificateName = String((item as CertificateExemptionApiItem).certificate_name || "").trim() || `#${certificateId || index + 1}`;
+          const cohorts = Array.isArray((item as CertificateExemptionApiItem).exempted_cohorts)
+            ? (item as CertificateExemptionApiItem).exempted_cohorts!
+            : [];
+
+          if (!Number.isFinite(certificateId) && !certificateName) return null;
+
+          const batches = Array.from(
+            new Set(
+              cohorts
+                .map((cohort: ExemptionCohortApiItem) =>
+                  cohort.cohort_id != null ? String(cohort.cohort_id) : cohort.cohort_name?.trim() || ""
+                )
+                .filter(Boolean)
+            )
+          );
+
+          const majors = Array.from(
+            new Set(
+              cohorts
+                .flatMap((cohort: ExemptionCohortApiItem) => cohort.majors || [])
+                .map((major: ExemptionMajorApiItem) =>
+                  major.major_name?.trim() || (major.major_id != null ? String(major.major_id) : "")
+                )
+                .filter(Boolean)
+            )
+          );
+
+          const exemptionPairs = Array.from(
+            new Set(
+              cohorts
+                .flatMap((cohort: ExemptionCohortApiItem) => {
+                  const cohortId = Number(cohort.cohort_id);
+                  if (!Number.isFinite(cohortId)) return [] as string[];
+                  return (cohort.majors || [])
+                    .map((major: ExemptionMajorApiItem) => {
+                      const majorId = major.major_id != null ? String(major.major_id) : "";
+                      if (!majorId) return null;
+                      return `${cohortId}::${majorId}`;
+                    })
+                    .filter((value): value is string => !!value);
+                })
+            )
+          ).map((value) => {
+            const [cohortId, majorId] = value.split("::");
+            return { cohort_id: Number(cohortId), major_id: majorId };
+          });
+
+          return {
+            id: Number.isFinite(certificateId) ? certificateId : index + 1,
+            types: [certificateName],
+            batches,
+            majors,
+            exemptionPairs,
+          } as ExemptCertificate;
+        })
+        .filter((item: ExemptCertificate | null): item is ExemptCertificate => item != null);
 
       setExemptCertificates(mapped);
     } catch (err) {
