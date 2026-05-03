@@ -40,6 +40,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import CertificateFormDialog from "./components/CertificateFormDialog"
@@ -466,8 +467,11 @@ export default function ChungChiPage() {
     })
 
     setBaseCellStatus(nextBaseStatus)
-    setEditedCellStatus({})
   }, [certificates, certificateColumns, certificateOptions, certificateOptionsLoaded])
+
+  useEffect(() => {
+    setEditedCellStatus({})
+  }, [certificates, certificateColumns])
 
   const toBoolean = (value: unknown): boolean => {
     if (typeof value === "boolean") return value
@@ -625,6 +629,48 @@ export default function ChungChiPage() {
     return getCertificateStatusByColumn(certificate, columnName, columnIndex)
   }
 
+  const getColumnCheckedState = (columnName: string, columnIndex: number): boolean | "indeterminate" => {
+    if (!Array.isArray(certificates) || certificates.length === 0) return false
+
+    let checkedCount = 0
+    for (const certificate of certificates) {
+      if (getCellStatus(certificate, columnName, columnIndex)) {
+        checkedCount += 1
+      }
+    }
+
+    if (checkedCount === 0) return false
+    if (checkedCount === certificates.length) return true
+    return "indeterminate"
+  }
+
+  const handleToggleColumnAll = (columnName: string, columnIndex: number, nextChecked: boolean) => {
+    if (!Array.isArray(certificates) || certificates.length === 0) return
+
+    setEditedCellStatus((prev) => {
+      const next: Record<string, boolean> = { ...prev }
+
+      for (const certificate of certificates) {
+        const studentId = certificate.studentId ?? certificate.id
+        const key = getCellKey(studentId, columnIndex)
+
+        const baseChecked = Object.prototype.hasOwnProperty.call(baseCellStatus, key)
+          ? Boolean(baseCellStatus[key])
+          : getCertificateStatusByColumn(certificate, columnName, columnIndex)
+
+        if (nextChecked === baseChecked) {
+          if (Object.prototype.hasOwnProperty.call(next, key)) {
+            delete next[key]
+          }
+        } else {
+          next[key] = nextChecked
+        }
+      }
+
+      return next
+    })
+  }
+
   const handleToggleCell = (
     certificate: Certificate,
     columnName: string,
@@ -727,8 +773,6 @@ export default function ChungChiPage() {
       setSaveSuccess("")
 
       const certificateOptions = await fetchCertificateOptions()
-      setCertificateOptions(certificateOptions)
-      setCertificateOptionsLoaded(true)
       const unresolvedHeaders: string[] = []
       const headerIdByIndex = new Map<number, number>()
 
@@ -817,6 +861,14 @@ export default function ChungChiPage() {
       } else {
         setSaveSuccess("Đã lưu thay đổi thành công.")
       }
+
+      setBaseCellStatus((prev) => {
+        const next: Record<string, boolean> = { ...prev }
+        for (const [key, value] of Object.entries(editedCellStatus)) {
+          next[key] = Boolean(value)
+        }
+        return next
+      })
 
       if (selectedLop) {
         setRefreshTrigger(prev => prev + 1)
@@ -1266,8 +1318,31 @@ export default function ChungChiPage() {
                               key={`${headerName}-${headerIndex}`}
                               className="h-10 px-4 text-center text-sm font-semibold text-gray-700 whitespace-nowrap"
                             >
-                              <div className="truncate" title={getColumnLabel(headerName) || headerName}>
-                                {getColumnLabel(headerName) || headerName}
+                              <div className="group flex items-center justify-center gap-2 w-full leading-tight">
+                                <span
+                                  className="truncate max-w-[180px]"
+                                  title={getColumnLabel(headerName) || headerName}
+                                >
+                                  {getColumnLabel(headerName) || headerName}
+                                </span>
+
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="inline-flex items-center shrink-0">
+                                      <Checkbox
+                                        checked={getColumnCheckedState(headerName, headerIndex)}
+                                        onCheckedChange={(checked) =>
+                                          handleToggleColumnAll(headerName, headerIndex, checked === true)
+                                        }
+                                        aria-label={`Tick all cho cột ${getColumnLabel(headerName) || headerName}`}
+                                        className="data-[state=unchecked]:bg-transparent"
+                                      />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" sideOffset={6}>
+                                    Tick All
+                                  </TooltipContent>
+                                </Tooltip>
                               </div>
                             </TableHead>
                           ))}
