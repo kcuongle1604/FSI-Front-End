@@ -770,8 +770,8 @@ export default function DiemPage() {
                               key={subject.id}
                               className="h-10 px-4 text-center text-sm font-semibold text-gray-700 bg-blue-50 whitespace-nowrap min-w-[80px] w-[100px] max-w-[100px]"
                             >
-                              <div className="truncate" title={subject.label.toUpperCase()}>
-                                {subject.label.toUpperCase()}
+                              <div className="truncate" title={subject.label}>
+                                {subject.id}
                               </div>
                             </TableHead>
                           ))}
