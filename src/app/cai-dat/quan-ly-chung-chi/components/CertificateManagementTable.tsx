@@ -41,8 +41,8 @@ const CertificateManagementTable = ({ certificates, loading = false, onEditClick
     <div className="flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden min-h-0">
       {/* Table */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-        <div className="overflow-x-auto" style={{ height: '530px' }}>
-          <Table className="w-full" style={{ borderCollapse: 'collapse'}}>
+        <div className="w-full" style={{ height: "530px" }}>
+          <Table className="w-full table-fixed" style={{ borderCollapse: "collapse" }}>
             <TableHeader>
               <TableRow className="border-b border-gray-200 bg-blue-50" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <TableHead className="h-10 px-4 text-left text-sm font-semibold text-gray-700 bg-blue-50">STT</TableHead>
@@ -94,7 +94,7 @@ const CertificateManagementTable = ({ certificates, loading = false, onEditClick
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="p-0">
+                  <TableCell colSpan={5} className="p-0">
                     <div className="h-120 w-full flex items-center justify-center text-gray-500 text-sm">
                       {loading ? (
                         <span className="inline-flex items-center gap-2">
