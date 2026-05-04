@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { Suspense, useEffect, useRef, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
 import { Users, FileText } from "lucide-react"
@@ -124,7 +124,7 @@ function getScoreValueBySubject(
   return null
 }
 
-export default function DiemPage() {
+function DiemContent() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -1003,5 +1003,13 @@ export default function DiemPage() {
         }}
       />
     </AppLayout>
+  )
+}
+
+export default function DiemPage() {
+  return (
+    <Suspense fallback={null}>
+      <DiemContent />
+    </Suspense>
   )
 }

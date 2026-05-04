@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { Download, GraduationCap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -227,7 +227,7 @@ function toGraduationStatusLabel(status: unknown): string {
   return "Không đạt"
 }
 
-export default function XetTotNghiepPage() {
+function XetTotNghiepContent() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -636,5 +636,13 @@ export default function XetTotNghiepPage() {
         </Dialog>
       </div>
     </AppLayout>
+  )
+}
+
+export default function XetTotNghiepPage() {
+  return (
+    <Suspense fallback={null}>
+      <XetTotNghiepContent />
+    </Suspense>
   )
 }

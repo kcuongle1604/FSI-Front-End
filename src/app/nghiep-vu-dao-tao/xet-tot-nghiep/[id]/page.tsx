@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react"
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -76,7 +76,7 @@ const certificateData: CertificateData[] = [
   { id: 5, name: "Chứng chỉ tin học", status: true, note: "" },
 ]
 
-export default function XetTotNghiepDetailPage() {
+function XetTotNghiepDetailContent() {
   const router = useRouter()
   const pathname = usePathname()
   const params = useParams<{ id?: string | string[] }>()
@@ -412,5 +412,13 @@ export default function XetTotNghiepDetailPage() {
         </div>
       </div>
     </AppLayout>
+  )
+}
+
+export default function XetTotNghiepDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <XetTotNghiepDetailContent />
+    </Suspense>
   )
 }

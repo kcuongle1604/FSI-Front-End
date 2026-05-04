@@ -5,7 +5,7 @@ import React, { useLayoutEffect } from "react";
  * but corrected for any offsetParent with transform (e.g. modal, dialog, etc).
  * Returns { left, top, width, height }
  */
-export function useInputDropdownPosition(open: boolean, ref: React.RefObject<HTMLElement>) {
+export function useInputDropdownPosition(open: boolean, ref: React.RefObject<HTMLElement | null>) {
   const [rect, setRect] = React.useState({ left: 0, top: 0, width: 0, height: 0 });
   useLayoutEffect(() => {
     if (open && ref.current) {

@@ -39,7 +39,7 @@ const students: TuVanHocTap[] = [
     tcbb: 112,
     tctc: 30,
     totalCredits: 120,
-    gpa: "3.36",
+    gpa: 3.36,
     ccdr: "",
     program: "Hoàn thành",
     status: "Đạt"

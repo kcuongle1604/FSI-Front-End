@@ -1,1 +1,5 @@
-// File không còn dùng, popup chi tiết đã được chuyển về page.tsx
+import { redirect } from "next/navigation";
+
+export default function RegulationDetailFallbackPage() {
+  redirect("/cai-dat/quan-ly-quy-che");
+}

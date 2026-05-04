@@ -2,7 +2,7 @@
 
 export interface Student {
   id: number
-  mssv: number
+  mssv: number | string
   hoTen: string
   lop: string | null
   ngaySinh: string | null
