@@ -20,6 +20,7 @@ import {
   Edit,
   Trash2,
   MoreVertical,
+  Loader2,
 } from "lucide-react"
 import {
   deleteSubject,
@@ -52,6 +53,16 @@ type SubjectRow = {
   isRequired: boolean
 }
 
+type SubjectApiRow = SubjectListItem | {
+  id?: string | number
+  subject_id?: string | number
+  code?: string
+  name?: string
+  course_display_name?: string
+  credits?: number
+  is_required?: boolean
+}
+
 export default function QuanLyMonHocPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("quan-ly-mon-hoc")
@@ -74,7 +85,7 @@ export default function QuanLyMonHocPage() {
     const fetchSubjects = async () => {
       try {
         setLoadingSubjects(true)
-        const allRows: SubjectListItem[] = []
+        const allRows: SubjectApiRow[] = []
         let page = 1
         const size = 100
 
@@ -86,7 +97,7 @@ export default function QuanLyMonHocPage() {
             : payload?.data || payload?.items || payload?.results || []
 
           if (!Array.isArray(pageRows) || pageRows.length === 0) break
-          allRows.push(...pageRows)
+          allRows.push(...(pageRows as SubjectApiRow[]))
 
           if (pageRows.length < size) break
           page += 1
@@ -324,14 +335,21 @@ export default function QuanLyMonHocPage() {
                         <TableBody>
                           {loadingSubjects ? (
                             <TableRow key="loading">
-                              <TableCell colSpan={5} className="text-center text-gray-500 py-6">
-                                Đang tải...
+                              <TableCell colSpan={5} className="p-0">
+                                <div className="h-120 w-full flex items-center justify-center text-gray-500 text-sm">
+                                  <span className="inline-flex items-center gap-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Đang tải dữ liệu...
+                                  </span>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ) : filteredSubjects.length === 0 ? (
                             <TableRow key="empty">
-                              <TableCell colSpan={5} className="text-center text-gray-500 py-6">
-                                Chưa có học phần nào
+                              <TableCell colSpan={5} className="p-0">
+                                <div className="h-120 w-full flex items-center justify-center text-gray-500 text-sm">
+                                  Chưa có học phần nào
+                                </div>
                               </TableCell>
                             </TableRow>
                           ) : (

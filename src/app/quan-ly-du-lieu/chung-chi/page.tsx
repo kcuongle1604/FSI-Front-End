@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, useMemo, useCallback } from "react"
+import { Suspense, useEffect, useRef, useState, useMemo, useCallback } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
 import { Award, History, Upload } from "lucide-react"
@@ -162,7 +162,7 @@ type StudentCertificateSyncResponse = {
   errors?: unknown[]
 }
 
-export default function ChungChiPage() {
+function ChungChiContent() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -1548,5 +1548,13 @@ export default function ChungChiPage() {
         uploadDescription="Chọn file CSV chứa dữ liệu chứng chỉ miễn học phần tiếng Anh"
       />
     </AppLayout >
+  )
+}
+
+export default function ChungChiPage() {
+  return (
+    <Suspense fallback={null}>
+      <ChungChiContent />
+    </Suspense>
   )
 }

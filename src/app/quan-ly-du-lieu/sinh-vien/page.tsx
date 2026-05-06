@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { Suspense, useEffect, useRef, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppLayout from "@/components/AppLayout"
 import { Users, FileText } from "lucide-react"
@@ -69,7 +69,7 @@ function extractBackendMessage(error: any, fallback: string): string {
   return fallback
 }
 
-export default function SinhVienPage() {
+function SinhVienContent() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -668,5 +668,13 @@ export default function SinhVienPage() {
       />
       <ImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} onImportSuccess={fetchStudents} />
     </AppLayout>
+  )
+}
+
+export default function SinhVienPage() {
+  return (
+    <Suspense fallback={null}>
+      <SinhVienContent />
+    </Suspense>
   )
 }

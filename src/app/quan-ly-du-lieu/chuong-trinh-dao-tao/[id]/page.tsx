@@ -21,7 +21,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { Program } from "../page";
 import ImportHistoryTab from "../../sinh-vien/components/ImportHistoryTab";
 import ProgramSubjectsImportDialog from "../ProgramSubjectsImportDialog";
@@ -139,7 +139,7 @@ const INITIAL_COURSES: ProgramCourse[] = [
   },
 ];
 
-export default function ChuongTrinhDaoTaoDetailPage() {
+function ChuongTrinhDaoTaoDetailContent() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
@@ -660,5 +660,13 @@ export default function ChuongTrinhDaoTaoDetailPage() {
         />
       </div>
     </AppLayout>
+  );
+}
+
+export default function ChuongTrinhDaoTaoDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <ChuongTrinhDaoTaoDetailContent />
+    </Suspense>
   );
 }
