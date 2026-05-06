@@ -472,7 +472,9 @@ export default function XetTotNghiepPage() {
       return
     }
 
-    const studentIdsToSave = eligibleStudentIds
+    const studentIdsToSave = students
+      .map((student) => Number(student.mssv))
+      .filter((id) => Number.isFinite(id) && id > 0)
 
     if (!studentIdsToSave.length) {
       setErrorMessage("Không có sinh viên đủ điều kiện để lưu kết quả xét tốt nghiệp")
